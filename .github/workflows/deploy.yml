@@ -9,15 +9,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Deploy using ssh
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.PRIVATE_KEY }}
-        port: 22
-        script: |
-          cd /root/cinetra
-          git pull origin main
-          git status
-          docker compose up -d --build
+    - name: Trigger Coolify deployment
+      env:
+        COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+        COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+      run: |
+        curl --fail-with-body -sS -X POST \
+          -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+          "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}"

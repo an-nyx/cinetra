@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+coolify_endpoint = "https://coolify.example.com"
+coolify_token    = "<coolify-api-token>"
+server_uuid      = "<server-uuid>"
+
+domain = "https://cinetra.example.com"
+
+api_authorization = "Bearer <tmdb-api-token>"
+
+# Optional: reuse the JWT secret from the old .env so users stay logged in.
+# jwt_secret = "<current-jwt-secret>"

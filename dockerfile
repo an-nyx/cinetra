@@ -1,10 +1,8 @@
 FROM node:25.1.0-alpine3.22 AS node-pnpm
 
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
-
-ENV PNPM_HOME="/root/.local/share/pnpm"
-
-ENV PATH="$PNPM_HOME:$PATH"
+# Pinned pnpm: the unpinned get.pnpm.io script started installing pnpm 12,
+# which puts the binary in $PNPM_HOME/bin and broke `pnpm` on PATH.
+RUN npm install -g pnpm@10.18.3
 
 FROM node-pnpm AS frontend-builder
 
@@ -30,10 +28,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY backend .
 
-RUN pnpm prisma generate
+# prisma.config.ts requires DATABASE_URL to load; generate never connects, so a placeholder is enough.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" pnpm prisma generate
 
 RUN pnpm build
 
 COPY --from=frontend-builder /frontend/dist ./dist/ui
 
-CMD ["pnpm", "start"]
+# Apply pending Prisma migrations before starting (replaces the compose "migrate" service).
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]
