@@ -1,13 +1,9 @@
 import { UserRepository } from '../model/user.repository';
 import { User, CreateUserDto, UpdateUserDto } from '../model/user.entity';
-import { PrismaClient } from '../../../../generated/prisma/client';
+import { prisma } from '../../../database/prisma';
 
 export class UserPrismaRepository implements UserRepository {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
-  }
+  private prisma = prisma;
 
   async findAll(): Promise<User[]> {
     return this.prisma.user.findMany();

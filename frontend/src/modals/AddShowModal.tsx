@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import useDebounce from "@/hooks/use-debounce";
@@ -53,12 +52,9 @@ export default function AddShowModal({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!show.name || !show.overview || !show.posterURL) {
-      closeModal();
-      return;
-    }
+    if (!show.name || (!show.id && !show.tvmazeId)) return;
 
-    ShowService.createShow(show)
+    ShowService.createShow({ name: show.name, overview: show.overview, posterURL: show.posterURL, ...(show.id ? { tmdbId: show.id } : { tvmazeId: show.tvmazeId }) })
       .then((newShow) => {
         setShows([newShow, ...shows]);
       })
@@ -76,12 +72,14 @@ export default function AddShowModal({
   };
 
   const onSearchResultClick = (searchResult: SearchResult) => {
-    const { name, overview, posterURL } = searchResult;
+    const { id, tvmazeId, name, overview, posterURL } = searchResult;
 
     setShow({
       name,
       overview,
       posterURL,
+      id,
+      tvmazeId,
     });
     setSearch("");
   };
@@ -105,7 +103,7 @@ export default function AddShowModal({
   }, [debouncedSearchTerm]);
 
   return (
-    <Dialog open={modalStatus} onOpenChange={setModalStatus}>
+    <Dialog open={modalStatus} onOpenChange={(open) => { if (!open) closeModal(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a show</DialogTitle>
@@ -146,53 +144,16 @@ export default function AddShowModal({
             )}
           </div>
 
-          {/* Form Fields */}
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <Label htmlFor="name" className="text-sm font-medium">
-                Name
-              </Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                value={show.name}
-                required
-                readOnly
-                className="w-full rounded-md bg-muted text-muted-foreground cursor-not-allowed"
-              />
+          {show.name && (
+            <div className="flex gap-4 rounded-xl border bg-muted/40 p-3">
+              <img src={show.posterURL} alt="" className="h-28 w-[4.7rem] shrink-0 rounded-lg object-cover" />
+              <div className="min-w-0">
+                <p className="mb-1 text-xs text-primary">Ready to add</p>
+                <h3 className="font-semibold">{show.name}</h3>
+                <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{show.overview}</p>
+              </div>
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="overview" className="text-sm font-medium">
-                Overview
-              </Label>
-              <Textarea
-                id="overview"
-                name="overview"
-                rows={3}
-                value={show.overview}
-                required
-                readOnly
-                className="w-full rounded-md bg-muted text-muted-foreground cursor-not-allowed resize-none"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="posterURL" className="text-sm font-medium">
-                Poster URL
-              </Label>
-              <Input
-                id="posterURL"
-                name="posterURL"
-                type="text"
-                value={show.posterURL}
-                required
-                readOnly
-                className="w-full rounded-md bg-muted text-muted-foreground cursor-not-allowed"
-              />
-            </div>
-          </div>
+          )}
 
           {/* Footer Buttons */}
           <DialogFooter className="flex justify-end gap-2">
@@ -203,7 +164,7 @@ export default function AddShowModal({
             >
               Cancel
             </Button>
-            <Button type="submit">Add</Button>
+            <Button type="submit" disabled={!show.name}>Add to library</Button>
           </DialogFooter>
         </form>
       </DialogContent>

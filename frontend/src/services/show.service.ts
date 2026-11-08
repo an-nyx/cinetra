@@ -9,6 +9,9 @@ interface CreateShowData {
   episodesWatched?: number;
   completed?: boolean;
   favorite?: boolean;
+  tmdbId?: number;
+  tvmazeId?: number;
+  status?: "watching" | "completed" | "planned" | "paused" | "dropped" | null;
 }
 
 interface UpdateShowData {
@@ -19,16 +22,59 @@ interface UpdateShowData {
   episodesWatched?: number;
   completed?: boolean;
   favorite?: boolean;
+  tmdbId?: number;
+  tvmazeId?: number;
+  status?: "watching" | "completed" | "planned" | "paused" | "dropped" | null;
 }
 
 interface ShowSearchResult {
   id: number;
+  tvmazeId?: number;
   name: string;
   overview: string;
   posterURL: string;
 }
 
+export interface EpisodeGuide {
+  seasons: { number: number; episodeCount: number }[];
+  season: number;
+  episodes: { number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null }[];
+  watched: { season: number; episode: number; watchedAt: string }[];
+}
+
+export interface TrackedEpisode { season: number; number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null }
+export interface UpcomingRelease {
+  showId: string; showName: string; posterURL: string | null; showStatus: string | null;
+  season: number; number: number; name: string; airDate: string; airTimestamp: string | null; seasonPremiere: boolean;
+}
+export interface TrackingSummary {
+  showId: string; name: string; posterURL: string | null; status: string; source: string;
+  watchedCount: number; releasedCount: number; remainingCount: number; progressPercent: number;
+  lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
+  newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
+  error?: string | null;
+}
+
 class ShowServiceClass extends ApiService {
+  async getLibraryTracking(): Promise<TrackingSummary[]> {
+    const response = await this.get<TrackingSummary[]>("/show/tracking");
+    return response.data;
+  }
+
+  async getUpcomingReleases(): Promise<{ releases: UpcomingRelease[]; failedShows: number }> {
+    const response = await this.get<{ releases: UpcomingRelease[]; failedShows: number }>("/show/upcoming");
+    return response.data;
+  }
+
+  async getTrackingSummary(id: string): Promise<TrackingSummary> {
+    const response = await this.get<TrackingSummary>(`/show/${id}/tracking`);
+    return response.data;
+  }
+
+  async importLegacyProgress(id: string): Promise<TrackingSummary> {
+    const response = await this.post<TrackingSummary>(`/show/${id}/import-legacy-progress`);
+    return response.data;
+  }
   async getAllShows(): Promise<ShowType[]> {
     const response = await this.get<ShowType[]>("/show");
     return response.data;
@@ -54,8 +100,21 @@ class ShowServiceClass extends ApiService {
   }
 
   async searchShows(query: string): Promise<ShowSearchResult[]> {
-    const response = await this.get<ShowSearchResult[]>(`/show/search?q=${query}`);
+    const response = await this.get<ShowSearchResult[]>(`/show/search?q=${encodeURIComponent(query)}`);
     return response.data;
+  }
+
+  async getEpisodeGuide(id: string, season = 1): Promise<EpisodeGuide> {
+    const response = await this.get<EpisodeGuide>(`/show/${id}/episodes?season=${season}`);
+    return response.data;
+  }
+
+  async setEpisodeWatched(id: string, season: number, episode: number, watched: boolean): Promise<void> {
+    await this.put(`/show/${id}/episodes/${season}/${episode}`, { watched });
+  }
+
+  async markSeasonWatched(id: string, season: number): Promise<void> {
+    await this.post(`/show/${id}/seasons/${season}/watched`);
   }
 
   async toggleFavorite(id: string, favorite: boolean): Promise<ShowType> {

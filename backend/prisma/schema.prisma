@@ -34,10 +34,30 @@ model Show {
   episodesWatched Int      @default(0)
   completed       Boolean  @default(false)
   favorite        Boolean  @default(false)
+  tmdbId          Int?
+  tvmazeId        Int?
+  status          String?
+  episodeWatches  EpisodeWatch[]
   user            User     @relation(fields: [userId], references: [id])
   userId          String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@unique([userId, tmdbId])
+  @@unique([userId, tvmazeId])
+  @@index([userId])
+}
+
+model EpisodeWatch {
+  id        String   @id @default(uuid())
+  showId    String
+  show      Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
+  season    Int
+  episode   Int
+  watchedAt DateTime @default(now())
+
+  @@unique([showId, season, episode])
+  @@index([showId, watchedAt])
 }
 
 model Movie {
@@ -46,8 +66,25 @@ model Movie {
   overview  String?
   posterURL String?
   favorite  Boolean  @default(false)
+  tmdbId    Int?
+  status    String?
+  rating    Int?
+  notes     String?
+  watches   MovieWatch[]
   user      User     @relation(fields: [userId], references: [id])
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@unique([userId, tmdbId])
+}
+
+model MovieWatch {
+  id        String   @id @default(uuid())
+  movieId   String
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  watchedAt DateTime @default(now())
+
+  @@index([movieId, watchedAt])
 }

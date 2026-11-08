@@ -4,6 +4,10 @@ export interface Movie {
   overview: string | null;
   posterURL: string | null;
   favorite: boolean;
+  tmdbId: number | null;
+  status: string | null;
+  rating: number | null;
+  notes: string | null;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -14,6 +18,7 @@ export interface CreateMovieDto {
   overview?: string;
   posterURL?: string;
   favorite?: boolean;
+  tmdbId?: number;
 }
 
 export interface UpdateMovieDto {
@@ -21,4 +26,8 @@ export interface UpdateMovieDto {
   overview?: string;
   posterURL?: string;
   favorite?: boolean;
+  tmdbId?: number;
+  status?: string | null;
+  rating?: number | null;
+  notes?: string | null;
 }

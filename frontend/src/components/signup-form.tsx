@@ -71,6 +71,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           <Label htmlFor="username">Username</Label>
           <Input
             id="username"
+            autoComplete="username"
             type="text"
             placeholder="e.g., John"
             value={formData.username}
@@ -82,6 +83,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
+            autoComplete="email"
             type="email"
             placeholder="m@example.com"
             value={formData.email}
@@ -93,6 +95,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           <Label htmlFor="password">Password</Label>
           <Input
             id="password"
+            autoComplete="new-password"
             type="password"
             value={formData.password}
             onChange={handleChange}
@@ -103,6 +106,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           <Label htmlFor="passwordConfirmation">Confirm Password</Label>
           <Input
             id="passwordConfirmation"
+            autoComplete="new-password"
             type="password"
             value={formData.passwordConfirmation}
             onChange={handleChange}

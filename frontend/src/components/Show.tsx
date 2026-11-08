@@ -1,5 +1,7 @@
+import { Heart, Tv } from "lucide-react";
 import { ShowType } from "@/types";
 import { ShowService } from "@/services";
+import type { TrackingSummary } from "@/services/show.service";
 
 interface ShowProps {
   id: string;
@@ -10,6 +12,8 @@ interface ShowProps {
   shows: ShowType[];
   setShows: React.Dispatch<React.SetStateAction<ShowType[]>>;
   type: "show" | "movie";
+  tracking?: TrackingSummary;
+  onMarkNext?: (item: TrackingSummary) => void;
 }
 
 export default function Show({
@@ -20,6 +24,8 @@ export default function Show({
   setSelectedShow,
   shows,
   setShows,
+  tracking,
+  onMarkNext,
 }: ShowProps) {
   const toggleFavorite = async (id: string, favorite: boolean) => {
     try {
@@ -38,38 +44,29 @@ export default function Show({
   };
 
   return (
-    <div
-      className="aspect-[2/3] relative cursor-pointer rounded-md overflow-hidden"
-      onClick={() => setSelectedShow(id)}
-    >
-      <img className="w-full h-full object-cover" src={posterURL} alt="" />
-      <svg
-        className="w-6 aspect-square absolute top-1 right-1"
-        viewBox="0 0 24 24"
-        fill={favorite ? "#ff0000" : "#ffffff60"}
-        xmlns="http://www.w3.org/2000/svg"
-        onClick={(e) => {
-          e.stopPropagation();
-          toggleFavorite(id, favorite);
-        }}
+    <article className="group relative min-w-0">
+      <button
+        type="button"
+        className="cinema-poster relative block aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-muted text-left transition-[transform,box-shadow,border-color] duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-[0_20px_45px_rgba(0,0,0,0.35)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none"
+        onClick={() => setSelectedShow(id)}
+        aria-label={`Open ${name}`}
       >
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M12 6.00019C10.2006 3.90317 7.19377 3.2551 4.93923 5.17534C2.68468 7.09558 2.36727 10.3061 4.13778 12.5772C5.60984 14.4654 10.0648 18.4479 11.5249 19.7369C11.6882 19.8811 11.7699 19.9532 11.8652 19.9815C11.9483 20.0062 12.0393 20.0062 12.1225 19.9815C12.2178 19.9532 12.2994 19.8811 12.4628 19.7369C13.9229 18.4479 18.3778 14.4654 19.8499 12.5772C21.6204 10.3061 21.3417 7.07538 19.0484 5.17534C16.7551 3.2753 13.7994 3.90317 12 6.00019Z"
-          stroke="#000000dd"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <h2
-        className="mb-3 w-[12ch] text-white text-base font-normal absolute bottom-0 left-2 z-10 whitespace-nowrap overflow-hidden text-ellipsis"
-        title={name}
+        <span className="absolute inset-0 flex items-center justify-center text-muted-foreground"><Tv className="size-10" /></span>
+        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transform-none" src={posterURL} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+        <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+        {tracking && !tracking.error && <span className="absolute bottom-0 left-0 h-1 bg-primary transition-[width] duration-500" style={{ width: `${tracking.progressPercent}%` }} />}
+        <span className="absolute inset-x-0 bottom-0 line-clamp-2 p-3 pb-4 text-sm font-semibold leading-5 text-white sm:text-base">{name}</span>
+      </button>
+      {tracking && !tracking.error && <div className="mt-3 space-y-2 px-1"><div className="flex items-center justify-between gap-1 text-xs"><span className="truncate text-muted-foreground">{tracking.nextEpisode ? `Next · S${tracking.nextEpisode.season}E${tracking.nextEpisode.number}` : 'Caught up'}</span><span className="shrink-0 font-semibold text-primary">{tracking.progressPercent}%</span></div>{tracking.newEpisodes > 0 && <span className="cinema-tag">{tracking.newEpisodes} new episode{tracking.newEpisodes === 1 ? '' : 's'}</span>}{tracking.nextEpisode && onMarkNext && <button type="button" className="min-h-10 w-full rounded-xl border border-primary/35 px-2 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onMarkNext(tracking)}>Mark next watched</button>}</div>}
+      <button
+        type="button"
+        className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-primary"
+        aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`}
+        aria-pressed={favorite}
+        onClick={() => toggleFavorite(id, favorite)}
       >
-        {name}
-      </h2>
-      <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-black to-transparent pointer-events-none"></div>
-    </div>
+        <Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} />
+      </button>
+    </article>
   );
 }

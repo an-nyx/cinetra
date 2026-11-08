@@ -27,6 +27,7 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -94,6 +95,20 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
     }
   };
 
+  const exportData = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await UserService.exportData();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `cinetra-export-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Could not export your data"); }
+    finally { setIsExporting(false); }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -153,6 +168,9 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
                 {isSaving ? "Updating..." : "Update Account"}
               </Button>
             </form>
+            <Button type="button" variant="outline" className="w-full" disabled={isExporting} onClick={exportData}>
+              {isExporting ? "Preparing export..." : "Export my data"}
+            </Button>
           </>
         )}
       </DialogContent>

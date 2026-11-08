@@ -16,19 +16,21 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { LayoutDashboardIcon } from "lucide-react";
+import { CalendarDays, Film, House, Tv } from "lucide-react";
 
 const navData = {
   navMain: [
+    { title: "Home", url: "/", icon: House },
     {
       title: "Shows",
       url: "/shows",
-      icon: LayoutDashboardIcon,
+      icon: Tv,
     },
+    { title: "Upcoming", url: "/upcoming", icon: CalendarDays },
     {
       title: "Movies",
       url: "/movies",
-      icon: LayoutDashboardIcon,
+      icon: Film,
     },
   ],
 };

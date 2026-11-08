@@ -7,6 +7,10 @@ interface UpdateUserData {
 }
 
 class UserServiceClass extends ApiService {
+  async exportData(): Promise<Blob> {
+    const response = await this.get<Blob>("/user/export", { responseType: "blob" });
+    return response.data;
+  }
   async getCurrentUser(): Promise<UserType> {
     const response = await this.get<UserType>("/user");
     return response.data;

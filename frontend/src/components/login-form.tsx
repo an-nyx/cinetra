@@ -49,6 +49,7 @@ export function LoginForm({ className, handleSubmit: onSubmit, ...props }: Login
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
+            autoComplete="email"
             type="email"
             placeholder="name@example.com"
             value={formData.email}
@@ -68,6 +69,7 @@ export function LoginForm({ className, handleSubmit: onSubmit, ...props }: Login
           </div>
           <Input
             id="password"
+            autoComplete="current-password"
             type="password"
             value={formData.password}
             onChange={handleChange}

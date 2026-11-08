@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { MovieType } from "@/types/index.ts";
-import { RefreshCw, Search } from "lucide-react";
+import { Plus, RefreshCw, Search } from "lucide-react";
 
 interface ListFiltersType {
   favoriteFilter?: "favorite" | "notFavorite";
@@ -63,19 +63,20 @@ export default function MoviesPage() {
   }, [filters.sortBy]);
 
   return (
-    <div className="px-4 py-6 lg:px-8 lg:py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Movie List</h1>
-        <div className="flex items-center gap-3">
+    <div className="library-page mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
+      <div className="library-heading mb-7 flex flex-col gap-5">
+        <div><p className="cinema-eyebrow mb-2">Your library</p><h1 className="text-4xl font-semibold tracking-tight">Movies<span className="ml-3 text-base font-normal text-muted-foreground">{movies.length}</span></h1></div>
+        <div className="flex min-w-0 items-center gap-3">
           <InputGroup>
             <InputGroupInput
               id="search"
               type="text"
               name="search"
+              aria-label="Search your movies"
               placeholder="Search for a movie..."
               value={search}
               onChange={(e) => setSearch(e.target.value.toLowerCase())}
-              className="w-64"
+              className="min-w-0 w-full"
             />
             <InputGroupAddon>
               <Search />
@@ -83,9 +84,9 @@ export default function MoviesPage() {
           </InputGroup>
           <Button
             onClick={() => setAddMovieModalStatus(true)}
-            className="font-medium"
+            className="shrink-0 gap-2 rounded-xl font-medium"
           >
-            Add a Movie
+            <Plus className="size-4" /><span>Add movie</span>
           </Button>
           <AddMovieModal
             modalStatus={addMovieModalStatus}
@@ -96,8 +97,8 @@ export default function MoviesPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="library-filters mb-6 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select
             key={`favorite-${key}`}
             name="favoriteFilter"
@@ -105,7 +106,7 @@ export default function MoviesPage() {
               setFilters({ ...filters, favoriteFilter: value })
             }
           >
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger aria-label="Filter favorites" className="w-auto min-w-[130px]">
               <SelectValue placeholder="All favorites" />
             </SelectTrigger>
             <SelectContent>
@@ -136,11 +137,12 @@ export default function MoviesPage() {
         <Select
           key={`sort-${key}`}
           name="sortBy"
+          value={filters.sortBy ?? ""}
           onValueChange={(value: "nameAsc" | "nameDesc" | "dateNewest" | "dateOldest" | "updatedNewest" | "updatedOldest") =>
             setFilters({ ...filters, sortBy: value })
           }
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger aria-label="Sort library" className="w-auto min-w-[130px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
@@ -194,13 +196,13 @@ export default function MoviesPage() {
 
         if (sortedMovies.length === 0) {
           return (
-            <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="cinema-empty flex flex-col items-center justify-center px-4 py-16">
               <div className="text-center space-y-4">
                 <div className="text-6xl mb-4">🎬</div>
-                <h3 className="text-xl font-semibold text-gray-900">
+                <h3 className="text-xl font-semibold text-foreground">
                   {movies.length === 0 ? "No movies yet" : "No movies found"}
                 </h3>
-                <p className="text-gray-500 max-w-md">
+                <p className="text-muted-foreground max-w-md">
                   {movies.length === 0
                     ? "Start building your collection by adding your first movie!"
                     : "Try adjusting your search or filters to find what you're looking for."}
@@ -219,7 +221,7 @@ export default function MoviesPage() {
         }
 
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8  gap-4 w-full gap-1 mt-1">
+          <div className="grid w-full grid-cols-2 gap-x-4 gap-y-7 min-[480px]:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {sortedMovies.map((movie) => (
               <Movie
                 key={movie.id}

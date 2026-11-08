@@ -1,4 +1,6 @@
 export interface SearchResult {
+  id?: number;
+  tvmazeId?: number;
   name: string;
   overview: string;
   posterURL: string;
@@ -10,22 +12,20 @@ interface SearchResultItemProps {
   onSearchResultClick: (searchResult: SearchResult) => void;
 }
 
-export default function SearchResultItem({ index, searchResult, onSearchResultClick }: SearchResultItemProps) {
+export default function SearchResultItem({ searchResult, onSearchResultClick }: SearchResultItemProps) {
   const { name, overview, posterURL } = searchResult;
 
-  return <li
-    key={index}
-    className="py-2 px-3 hover:bg-accent rounded-md cursor-pointer flex gap-2.5"
-    onClick={() => onSearchResultClick(searchResult)}
-  >
-    <img src={posterURL} className="h-16 aspect-[3/4]" alt="" />
-    <div>
-      <p className="overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-        {name}
-      </p>
-      <p className="custom-clamp overflow-hidden text-ellipsis text-sm font-light">
-        {overview}
-      </p>
-    </div>
-  </li>;
-};
+  return (
+    <button
+      type="button"
+      className="flex w-full min-w-0 gap-3 rounded-xl p-2 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary"
+      onClick={() => onSearchResultClick(searchResult)}
+    >
+      <img src={posterURL} className="h-20 w-14 shrink-0 rounded-md object-cover" alt="" loading="lazy" />
+      <span className="min-w-0">
+        <span className="line-clamp-2 font-medium">{name}</span>
+        <span className="mt-1 line-clamp-2 text-sm text-muted-foreground">{overview}</span>
+      </span>
+    </button>
+  );
+}

@@ -7,6 +7,9 @@ export interface Show {
   episodesWatched: number;
   completed: boolean;
   favorite: boolean;
+  tmdbId: number | null;
+  tvmazeId: number | null;
+  status: string | null;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +23,9 @@ export interface CreateShowDto {
   episodesWatched?: number;
   completed?: boolean;
   favorite?: boolean;
+  tmdbId?: number;
+  tvmazeId?: number;
+  status?: string;
 }
 
 export interface UpdateShowDto {
@@ -30,4 +36,7 @@ export interface UpdateShowDto {
   episodesWatched?: number;
   completed?: boolean;
   favorite?: boolean;
+  tmdbId?: number;
+  tvmazeId?: number;
+  status?: string | null;
 }

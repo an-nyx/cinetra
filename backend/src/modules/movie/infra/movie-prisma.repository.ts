@@ -1,13 +1,9 @@
 import { MovieRepository } from "../model/movie.repository";
 import { Movie, CreateMovieDto, UpdateMovieDto } from "../model/movie.entity";
-import { PrismaClient } from '../../../../generated/prisma/client';
+import { prisma } from '../../../database/prisma';
 
 export class MoviePrismaRepository implements MovieRepository {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
-  }
+  private prisma = prisma;
 
   async findById(movieId: string, userId: string): Promise<Movie | null> {
     const movie = await this.prisma.movie.findUnique({
@@ -25,6 +21,14 @@ export class MoviePrismaRepository implements MovieRepository {
   }
 
   async create(movieData: CreateMovieDto, userId: string): Promise<Movie> {
+    const existing = await this.prisma.movie.findFirst({ where: {
+      userId,
+      OR: [
+        ...(movieData.tmdbId ? [{ tmdbId: movieData.tmdbId }] : []),
+        { name: { equals: movieData.name, mode: 'insensitive' } },
+      ],
+    } });
+    if (existing) throw new Error('Movie already exists');
     const newMovie = await this.prisma.movie.create({
       data: {...movieData, userId: userId}
     });

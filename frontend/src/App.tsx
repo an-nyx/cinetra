@@ -13,6 +13,7 @@ import MoviesPage from "./pages/Movies-page.tsx";
 import LoginPage from "./pages/login-page.tsx";
 import SignupPage from "./pages/signup-page.tsx";
 import WelcomePage from "./pages/welcome-page.tsx";
+import UpcomingPage from "./pages/upcoming-page.tsx";
 import { AuthProvider } from "./context/auth-context.tsx";
 import { ThemeProvider } from "./components/theme-provider.tsx";
 import HomePage from "./pages/home-page.tsx";
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
       {
         path: "/shows",
         element: <ShowsPage />,
+      },
+      {
+        path: "/upcoming",
+        element: <UpcomingPage />,
       },
       {
         path: "/movies",

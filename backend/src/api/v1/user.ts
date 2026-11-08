@@ -2,8 +2,26 @@ import { Router, Request, Response } from 'express';
 import { userModule } from '../../modules/user';
 import { securityModule } from '../../modules/security';
 import { protectedRoute } from '../../middlewares/protectedRoute';
+import { prisma } from '../../database/prisma';
 
 const router = Router();
+
+router.get('/export', protectedRoute, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, username: true, email: true, createdAt: true, updatedAt: true,
+        Show: { include: { episodeWatches: true } }, Movie: { include: { watches: true } } },
+    });
+    if (!user) { res.status(404).json({ message: 'User not found' }); return; }
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Disposition', 'attachment; filename="cinetra-export.json"');
+    res.json({ exportedAt: new Date().toISOString(), user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Could not export data' });
+  }
+});
 
 function validateEmail(email: string): boolean {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
