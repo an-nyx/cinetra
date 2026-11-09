@@ -10,6 +10,8 @@ import type { ShowType } from "@/types";
 import { posterSrc } from "@/lib/poster";
 import { episodeCode, homeDashboard, savedPositionCode } from "@/lib/tracking";
 import { eventEpisodeLine, groupReleaseEvents, shortDay, timeLabel } from "@/lib/upcoming-calendar";
+import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
+import { filterMovieReleases } from "@/lib/movie-calendar";
 import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -40,6 +42,8 @@ export default function WelcomePage() {
   const now = useNow();
   // Coming soon reads the same TVMaze schedule and grouping as the Upcoming page, and loads on its own (never blocks Home).
   const upcoming = useUpcomingSchedule();
+  const movieDiscovery = useMovieDiscovery();
+  const upcomingMovies = useMemo(() => filterMovieReleases(movieDiscovery.data?.releases || [], "all", now).slice(0, 3), [movieDiscovery.data, now]);
 
   const load = useCallback(async () => {
     try { const [library, progress] = await Promise.all([ShowService.getAllShows(), ShowService.getLibraryTracking()]); setShows(library); setTracking(progress); setError(""); }
@@ -144,6 +148,15 @@ export default function WelcomePage() {
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{event.showName}</span><span className="block truncate text-xs text-muted-foreground">{eventEpisodeLine(event)}</span></span>
             <span className="shrink-0 text-right text-xs"><span className="block font-semibold text-primary">{shortDay(event.day, now)}</span>{timeLabel(event.timestamp) && <span className="block text-[11px] text-muted-foreground">{timeLabel(event.timestamp)}</span>}</span>
           </button></li>)}</ul>}
+      </section>}
+
+      {upcomingMovies.length > 0 && <section aria-labelledby="upcoming-movies-heading">
+        <div className="dash-heading"><h2 id="upcoming-movies-heading">Upcoming Movies</h2><Link to="/upcoming?category=movies" className="dash-link">See all<ChevronRight className="size-3.5" /></Link></div>
+        <ul className="space-y-1.5">{upcomingMovies.map(movie => <li key={movie.tmdbId}><Link to="/upcoming?category=movies" className="dash-card dash-row flex min-h-14 items-center gap-3 p-2">
+          <Poster url={movie.posterURL} size="w92" className="h-[54px] w-9" />
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{movie.title}</span><span className="block truncate text-xs text-muted-foreground">{movie.collectionName}</span></span>
+          <span className="shrink-0 text-xs font-semibold text-primary">{shortDay(movie.date!, now)}</span>
+        </Link></li>)}</ul>
       </section>}
 
       {/* F. Recently watched (recorded watch times only) */}

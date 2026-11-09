@@ -8,7 +8,8 @@
     "test:episode-toggle": "ts-node tests/episode-toggle.integration.test.ts",
     "test:tracking": "ts-node tests/new-season-notice.test.ts && ts-node tests/manual-dropped-status.test.ts && ts-node tests/legacy-progress.test.ts && ts-node tests/upcoming-schedule.test.ts && ts-node tests/tvmaze-service.test.ts && ts-node tests/tmdb-error-sanitization.test.ts && ts-node tests/tracking-audit.test.ts && ts-node tests/schedule-and-progress-reasons.test.ts && ts-node tests/season-progress.test.ts && ts-node tests/performance-cache.test.ts && ts-node tests/rematch.test.ts",
     "start": "node dist/src/index.js",
-    "dev": "nodemon src/index.ts"
+    "dev": "nodemon src/index.ts",
+    "test:movie-discovery": "ts-node tests/movie-discovery.test.ts"
   },
   "keywords": [],
   "author": "",

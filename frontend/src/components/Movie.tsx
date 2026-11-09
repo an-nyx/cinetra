@@ -8,6 +8,8 @@ interface MovieProps {
   name: string;
   favorite: boolean;
   posterURL?: string;
+  status?: "watchlist" | "watched" | null;
+  year?: string;
   setSelectedMovie: React.Dispatch<React.SetStateAction<string>>;
   movies: MovieType[];
   setMovies: React.Dispatch<React.SetStateAction<MovieType[]>>;
@@ -18,6 +20,8 @@ export default function Movie({
   name,
   favorite,
   posterURL,
+  status,
+  year,
   setSelectedMovie,
   movies,
   setMovies,
@@ -39,25 +43,16 @@ export default function Movie({
   };
 
   return (
-    <article className="group relative min-w-0">
-      <button
-        type="button"
-        className="cinema-poster relative block aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-muted text-left transition-[transform,box-shadow,border-color] duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-[0_20px_45px_rgba(0,0,0,0.35)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none"
-        onClick={() => setSelectedMovie(id)}
-        aria-label={`Open ${name}`}
-      >
-        <span className="absolute inset-0 flex items-center justify-center text-muted-foreground"><Film className="size-10" /></span>
-        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transform-none" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
-        <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-        <span className="absolute inset-x-0 bottom-0 line-clamp-2 p-3 pb-4 text-sm font-semibold leading-5 text-white sm:text-base">{name}</span>
+    <article className={`group relative min-w-0 overflow-hidden rounded-xl border bg-card/60 ${status === "watched" ? "border-primary/25" : "border-border"}`}>
+      <button type="button" className="compact-movie-poster relative block w-full overflow-hidden bg-muted text-left focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary" onClick={() => setSelectedMovie(id)} aria-label={`Open ${name}`}>
+        <span className="absolute inset-0 flex items-center justify-center text-muted-foreground"><Film className="size-8" /></span>
+        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
       </button>
-      <button
-        type="button"
-        className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-primary"
-        aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`}
-        aria-pressed={favorite}
-        onClick={() => toggleFavorite(id, favorite)}
-      >
+      <button type="button" onClick={() => setSelectedMovie(id)} className="block h-[3.1rem] w-full min-w-0 px-2 py-1 text-left">
+        <span className="block truncate text-sm font-semibold leading-5" title={name}>{name}</span>
+        <span className="block truncate text-xs text-muted-foreground">{[year, status === "watched" ? "Watched" : status === "watchlist" ? "Watchlist" : null].filter(Boolean).join(" · ") || " "}</span>
+      </button>
+      <button type="button" className="absolute right-1.5 top-1.5 flex size-10 items-center justify-center rounded-full bg-black/65 text-white focus-visible:outline-2 focus-visible:outline-primary" aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}>
         <Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} />
       </button>
     </article>

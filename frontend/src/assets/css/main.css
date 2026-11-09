@@ -302,3 +302,9 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 .filter-rail::-webkit-scrollbar { display: none; }
 @media (min-width: 768px) { .filter-rail { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .dash-row { transition: none !important; } }
+
+/* Match the compact show grid without covering the floating dock. */
+.compact-movie-poster { aspect-ratio: 2 / 3; }
+@media (max-width: 639px) {
+  .compact-movie-poster { aspect-ratio: auto; height: clamp(84px, calc((100vh - 330px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2), 320px); height: clamp(84px, calc((100dvh - 330px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2), 320px); }
+}

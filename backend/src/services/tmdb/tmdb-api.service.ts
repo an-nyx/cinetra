@@ -20,6 +20,9 @@ interface ApiResponse {
 export type TMDBShowDetails = { name?: string; original_name?: string; overview?: string; first_air_date?: string | null; poster_path?: string | null; seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; name?: string; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null };
 type SeasonDetails = { episodes: Array<{ episode_number: number; name: string; air_date: string | null; runtime: number | null; episode_type?: string }> };
 
+export type MovieDetails = { id: number; title?: string; overview?: string; poster_path?: string | null; release_date?: string | null; status?: string; belongs_to_collection?: { id: number; name: string } | null; release_dates?: { results?: Array<{ iso_3166_1: string; release_dates: Array<{ type: number; release_date: string }> }> } };
+export type MovieCollection = { id: number; name: string; parts?: Array<{ id: number; title?: string; release_date?: string | null }> };
+
 export class TMDBApiService implements TMDBService {
   private fetcher: AxiosInstance;
   private hasAuthentication: boolean;
@@ -123,6 +126,16 @@ export class TMDBApiService implements TMDBService {
     if (!query) return [];
     const response = await this.cached(`candidates:tv:${query.toLowerCase()}`, () => this.get<{ results: Array<{ id: number; name?: string; original_name?: string; overview?: string; first_air_date?: string }> }>('/search/tv', { params: { query } }));
     return response.data.results || [];
+  }
+
+  async getMovieDetails(id: number): Promise<MovieDetails> {
+    const response = await this.get<MovieDetails>(`/movie/${id}`, { params: { append_to_response: 'release_dates' } });
+    return response.data;
+  }
+
+  async getCollection(id: number): Promise<MovieCollection> {
+    const response = await this.get<MovieCollection>(`/collection/${id}`);
+    return response.data;
   }
 
   async getShow(id: number): Promise<TMDBShowDetails> {

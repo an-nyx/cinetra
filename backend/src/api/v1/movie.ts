@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { movieModule } from '../../modules/movie';
 import { CreateMovieDto, UpdateMovieDto } from '../../modules/movie/model/movie.entity';
+import { discoverMovies } from '../../services/movie-discovery.service';
 import { getMovieWatches, addMovieWatch } from '../../services/movie-watch.service';
 
 const router = Router();
@@ -34,6 +35,26 @@ router.get("/search", async (req: Request, res: Response) => {
   } catch (error) {
     res.status(502).json({ message: "TMDB search unavailable. Check the API credential." });
   }
+});
+
+// Read-only, keyed by this user's saved IDs. Builds outside the request so Home never waits for TMDB.
+const discovery = new Map<string, { signature: string; until: number; result?: Awaited<ReturnType<typeof discoverMovies>>; running?: Promise<void> }>();
+router.get('/upcoming', async (req: Request, res: Response) => {
+  try {
+    const movies = await movieModule.Queries.GetAllQuery.execute(req.user.id);
+    const ids = movies.map(m => m.tmdbId);
+    const region = typeof req.query.region === 'string' && /^[A-Z]{2}$/.test(req.query.region) ? req.query.region : undefined;
+    const signature = JSON.stringify([ids.slice().sort(), region]);
+    let entry = discovery.get(req.user.id);
+    if (!entry || entry.signature !== signature || entry.until < Date.now()) {
+      entry = { signature, until: Date.now() + 12 * 60 * 60_000 };
+      const current = entry;
+      current.running = discoverMovies(ids, new Date().toISOString().slice(0, 10), region).then(result => { current.result = result; if (result.unresolved) current.until = Date.now() + 5 * 60_000; }).catch(() => { current.until = 0; }).finally(() => { current.running = undefined; });
+      if (discovery.size >= 500) discovery.delete(discovery.keys().next().value!);
+      discovery.set(req.user.id, entry);
+    }
+    res.json(entry.result || { status: 'building' });
+  } catch { res.status(503).json({ message: 'Movie discovery unavailable' }); }
 });
 
 router.get("/:id", async (req: Request<{id: string}>, res: Response) => {
