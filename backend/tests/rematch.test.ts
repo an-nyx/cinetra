@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { analyzeRematchProgress } from '../src/services/rematch.model';
+import { analyzeRematchProgress, summarizeSeries } from '../src/services/rematch.model';
 import { buildTrackingSummary, type Catalog, type TrackedShow } from '../src/services/tracking-summary.model';
 
 // Same title, different series: an anime with long seasons (1999) and a live-action adaptation with short ones (2023).
@@ -74,6 +74,21 @@ const w = (season: number, episode: number) => ({ season, episode, watchedAt: ne
   // A compatible position simply counts against the new series.
   const ok = buildTrackingSummary(show(1, 8), liveAction2023, null, [], today);
   assert.equal(ok.watchedCount, 8); assert.equal(ok.releasedCount, 16); assert.equal(ok.progressPercent, 50);
+}
+
+// Comparison cards: the replacement shows only its own TMDB poster and overview, never the saved show's.
+{
+  const saved = { name: 'One Piece', posterURL: 'https://image.tmdb.org/t/p/w500/saved.jpg', overview: 'Saved overview' };
+  const withMeta: Catalog = { ...liveAction2023, meta: { name: 'ONE PIECE', originalName: 'ONE PIECE', overview: 'Live action.', firstAirDate: '2023-08-31', nextEpisode: null, lastAiredSeason: 2, seasonAirDates: {}, posterPath: '/live.jpg' } };
+  const bare: Catalog = { ...liveAction2023, meta: { name: 'Carême', originalName: 'Carême', overview: null, firstAirDate: '2025-04-01', nextEpisode: null, lastAiredSeason: 1, seasonAirDates: {}, posterPath: null } };
+  const r = summarizeSeries(111110, withMeta, 'replacement', saved, today);
+  assert.deepEqual([r.name, r.year, r.posterURL, r.overview, r.seasons, r.releasedEpisodes], ['ONE PIECE', '2023', 'https://image.tmdb.org/t/p/w500/live.jpg', 'Live action.', 2, 16]);
+  const missing = summarizeSeries(1, bare, 'replacement', saved, today);
+  assert.equal(missing.posterURL, null); // neutral placeholder, not the saved show's poster
+  assert.equal(missing.overview, null);
+  assert.equal(missing.year, '2025');
+  const current = summarizeSeries(37854, null, 'current', saved, today); // current catalog unavailable: the entry's own data
+  assert.deepEqual([current.name, current.posterURL, current.overview, current.year], ['One Piece', saved.posterURL, 'Saved overview', null]);
 }
 
 console.log('edit show (TMDB rematch) tests passed');

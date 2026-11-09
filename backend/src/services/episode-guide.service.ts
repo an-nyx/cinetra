@@ -8,7 +8,7 @@ import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
 import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type ScheduleIdentity, type UpcomingItem } from './upcoming-schedule.model';
 import { chooseScheduleOnlyTMDBMatch, type ScheduleMatch } from './schedule-identity';
 import { mapLimit, SWRCache } from './swr-cache';
-import { analyzeRematchProgress } from './rematch.model';
+import { analyzeRematchProgress, summarizeSeries } from './rematch.model';
 
 const tmdb = new TMDBApiService();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -364,17 +364,6 @@ export class RematchConflictError extends EpisodeGuideError {
   constructor(message: string, public preview: Awaited<ReturnType<typeof previewRematch>>) { super(409, message); }
 }
 
-function seriesSummary(tmdbId: number, catalog: Catalog | null, fallback: { name: string; posterURL: string | null; overview: string | null }) {
-  const meta = catalog?.meta;
-  return {
-    tmdbId, name: meta?.name || fallback.name, originalName: meta?.originalName ?? null, year: (meta?.firstAirDate || '').slice(0, 4) || null,
-    overview: meta?.overview ?? fallback.overview ?? null,
-    posterURL: meta?.posterPath ? `https://image.tmdb.org/t/p/w500${meta.posterPath}` : fallback.posterURL,
-    seasons: catalog ? catalog.seasons.filter(s => s.number > 0).length : null,
-    releasedEpisodes: catalog ? catalog.episodes.filter(e => e.season > 0 && e.number > 0 && !!e.airDate && e.airDate <= today()).length : null,
-  };
-}
-
 /**
  * Read-only: compare a show's current TMDB match with a chosen replacement, and explain how its existing progress
  * would read against the replacement. Never changes anything.
@@ -397,8 +386,8 @@ export async function previewRematch(showId: string, userId: string, tmdbId: num
   const unchanged = show.tmdbId === tmdbId;
   return {
     showId, unchanged, currentTmdbId: show.tmdbId,
-    current: show.tmdbId ? seriesSummary(show.tmdbId, current, show) : null,
-    replacement: seriesSummary(tmdbId, replacement, show),
+    current: show.tmdbId ? summarizeSeries(show.tmdbId, current, 'current', show, today()) : null,
+    replacement: summarizeSeries(tmdbId, replacement, 'replacement', show, today()),
     duplicate, progress: analyzeRematchProgress(show, watches, replacement, today()),
     canApply: !unchanged && !duplicate,
   };

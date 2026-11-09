@@ -107,6 +107,19 @@ async function main() {
     assert.deepEqual(await service.getShow(52814), { name: 'Halo', seasons: [] });
   }
 
+  // Search results carry what is needed to tell same-named series apart; a missing poster stays empty.
+  {
+    const service = serviceWith({ TMDB_READ_ACCESS_TOKEN: FAKE_V4 }, async config => ({ status: 200, statusText: 'OK', headers: {}, config, data: { results: [
+      { id: 1, name: 'Carême', original_name: 'Carême', overview: 'A chef in Napoleonic Paris.', poster_path: '/a.jpg', first_air_date: '2025-04-14' },
+      { id: 2, name: 'Careme', original_name: 'Carême', overview: '', poster_path: null, first_air_date: '' },
+    ] } }));
+    const found = await service.searchShows('Careme');
+    assert.deepEqual(found.map(r => [r.id, r.name, r.year, r.originalName, r.posterURL]), [
+      [1, 'Carême', '2025', 'Carême', 'https://image.tmdb.org/t/p/w500/a.jpg'],
+      [2, 'Careme', null, 'Carême', ''],
+    ]);
+  }
+
   console.log('TMDB error sanitization tests passed');
 }
 

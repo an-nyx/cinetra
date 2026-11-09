@@ -51,3 +51,24 @@ export function analyzeRematchProgress(show: TrackedShow, watches: { season: num
     warnings,
   };
 }
+
+export type SeriesSummary = { tmdbId: number; name: string; originalName: string | null; year: string | null; overview: string | null; posterURL: string | null; seasons: number | null; releasedEpisodes: number | null };
+
+/**
+ * Describe a TMDB series for the Edit show comparison.
+ * - "current": the series the library entry is linked to now; it may fall back to the entry's own saved poster and
+ *   overview, which belong to that entry.
+ * - "replacement": only TMDB's own data for that exact series. A missing poster or overview stays empty (the page shows
+ *   a neutral placeholder); another show's poster or text is never substituted, so it cannot be saved either.
+ */
+export function summarizeSeries(tmdbId: number, catalog: Catalog | null, role: 'current' | 'replacement', saved: { name: string; posterURL: string | null; overview: string | null }, today: string): SeriesSummary {
+  const meta = catalog?.meta;
+  const own = role === 'current';
+  return {
+    tmdbId, name: meta?.name || saved.name, originalName: meta?.originalName ?? null, year: (meta?.firstAirDate || '').slice(0, 4) || null,
+    overview: meta?.overview || (own ? saved.overview : null) || null,
+    posterURL: meta?.posterPath ? `https://image.tmdb.org/t/p/w500${meta.posterPath}` : own ? saved.posterURL : null,
+    seasons: catalog ? catalog.seasons.filter(s => s.number > 0).length : null,
+    releasedEpisodes: catalog ? catalog.episodes.filter(e => e.season > 0 && e.number > 0 && !!e.airDate && e.airDate <= today).length : null,
+  };
+}

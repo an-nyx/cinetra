@@ -14,11 +14,13 @@ interface Props {
   shows: ShowType[];
   setShows: React.Dispatch<React.SetStateAction<ShowType[]>>;
   type: "show" | "movie";
+  /** Open straight into Edit show (e.g. "Fix match" from Needs review). */
+  initialEditMatch?: boolean;
 }
 const code = (episode: TrackedEpisode) => `S${String(episode.season).padStart(2, '0')}E${String(episode.number).padStart(2, '0')}`;
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function ShowModal({ selectedShow, closeModal, shows, setShows }: Props) {
+export default function ShowModal({ selectedShow, closeModal, shows, setShows, initialEditMatch = false }: Props) {
   const show = shows.find(item => item.id === selectedShow);
   const [summary, setSummary] = useState<TrackingSummary | null>(null);
   const [guide, setGuide] = useState<EpisodeGuide | null>(null);
@@ -55,7 +57,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
     return () => { active = false; };
   }, [selectedShow]);
 
-  useEffect(() => { setEditingMatch(false); setMatchNotice(""); }, [selectedShow]);
+  useEffect(() => { setEditingMatch(!!selectedShow && initialEditMatch); setMatchNotice(""); }, [selectedShow, initialEditMatch]);
 
   // After Edit show: reload the guide and show; if saved progress no longer fits, open Edit progress for review.
   const matchApplied = async ({ needsReview }: { needsReview: boolean }) => {
@@ -110,7 +112,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
         <DialogDescription>Episode tracking · {summary ? summary.source || 'Guide unavailable' : 'Loading guide'}</DialogDescription>
       </DialogHeader>
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:px-7">
-        {editingMatch && show ? <EditShowMatch showId={show.id} showName={show.name} currentTmdbId={show.tmdbId ?? null} onCancel={() => setEditingMatch(false)} onApplied={matchApplied} /> : <>
+        {editingMatch && show ? <EditShowMatch showId={show.id} showName={show.name} showPosterURL={show.posterURL || null} currentTmdbId={show.tmdbId ?? null} onCancel={() => setEditingMatch(false)} onApplied={matchApplied} /> : <>
           {matchNotice && <p role="status" className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">{matchNotice}</p>}
           {show && <div className="flex gap-4 py-6 sm:gap-6">
             {show.posterURL ? <img src={posterSrc(show.posterURL, "w342")} alt="" className="cinema-poster h-36 w-24 shrink-0 rounded-xl object-cover sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
