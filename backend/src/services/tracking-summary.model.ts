@@ -9,6 +9,7 @@ export type CatalogMeta = {
   name: string | null; originalName: string | null; overview: string | null; firstAirDate: string | null;
   nextEpisode: { season: number; number: number; name: string; airDate: string | null } | null;
   lastAiredSeason: number | null; seasonAirDates: Record<number, string | null>;
+  posterPath?: string | null;
 };
 export type Catalog = Omit<EpisodeCatalog, 'episodes'> & {
   episodes: CatalogEpisode[]; source: 'TMDB'; broadcastStatus: string | null; inProduction: boolean | null; nextEpisodeAnnounced: boolean;
@@ -37,7 +38,7 @@ const code = (season: number, episode: number) => `S${String(season).padStart(2,
 const regularOf = (catalog: Catalog) => catalog.episodes.filter(e => e.season > 0 && e.number > 0).sort((a, b) => a.season - b.season || a.number - b.number);
 
 /** Plain-language reason a saved position cannot be placed on the episode list. */
-function describePositionConflict(show: TrackedShow, catalog: Catalog, today: string) {
+export function describePositionConflict(show: TrackedShow, catalog: Catalog, today: string) {
   const { seasonsWatched: s, episodesWatched: e } = show;
   const position = code(s, e);
   if (s === 0) return `Saved position ${position} names no season, so it cannot be placed on episodes.`;
@@ -71,7 +72,7 @@ function describeMetadataGap(catalog: Catalog, today: string) {
 
 type TMDBEpisodeRef = { season_number: number; episode_number: number; name?: string; air_date?: string | null };
 type TMDBDetailsLike = {
-  name?: string | null; original_name?: string | null; overview?: string | null; first_air_date?: string | null;
+  name?: string | null; original_name?: string | null; overview?: string | null; first_air_date?: string | null; poster_path?: string | null;
   status?: string | null; in_production?: boolean | null; next_episode_to_air?: TMDBEpisodeRef | null; last_episode_to_air?: TMDBEpisodeRef | null;
   seasons?: { season_number: number; episode_count: number; air_date?: string | null }[];
 };
@@ -97,6 +98,7 @@ export function catalogFromTMDB(details: TMDBDetailsLike, pages: { season: numbe
       nextEpisode: details.next_episode_to_air ? { season: details.next_episode_to_air.season_number, number: details.next_episode_to_air.episode_number, name: details.next_episode_to_air.name || '', airDate: details.next_episode_to_air.air_date || null } : null,
       lastAiredSeason: details.last_episode_to_air?.season_number ?? null,
       seasonAirDates: Object.fromEntries(seasons.map(s => [s.season_number, s.air_date || null])),
+      posterPath: details.poster_path || null,
     },
     episodes: pages.flatMap(page => (page.data?.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: page.season, number: e.episode_number, name: e.name || '', airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null, episodeType: e.episode_type || null }))),
   };

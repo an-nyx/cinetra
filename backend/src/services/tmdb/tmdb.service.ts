@@ -3,6 +3,8 @@ export interface SearchResult {
   name: string;
   overview: string;
   posterURL: string;
+  originalName?: string;
+  year?: string | null;
 }
 
 export interface TMDBService {

@@ -1,13 +1,13 @@
 import { Router, Request, Response } from "express";
 import { showModule } from '../../modules/show';
 import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.entity';
-import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming } from '../../services/episode-guide.service';
+import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming, previewRematch, applyRematch, RematchConflictError } from '../../services/episode-guide.service';
 
 const router = Router();
 
 // Adding, editing or removing a show can change the schedule: refresh Upcoming (in the background) after success.
 router.use((req, res, next) => {
-  if ((req.method === 'POST' && req.path === '/') || ((req.method === 'PUT' || req.method === 'DELETE') && /^\/[^/]+$/.test(req.path))) {
+  if ((req.method === 'POST' && req.path === '/') || ((req.method === 'PUT' || req.method === 'DELETE') && /^\/[^/]+(\/tmdb-match)?$/.test(req.path))) {
     res.on('finish', () => { if (res.statusCode < 400) invalidateUpcoming(req.user.id); });
   }
   next();
@@ -38,6 +38,23 @@ router.get("/tracking", async (req: Request, res: Response) => {
 router.get("/upcoming", async (req: Request, res: Response) => {
   try { res.json(await getUpcomingReleases(req.user.id)); }
   catch (error) { guideError(res, error); }
+});
+
+// Edit show: compare the current TMDB match with a chosen series (read-only), then re-link after confirmation.
+router.get("/:id/tmdb-match", async (req: Request<{id: string}>, res: Response) => {
+  try { res.json(await previewRematch(req.params.id, req.user.id, Number(req.query.tmdbId))); }
+  catch (error) { guideError(res, error); }
+});
+router.put("/:id/tmdb-match", async (req: Request<{id: string}, {}, { tmdbId?: unknown; expectedCurrentTmdbId?: unknown; acknowledgeProgress?: unknown }>, res: Response) => {
+  const { tmdbId, expectedCurrentTmdbId, acknowledgeProgress } = req.body || {};
+  if (!Number.isInteger(tmdbId) || (expectedCurrentTmdbId !== null && !Number.isInteger(expectedCurrentTmdbId)) || (acknowledgeProgress !== undefined && typeof acknowledgeProgress !== 'boolean')) {
+    res.status(400).json({ message: 'Invalid change' }); return;
+  }
+  try { res.json(await applyRematch(req.params.id, req.user.id, tmdbId as number, expectedCurrentTmdbId as number | null, acknowledgeProgress === true)); }
+  catch (error) {
+    if (error instanceof RematchConflictError) res.status(409).json({ message: error.message, preview: error.preview });
+    else guideError(res, error);
+  }
 });
 
 router.get("/:id/tracking", async (req: Request<{id: string}>, res: Response) => {

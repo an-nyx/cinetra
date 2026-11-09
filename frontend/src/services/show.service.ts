@@ -25,11 +25,21 @@ interface UpdateShowData {
   status?: "watching" | "completed" | "planned" | "paused" | "dropped" | null;
 }
 
-interface ShowSearchResult {
+export interface ShowSearchResult {
   id: number;
   name: string;
   overview: string;
   posterURL: string;
+  originalName?: string;
+  year?: string | null;
+}
+
+export interface TmdbSeriesSummary { tmdbId: number; name: string; originalName: string | null; year: string | null; overview: string | null; posterURL: string | null; seasons: number | null; releasedEpisodes: number | null }
+/** Read-only comparison of a show's current TMDB match with a chosen replacement, including how progress would read. */
+export interface TmdbMatchPreview {
+  showId: string; unchanged: boolean; currentTmdbId: number | null; canApply: boolean;
+  current: TmdbSeriesSummary | null; replacement: TmdbSeriesSummary; duplicate: { id: string; name: string } | null;
+  progress: { savedPosition: string | null; positionFits: boolean; positionDetail: string | null; coveredReleasedEpisodes: number; explicitRecords: number; mappedRecords: string[]; unmappedRecords: string[]; hasProgress: boolean; needsAcknowledgement: boolean; warnings: string[] };
 }
 
 export interface EpisodeGuide {
@@ -111,6 +121,17 @@ class ShowServiceClass extends ApiService {
     return response.data;
   }
 
+
+  async previewTmdbMatch(id: string, tmdbId: number): Promise<TmdbMatchPreview> {
+    const response = await this.get<TmdbMatchPreview>(`/show/${id}/tmdb-match?tmdbId=${tmdbId}`);
+    return response.data;
+  }
+
+  /** Re-link this show only. Fails with 409 (and a fresh preview) on duplicates, concurrent edits or unacknowledged progress. */
+  async applyTmdbMatch(id: string, body: { tmdbId: number; expectedCurrentTmdbId: number | null; acknowledgeProgress: boolean }): Promise<{ preview: TmdbMatchPreview; summary: TrackingSummary }> {
+    const response = await this.put<{ preview: TmdbMatchPreview; summary: TrackingSummary }>(`/show/${id}/tmdb-match`, body);
+    return response.data;
+  }
 
   async getEpisodeGuide(id: string, season = 1): Promise<EpisodeGuide> {
     const response = await this.get<EpisodeGuide>(`/show/${id}/episodes?season=${season}`);
