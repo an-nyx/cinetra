@@ -5,6 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "build": "tsc",
+    "test:tracking": "ts-node tests/legacy-progress.test.ts",
     "start": "node dist/src/index.js",
     "dev": "nodemon src/index.ts"
   },

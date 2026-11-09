@@ -1,5 +1,6 @@
 import { TMDBService, SearchResult } from './tmdb.service';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { resolveTMDBRequestAuth, TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb-auth';
 
 interface ApiResponse {
   results: Array<{
@@ -13,8 +14,12 @@ interface ApiResponse {
   }>;
 }
 
+type ShowDetails = { seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null };
+type SeasonDetails = { episodes: Array<{ episode_number: number; name: string; air_date: string | null; runtime: number | null; episode_type?: string }> };
+
 export class TMDBApiService implements TMDBService {
   private fetcher: AxiosInstance;
+  private hasAuthentication: boolean;
   private cache = new Map<string, { expires: number; value: Promise<unknown> }>();
 
   private cached<T>(key: string, fetch: () => Promise<T>): Promise<T> {
@@ -27,13 +32,18 @@ export class TMDBApiService implements TMDBService {
   }
 
   constructor() {
+    const auth = resolveTMDBRequestAuth(process.env);
+    this.hasAuthentication = !!auth;
     this.fetcher = axios.create({
       baseURL: 'https://api.themoviedb.org/3',
-      headers: {
-        Authorization: process.env.API_AUTHORIZATION,
-      },
+      ...auth,
       timeout: 10000,
     })
+  }
+
+  private get<T>(url: string, config?: { params?: Record<string, string | number> }) {
+    if (!this.hasAuthentication) throw new Error(TMDB_AUTH_CONFIGURATION_ERROR);
+    return this.fetcher.get<T>(url, config);
   }
 
   async searchShows(query: string): Promise<SearchResult[]> {
@@ -51,7 +61,7 @@ export class TMDBApiService implements TMDBService {
     }
 
     try {
-      const response = await this.cached(`search:${type}:${query.toLowerCase()}`, () => this.fetcher.get<ApiResponse>(`/search/${type}`, { params: { query } }));
+      const response = await this.cached(`search:${type}:${query.toLowerCase()}`, () => this.get<ApiResponse>(`/search/${type}`, { params: { query } }));
 
       const searchResults: SearchResult[] = response.data.results.map(
         ({ id, title, name, overview, poster_path }) => {
@@ -71,13 +81,13 @@ export class TMDBApiService implements TMDBService {
     }
   }
 
-  async getShow(id: number): Promise<{ seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null }> {
-    const response = await this.cached(`tv:${id}`, () => this.fetcher.get(`/tv/${id}`));
+  async getShow(id: number): Promise<ShowDetails> {
+    const response = await this.cached<AxiosResponse<ShowDetails>>(`tv:${id}`, () => this.get<ShowDetails>(`/tv/${id}`));
     return response.data;
   }
 
-  async getSeason(id: number, season: number): Promise<{ episodes: Array<{ episode_number: number; name: string; air_date: string | null; runtime: number | null; episode_type?: string }> }> {
-    const response = await this.cached(`season:${id}:${season}`, () => this.fetcher.get(`/tv/${id}/season/${season}`));
+  async getSeason(id: number, season: number): Promise<SeasonDetails> {
+    const response = await this.cached<AxiosResponse<SeasonDetails>>(`season:${id}:${season}`, () => this.get<SeasonDetails>(`/tv/${id}/season/${season}`));
     return response.data;
   }
 }

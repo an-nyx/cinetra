@@ -3,15 +3,17 @@ import axios from 'axios';
 import fs from 'node:fs';
 import path from 'node:path';
 import { prisma } from '../src/database/prisma';
+import { resolveTMDBRequestAuth, TMDB_AUTH_CONFIGURATION_ERROR } from '../src/services/tmdb/tmdb-auth';
 
 type Candidate = { id: number; name: string; original_name?: string; first_air_date?: string; overview?: string; poster_path?: string; vote_count?: number };
-const api = axios.create({ baseURL: 'https://api.themoviedb.org/3', headers: { Authorization: process.env.API_AUTHORIZATION }, timeout: 10000 });
+const tmdbAuth = resolveTMDBRequestAuth(process.env);
+const api = axios.create({ baseURL: 'https://api.themoviedb.org/3', ...tmdbAuth, timeout: 10000 });
 const norm = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const tokens = (s: string) => new Set(norm(s).split(' ').filter(w => w.length > 3));
 const overlap = (a: string, b: string) => { const x=tokens(a), y=tokens(b); if (!x.size || !y.size) return 0; let n=0; for(const t of x) if(y.has(t)) n++; return n/x.size; };
 const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 async function main(){
- if(!process.env.API_AUTHORIZATION||process.env.API_AUTHORIZATION.includes('<')) throw new Error('TMDB API_AUTHORIZATION is required; no provider fallback is allowed.');
+ if(!tmdbAuth) throw new Error(TMDB_AUTH_CONFIGURATION_ERROR);
  const shows=await prisma.show.findMany({orderBy:{name:'asc'},select:{id:true,name:true,overview:true,posterURL:true,tmdbId:true,seasonsWatched:true,episodesWatched:true,status:true,completed:true,favorite:true,episodeWatches:{select:{season:true,episode:true}}}});
  const rows:any[]=[];
  for(let i=0;i<shows.length;i+=8){

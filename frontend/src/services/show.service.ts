@@ -35,22 +35,23 @@ interface ShowSearchResult {
 export interface EpisodeGuide {
   seasons: { number: number; episodeCount: number }[];
   season: number;
-  episodes: { number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null }[];
+  episodes: { number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null }[];
   watched: { season: number; episode: number; watchedAt: string }[];
 }
 
-export interface TrackedEpisode { season: number; number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null }
+export interface TrackedEpisode { season: number; number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null; watched?: boolean; watchSource?: 'explicit' | 'legacy' | 'both' | null }
 export interface UpcomingRelease {
   showId: string; showName: string; posterURL: string | null; showStatus: string | null;
   season: number; number: number; name: string; airDate: string; airTimestamp: string | null; seasonPremiere: boolean;
 }
 export interface TrackingSummary {
   showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
-  guideAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number; normalizedEpisode?: number; needsReview?: boolean } | null;
-  watchedCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
+  guideAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number | null; normalizedEpisode?: number | null; needsReview?: boolean } | null;
+  watchedCount: number; explicitWatchedCount: number; legacyInferredCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
   broadcastStatus?: 'ended' | 'returning' | 'in_production' | 'planned' | 'unknown';
   viewingState?: 'unknown' | 'fully_watched' | 'caught_up' | 'in_progress' | 'not_started';
   completionEligible?: boolean; finalSeason?: number | null; finalityConfirmed?: boolean;
+  metadataError?: string | null; statusProgressNote?: string | null;
   lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
   newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
   error?: string | null;
