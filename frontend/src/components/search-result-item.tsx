@@ -1,3 +1,4 @@
+import { posterSrc } from "@/lib/poster";
 export interface SearchResult {
   id?: number;
   name: string;
@@ -20,7 +21,7 @@ export default function SearchResultItem({ searchResult, onSearchResultClick }: 
       className="flex w-full min-w-0 gap-3 rounded-xl p-2 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary"
       onClick={() => onSearchResultClick(searchResult)}
     >
-      <img src={posterURL} className="h-20 w-14 shrink-0 rounded-md object-cover" alt="" loading="lazy" />
+      <img src={posterSrc(posterURL, "w185")} className="h-20 w-14 shrink-0 rounded-md object-cover" alt="" loading="lazy" />
       <span className="min-w-0">
         <span className="line-clamp-2 font-medium">{name}</span>
         <span className="mt-1 line-clamp-2 text-sm text-muted-foreground">{overview}</span>

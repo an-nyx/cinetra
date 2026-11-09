@@ -1,4 +1,5 @@
 import { Heart, Film } from "lucide-react";
+import { posterSrc } from "@/lib/poster";
 import { MovieType } from "@/types";
 import { MovieService } from "@/services";
 
@@ -46,7 +47,7 @@ export default function Movie({
         aria-label={`Open ${name}`}
       >
         <span className="absolute inset-0 flex items-center justify-center text-muted-foreground"><Film className="size-10" /></span>
-        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transform-none" src={posterURL} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transform-none" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
         <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
         <span className="absolute inset-x-0 bottom-0 line-clamp-2 p-3 pb-4 text-sm font-semibold leading-5 text-white sm:text-base">{name}</span>
       </button>

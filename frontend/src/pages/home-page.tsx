@@ -22,7 +22,7 @@ export default function HomePage() {
     <SidebarProvider>
       <AppSidebar variant="inset" />
       <SidebarInset className="min-w-0">
-        <header className="app-header sticky top-0 z-30 flex min-h-16 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur-xl md:px-6">
+        <header className="app-header sticky top-0 z-30 flex min-h-16 shrink-0 items-center gap-3 border-b bg-background/95 px-4 md:backdrop-blur-xl md:px-6">
           <SidebarTrigger className="hidden md:flex" />
           <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Film className="size-5" /></span>
@@ -42,7 +42,7 @@ export default function HomePage() {
           </div>
         </header>
         <main id="main-content" className="app-content flex flex-1 flex-col"><Outlet /></main>
-        <nav aria-label="Main navigation" className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-background/95 px-4 pt-2 backdrop-blur-xl md:hidden">
+        <nav aria-label="Main navigation" className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-background/95 px-4 pt-2 md:backdrop-blur-xl md:hidden">
           {destinations.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
               <Icon className="size-5" /><span>{label}</span>
