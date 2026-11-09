@@ -14,6 +14,21 @@ export class EpisodeGuideError extends Error {
 
 const validNumber = (value: unknown, minimum: number) => typeof value === 'number' && Number.isInteger(value) && value >= minimum;
 
+export function normalizeLegacyPosition(seasonsWatched: number, episodesWatched: number, catalog: Catalog | null, now = today()) {
+  if (!catalog) return { season: seasonsWatched, episode: episodesWatched, complete: false, needsReview: false, known: false, progressCount: null as number | null };
+  const regular = catalog.episodes.filter(e => e.season > 0 && e.number > 0 && (!e.airDate || e.airDate <= now));
+  const seasonNumbers = [...new Set(catalog.seasons.map(s => s.number))].sort((a, b) => a - b);
+  if (seasonsWatched < 0 || episodesWatched < 0) return { season: seasonsWatched, episode: episodesWatched, complete: false, needsReview: true, known: true, progressCount: null };
+  if (!episodesWatched) return { season: Math.max(1, seasonsWatched), episode: 1, complete: seasonsWatched > 1, needsReview: false, known: true, progressCount: regular.filter(e => e.season < seasonsWatched).length };
+  const selected = seasonNumbers.includes(seasonsWatched) ? seasonsWatched : undefined;
+  if (!selected) return { season: seasonsWatched, episode: episodesWatched, complete: false, needsReview: true, known: true, progressCount: null };
+  const count = regular.filter(e => e.season === selected).length;
+  if (episodesWatched > count) return { season: selected, episode: episodesWatched, complete: false, needsReview: true, known: true, progressCount: null };
+  const done = episodesWatched === count && count > 0;
+  const following = seasonNumbers.find(n => n > selected);
+  return { season: done && following ? following : selected, episode: done && following ? 1 : episodesWatched + 1, complete: done, needsReview: false, known: true, progressCount: regular.filter(e => e.season < selected).length + episodesWatched };
+}
+
 async function catalogFor(show: { name: string; tmdbId: number | null; tvmazeId: number | null }): Promise<Catalog> {
   const key = `${show.tmdbId || ''}:${show.tvmazeId || ''}:${show.name}`;
   const cached = catalogCache.get(key);
@@ -65,13 +80,14 @@ export async function getTrackingSummary(showId: string, userId: string) {
   const upcoming = episodes.filter(e => e.airDate && e.airDate > today()).sort((a, b) => a.airDate!.localeCompare(b.airDate!));
   const last = [...episodes].filter(e => e.watchedAt).sort((a, b) => b.watchedAt!.getTime() - a.watchedAt!.getTime())[0] || null;
   const hasSavedPosition = show.seasonsWatched > 0 || show.episodesWatched > 0;
-  const next = hasSavedPosition ? null : remaining[0] || null;
+  const legacy = hasSavedPosition ? normalizeLegacyPosition(show.seasonsWatched, show.episodesWatched, catalog) : null;
+  const next = hasSavedPosition ? (legacy && !legacy.needsReview ? episodes.find(e => e.season === legacy.season && e.number === legacy.episode && e.airDate && e.airDate <= today()) || null : null) : remaining[0] || null;
   const watched = released.length - remaining.length;
   return {
     showId, name: show.name, posterURL: show.posterURL, status: show.status || (show.completed ? 'completed' : null), source: catalog?.source || null,
-    guideAvailable: !!catalog && episodes.length > 0, legacyPosition: hasSavedPosition ? { fullSeasons: show.seasonsWatched, episodesInNextSeason: show.episodesWatched } : null,
+    guideAvailable: !!catalog && episodes.length > 0, legacyPosition: hasSavedPosition ? { fullSeasons: show.seasonsWatched, episodesInNextSeason: show.episodesWatched, normalizedSeason: legacy?.season, normalizedEpisode: legacy?.episode, needsReview: legacy?.needsReview || false } : null,
     watchedCount: watched, releasedCount: released.length, remainingCount: remaining.length,
-    progressPercent: released.length && watches.length && !hasSavedPosition ? Math.round(watched / released.length * 100) : null,
+    progressPercent: released.length ? hasSavedPosition && legacy?.progressCount !== null && legacy?.progressCount !== undefined ? Math.round(Math.min(legacy.progressCount, released.length) / released.length * 100) : watches.length && !hasSavedPosition ? Math.round(watched / released.length * 100) : null : null,
     lastEpisode: last, nextEpisode: next, upcomingEpisode: upcoming[0] || null,
     newEpisodes: remaining.filter(e => !!last && e.airDate! > last.watchedAt!.toISOString().slice(0, 10)).length,
     recentHistory: [...watches].sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime()).slice(0, 5),

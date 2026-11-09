@@ -35,3 +35,19 @@ The recovery dry run compares backup and live rows on `(userId, Show.id)`, check
 ## Verification limits
 
 The authenticated deployed API and real mobile device were not available to this repair session. The local frontend was exercised against a mock API at 320, 375, 390 and 1280 px. Live production data was read and backed up only. A controlled cold comparison of the Upcoming service against eight shows in a disposable restored database took 917 ms with the previous code and 792 ms with the repaired code (zero failed guides in both). This is a small, local sample with sequential measurements and possible provider connection warming; it does not establish the speed of the full 159-show production request. Deployed mobile performance remains to be validated.
+
+## Follow up provider and legacy position audit
+
+A later read-only provider review queried all 159 live show titles against TMDB and TVMaze. Coverage is 158 without TMDB IDs, 159 without TVMaze IDs, and 158 without either ID. The backup predates both provider ID columns. Git history and the original add flow show that Cinetra used TMDB search for new entries; stored poster URLs use TMDB's `/image/t/p/w500/` image host. Poster paths are image identifiers and cannot recover a TMDB show ID on their own.
+
+Candidate comparison yielded 49 single exact-title candidates with strong overview overlap, 92 ambiguous candidates, and 18 with no exact match or a provider error. The show schema has no release-year field, and no saved poster path matched a TMDB search result strongly enough to serve as an independent ID confirmation. No candidate IDs were saved. A further episode-guide check of the 49 stronger candidates found 15 whose counters equal the provider's listed final-season episode count and whose current provider status is Ended. These are candidates for human review only: provider status and title/overview similarity do not establish that the series has no announced continuation or that the provider match is exact.
+
+The counter convention is: `S02E08` means eight episodes reached in Season 2; if that equals the season's regular-episode count, normalize the position to the following season's episode 1. `S03E00` normalizes to the same current position. Normalization never edits source counters or creates episode-watch records. When metadata is absent, the raw saved season and episode remain visible and percentages stay unavailable.
+
+Current implementation preserves provider IDs and personal statuses unless a user explicitly links a provider result from the details view. The existing details view has a provider search fallback; a dedicated review queue with year and poster comparison for every unmatched show remains outstanding. Automatic personal-status completion is intentionally not implemented.
+
+## Provider review queue implementation
+
+A protected `/review-matches` page is available from the desktop sidebar and mobile navigation. It prioritizes shows with saved counters, searches TMDB for each selected library title, and presents the existing record beside up to eight TMDB results with poster, year, overview, and match guidance. Search Again supports a different query. Skip and Confirm Match create durable browser-local drafts. Confirm shows the library title and exact TMDB ID/name/year, then stages the decision in local storage; it does not call a production write endpoint. Existing shows and all progress/status/favorite fields remain untouched. The queue can clear its local drafts. No database migration is required.
+
+The queue is now implemented. A production ID write operation is intentionally not included; it requires explicit approval of a specific mapping set and a transactional before-image/rollback plan. TVMaze cross-provider mapping is also not inferred. A browser session must be authenticated to use the review route.

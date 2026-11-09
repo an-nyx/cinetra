@@ -17,6 +17,7 @@ import UpcomingPage from "./pages/upcoming-page.tsx";
 import { AuthProvider } from "./context/auth-context.tsx";
 import { ThemeProvider } from "./components/theme-provider.tsx";
 import HomePage from "./pages/home-page.tsx";
+import MatchReviewPage from "./pages/match-review-page.tsx";
 
 const router = createBrowserRouter([
   {
@@ -42,6 +43,10 @@ const router = createBrowserRouter([
       {
         path: "/movies",
         element: <MoviesPage />,
+      },
+      {
+        path: "/review-matches",
+        element: <MatchReviewPage />,
       },
     ],
   },

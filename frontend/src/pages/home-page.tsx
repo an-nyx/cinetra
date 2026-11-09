@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { CalendarDays, Film, House, LogOut, Tv, UserRound } from "lucide-react";
+import { CalendarDays, Film, House, LogOut, Tv, UserRound, ScanSearch } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -14,6 +14,7 @@ const destinations = [
   { to: "/shows", label: "Shows", icon: Tv },
   { to: "/upcoming", label: "Upcoming", icon: CalendarDays },
   { to: "/movies", label: "Movies", icon: Film },
+  { to: "/review-matches", label: "Match Review", icon: ScanSearch },
 ];
 
 export default function HomePage() {
@@ -42,7 +43,7 @@ export default function HomePage() {
           </div>
         </header>
         <main id="main-content" className="app-content flex flex-1 flex-col"><Outlet /></main>
-        <nav aria-label="Main navigation" className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-background/95 px-4 pt-2 backdrop-blur-xl md:hidden">
+        <nav aria-label="Main navigation" className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 px-2 pt-2 backdrop-blur-xl md:hidden">
           {destinations.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
               <Icon className="size-5" /><span>{label}</span>

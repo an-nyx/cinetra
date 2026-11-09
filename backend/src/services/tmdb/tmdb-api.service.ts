@@ -10,6 +10,7 @@ interface ApiResponse {
     poster_path: string;
     original_name?: string;
     original_title?: string;
+    first_air_date?: string;
   }>;
 }
 
@@ -42,6 +43,14 @@ export class TMDBApiService implements TMDBService {
       return response.data.map(({ show }) => ({ id: 0, tvmazeId: show.id, name: show.name, overview: (show.summary || '').replace(/<[^>]*>/g, ''), posterURL: show.image?.medium || '' }));
     }
     return this.search('tv', query);
+  }
+
+  async searchShowCandidates(query: string) {
+    if (!process.env.API_AUTHORIZATION || process.env.API_AUTHORIZATION.includes('<')) throw new Error('TMDB credentials are unavailable');
+    query = query?.trim().slice(0, 100);
+    if (!query || query.length < 2) return [];
+    const response = await this.cached(`review-tv:${query.toLowerCase()}`, () => this.fetcher.get<ApiResponse>('/search/tv', { params: { query } }));
+    return response.data.results.slice(0, 8).map(item => ({ id: item.id, name: item.name || item.original_name || '', year: item.first_air_date?.slice(0, 4) || null, overview: item.overview || '', posterURL: item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : null, source: 'TMDB' as const }));
   }
 
   async searchMovies(query: string): Promise<SearchResult[]> {

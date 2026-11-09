@@ -49,12 +49,13 @@ export interface UpcomingRelease {
 }
 export interface TrackingSummary {
   showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
-  guideAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number } | null;
+  guideAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number; normalizedEpisode?: number; needsReview?: boolean } | null;
   watchedCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
   lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
   newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
   error?: string | null;
 }
+export interface MatchCandidate { id: number; name: string; year: string | null; overview: string; posterURL: string | null; source: 'TMDB' }
 
 class ShowServiceClass extends ApiService {
   async getLibraryTracking(): Promise<TrackingSummary[]> {
@@ -102,6 +103,11 @@ class ShowServiceClass extends ApiService {
 
   async searchShows(query: string): Promise<ShowSearchResult[]> {
     const response = await this.get<ShowSearchResult[]>(`/show/search?q=${encodeURIComponent(query)}`);
+    return response.data;
+  }
+
+  async getMatchCandidates(id: string, query: string): Promise<MatchCandidate[]> {
+    const response = await this.get<MatchCandidate[]>(`/show/${id}/match-candidates?q=${encodeURIComponent(query)}`);
     return response.data;
   }
 
