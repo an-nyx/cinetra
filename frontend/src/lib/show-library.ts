@@ -11,7 +11,7 @@ export type LibraryFilters = {
 /** Explicit status wins over the historical completed flag. */
 export const personalStatus = (show: Pick<ShowType, 'status' | 'completed'>): PersonalStatus => show.status || (show.completed ? 'completed' : 'none');
 export const personalStatusLabels: Record<PersonalStatus, string> = { watching: 'Watching', completed: 'Completed', dropped: 'Dropped', planned: 'Planned', paused: 'Paused', none: 'No status selected' };
-export const personalStatusColors: Partial<Record<PersonalStatus, string>> = { watching: '#3B82F6', completed: '#22C55E', dropped: '#EF4444' };
+export const personalStatusColors: Partial<Record<PersonalStatus, string>> = { watching: '#557da8', completed: '#5c9775', dropped: '#a75d60' };
 
 export function filterAndSortShows(shows: ShowType[], search: string, filters: LibraryFilters): ShowType[] {
   return shows.filter(show => {

@@ -6,9 +6,9 @@ const shows = [make('Waiting', 'watching', true, true, '2021-01-01'), make('Done
 test('S2E0 waiting with 100% progress stays Watching and blue', () => {
   Object.assign(shows[0], { seasonsWatched: 2, episodesWatched: 0, progressPercent: 100, viewingState: 'caught_up' });
   assert.equal(personalStatus(shows[0]), 'watching');
-  assert.equal(personalStatusColors[personalStatus(shows[0])], '#3B82F6');
-  assert.equal(personalStatusColors[personalStatus(shows[1])], '#22C55E');
-  assert.equal(personalStatusColors[personalStatus(shows[2])], '#EF4444');
+  assert.equal(personalStatusColors[personalStatus(shows[0])], '#557da8');
+  assert.equal(personalStatusColors[personalStatus(shows[1])], '#5c9775');
+  assert.equal(personalStatusColors[personalStatus(shows[2])], '#a75d60');
   assert.equal(personalStatus(shows[5]), 'none');
 });
 test('status, completion, favorite, search and sorting combine', () => {
