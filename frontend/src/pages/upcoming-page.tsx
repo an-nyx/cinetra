@@ -70,10 +70,10 @@ export default function UpcomingPage() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [data, library] = await Promise.all([ShowService.getUpcomingReleases(), ShowService.getAllShows()]);
+      const data = await ShowService.getUpcomingReleases();
       setReleases(data.releases);
       setFailedShows(data.failedShows);
-      setShows(library);
+      ShowService.getAllShows().then(setShows).catch(() => {});
       setNow(new Date());
       setError('');
     } catch { setError('Upcoming releases could not be loaded. Please try again.'); }

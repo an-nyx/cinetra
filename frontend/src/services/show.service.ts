@@ -48,8 +48,9 @@ export interface UpcomingRelease {
   season: number; number: number; name: string; airDate: string; airTimestamp: string | null; seasonPremiere: boolean;
 }
 export interface TrackingSummary {
-  showId: string; name: string; posterURL: string | null; status: string; source: string;
-  watchedCount: number; releasedCount: number; remainingCount: number; progressPercent: number;
+  showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
+  guideAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number } | null;
+  watchedCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
   lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
   newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
   error?: string | null;

@@ -23,7 +23,7 @@ export default function WelcomePage() {
   }, []);
   useEffect(() => { load(); window.addEventListener('tracking-updated', load); return () => window.removeEventListener('tracking-updated', load); }, [load]);
   const items = tracking.filter(item => !item.error);
-  const continuing = items.filter(item => item.nextEpisode && !['planned', 'paused', 'dropped'].includes(item.status) && (item.status !== 'completed' || item.newEpisodes > 0));
+  const continuing = items.filter(item => item.nextEpisode && !['planned', 'paused', 'dropped'].includes(item.status || '') && (item.status !== 'completed' || item.newEpisodes > 0));
   const newEpisodes = items.filter(item => item.newEpisodes > 0);
   const upcoming = items.filter(item => item.upcomingEpisode).sort((a, b) => a.upcomingEpisode!.airDate!.localeCompare(b.upcomingEpisode!.airDate!));
   const recent = items.flatMap(item => item.recentHistory.map(event => ({ item, event }))).sort((a, b) => b.event.watchedAt.localeCompare(a.event.watchedAt)).slice(0, 5);

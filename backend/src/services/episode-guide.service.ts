@@ -28,17 +28,17 @@ async function catalogFor(show: { name: string; tmdbId: number | null; tvmazeId:
     // TVMaze's public episode endpoint provides a real guide when TMDB is not configured.
     let tvmazeId = show.tvmazeId;
     if (!tvmazeId) {
-      const search = await axios.get<Array<{ show: { id: number; name: string } }>>('https://api.tvmaze.com/search/shows', { params: { q: show.name }, timeout: 10000 });
+      const search = await axios.get<Array<{ show: { id: number; name: string } }>>('https://api.tvmaze.com/search/shows', { params: { q: show.name }, timeout: 4000 });
       const match = search.data.find(item => item.show.name.localeCompare(show.name, undefined, { sensitivity: 'base' }) === 0);
       if (!match) throw new EpisodeGuideError(404, 'No exact episode guide match found for this show');
       tvmazeId = match.show.id;
     }
-    const response = await axios.get<Array<{ season: number; number: number; name: string; airdate: string | null; airstamp: string | null; runtime: number | null }>>(`https://api.tvmaze.com/shows/${tvmazeId}/episodes`, { timeout: 10000 });
+    const response = await axios.get<Array<{ season: number; number: number; name: string; airdate: string | null; airstamp: string | null; runtime: number | null }>>(`https://api.tvmaze.com/shows/${tvmazeId}/episodes`, { timeout: 4000 });
     const episodes = response.data.filter(e => e.season > 0 && e.number > 0).map(e => ({ season: e.season, number: e.number, name: e.name, airDate: e.airdate || null, airTimestamp: e.airstamp || null, runtime: e.runtime || null }));
     const seasons = [...new Set(episodes.map(e => e.season))].sort((a, b) => a - b).map(number => ({ number, episodeCount: episodes.filter(e => e.season === number).length }));
     return { source: 'TVMaze', seasons, episodes };
-  })().catch(error => { catalogCache.delete(key); throw error; });
-  catalogCache.set(key, { until: Date.now() + 15 * 60_000, value });
+  })().catch(error => { if (!(error instanceof EpisodeGuideError && error.status === 404)) catalogCache.delete(key); throw error; });
+  catalogCache.set(key, { until: Date.now() + 60 * 60_000, value });
   return value;
 }
 
@@ -52,17 +52,26 @@ async function load(showId: string, userId: string) {
 }
 
 export async function getTrackingSummary(showId: string, userId: string) {
-  const { show, catalog, episodes, watches } = await load(showId, userId);
+  const show = await prisma.show.findFirst({ where: { id: showId, userId } });
+  if (!show) throw new EpisodeGuideError(404, 'Show not found');
+  const watches = await prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } });
+  let catalog: Catalog | null = null;
+  try { catalog = await catalogFor(show); } catch { /* Saved positions remain available without a provider. */ }
+  const watchMap = new Map(watches.map(w => [`${w.season}:${w.episode}`, w.watchedAt]));
+  const episodes: Episode[] = (catalog?.episodes || []).map(e => ({ ...e, watchedAt: watchMap.get(`${e.season}:${e.number}`) || null }));
+  episodes.sort((a, b) => a.season - b.season || a.number - b.number);
   const released = episodes.filter(e => e.airDate && e.airDate <= today());
   const remaining = released.filter(e => !e.watchedAt);
   const upcoming = episodes.filter(e => e.airDate && e.airDate > today()).sort((a, b) => a.airDate!.localeCompare(b.airDate!));
   const last = [...episodes].filter(e => e.watchedAt).sort((a, b) => b.watchedAt!.getTime() - a.watchedAt!.getTime())[0] || null;
-  const next = remaining[0] || null;
+  const hasSavedPosition = show.seasonsWatched > 0 || show.episodesWatched > 0;
+  const next = hasSavedPosition ? null : remaining[0] || null;
   const watched = released.length - remaining.length;
   return {
-    showId, name: show.name, posterURL: show.posterURL, status: show.status || (show.completed ? 'completed' : watches.length ? 'watching' : 'planned'), source: catalog.source,
+    showId, name: show.name, posterURL: show.posterURL, status: show.status || (show.completed ? 'completed' : null), source: catalog?.source || null,
+    guideAvailable: !!catalog && episodes.length > 0, legacyPosition: hasSavedPosition ? { fullSeasons: show.seasonsWatched, episodesInNextSeason: show.episodesWatched } : null,
     watchedCount: watched, releasedCount: released.length, remainingCount: remaining.length,
-    progressPercent: released.length ? Math.round(watched / released.length * 100) : 0,
+    progressPercent: released.length && watches.length && !hasSavedPosition ? Math.round(watched / released.length * 100) : null,
     lastEpisode: last, nextEpisode: next, upcomingEpisode: upcoming[0] || null,
     newEpisodes: remaining.filter(e => !!last && e.airDate! > last.watchedAt!.toISOString().slice(0, 10)).length,
     recentHistory: [...watches].sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime()).slice(0, 5),
@@ -91,8 +100,8 @@ export async function getUpcomingReleases(userId: string) {
     } catch { return { releases: [], failed: true }; }
   };
   const results: Awaited<ReturnType<typeof fetchOne>>[] = [];
-  for (let index = 0; index < shows.length; index += 4) {
-    results.push(...await Promise.all(shows.slice(index, index + 4).map(fetchOne)));
+  for (let index = 0; index < shows.length; index += 16) {
+    results.push(...await Promise.all(shows.slice(index, index + 16).map(fetchOne)));
   }
   const unique = new Map(results.flatMap(result => result.releases).map(e => [`${e.showId}:${e.season}:${e.number}`, e]));
   const releaseTime = (e: { airTimestamp: string | null; airDate: string }) => Date.parse(e.airTimestamp || `${e.airDate}T00:00:00Z`);
@@ -127,12 +136,6 @@ export async function setSeasonWatched(showId: string, userId: string, season: n
 }
 
 export async function importLegacyProgress(showId: string, userId: string) {
-  const { show, catalog, episodes, watches } = await load(showId, userId);
-  if (watches.length) throw new EpisodeGuideError(409, 'Individual episodes have already been tracked');
-  const fullSeasons = catalog.seasons.slice(0, show.seasonsWatched).map(s => s.number);
-  const nextSeason = catalog.seasons[show.seasonsWatched]?.number;
-  const importable = episodes.filter(e => e.airDate && e.airDate <= today() &&
-    (fullSeasons.includes(e.season) || e.season === nextSeason && e.number <= show.episodesWatched));
-  await prisma.episodeWatch.createMany({ data: importable.map(e => ({ showId, season: e.season, episode: e.number })), skipDuplicates: true });
-  return getTrackingSummary(showId, userId);
+  if (!await prisma.show.findFirst({ where: { id: showId, userId }, select: { id: true } })) throw new EpisodeGuideError(404, 'Show not found');
+  throw new EpisodeGuideError(409, 'Saved counters do not prove individual episodes were watched. Edit the saved position instead.');
 }
