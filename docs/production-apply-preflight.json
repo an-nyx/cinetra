@@ -1,0 +1,24 @@
+{
+  "verifiedAt": "2026-11-09T09:08:46.124Z",
+  "revalidationSha256": "59cd2ce9c32ce46588a03c618a005c5604527e8b67a11a62f5ecf71cff672767",
+  "applyPlanSha256": "20155f2fa29be0a8a05ceca8ebd61674c67ea240843b584bcf00f81521483733",
+  "rows": 90,
+  "tmdbIdsUnique": true,
+  "occupiedTmdbIdConflicts": 0,
+  "tmdbUpdates": 90,
+  "bobaBefore": {
+    "id": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+    "name": "The Book of Boba Fett",
+    "seasonsWatched": 1,
+    "episodesWatched": 8,
+    "tmdbId": null,
+    "status": null,
+    "completed": true,
+    "favorite": false,
+    "_count": {
+      "episodeWatches": 0
+    }
+  },
+  "watchedRowsInTmdbTargets": 52,
+  "personalStatusesPresent": 46
+}

@@ -1,0 +1,41 @@
+{
+  "appliedAt": "2026-11-09T09:09:59.765Z",
+  "transaction": "separate one-row correction",
+  "before": {
+    "id": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+    "name": "The Book of Boba Fett",
+    "seasonsWatched": 1,
+    "episodesWatched": 8,
+    "tmdbId": 115036,
+    "status": null,
+    "completed": true,
+    "favorite": false,
+    "_count": {
+      "episodeWatches": 0
+    }
+  },
+  "after": {
+    "id": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+    "name": "The Book of Boba Fett",
+    "seasonsWatched": 1,
+    "episodesWatched": 7,
+    "tmdbId": 115036,
+    "status": null,
+    "completed": true,
+    "favorite": false,
+    "_count": {
+      "episodeWatches": 0
+    }
+  },
+  "changedColumn": "episodesWatched",
+  "rollback": {
+    "where": {
+      "id": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+      "episodesWatched": 7,
+      "seasonsWatched": 1
+    },
+    "set": {
+      "episodesWatched": 8
+    }
+  }
+}
