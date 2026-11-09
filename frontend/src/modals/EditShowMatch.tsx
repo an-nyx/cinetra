@@ -1,32 +1,29 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { AlertTriangle, ArrowLeft, Check, Search, Tv } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import useDebounce from "@/hooks/use-debounce";
-import { posterSrc } from "@/lib/poster";
+import TmdbResultCard, { SeriesPoster } from "@/components/tmdb-result-card";
 import { ShowService } from "@/services";
 import type { ShowSearchResult, TmdbMatchPreview, TmdbSeriesSummary } from "@/services/show.service";
 
 type Props = {
   showId: string;
   showName: string;
+  /** The library entry's saved poster, shown at the top so it is clear which entry is being edited. */
+  showPosterURL: string | null;
   currentTmdbId: number | null;
   onCancel: () => void;
   /** Called after a successful change; needsReview is true when saved progress does not fit the new series. */
   onApplied: (result: { needsReview: boolean }) => void;
 };
 
-function Poster({ url, size = "w92", className }: { url: string | null | undefined; size?: "w92" | "w154"; className: string }) {
-  return url ? <img src={posterSrc(url, size)} alt="" loading="lazy" className={`${className} shrink-0 rounded-md object-cover`} />
-    : <span className={`${className} flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground`}><Tv className="size-5" /></span>;
-}
-
 function SeriesCard({ label, series }: { label: string; series: TmdbSeriesSummary | null }) {
   return <div className="rounded-xl border bg-card p-3">
     <p className="cinema-eyebrow mb-2">{label}</p>
     {series ? <div className="flex gap-3">
-      <Poster url={series.posterURL} size="w154" className="h-24 w-16" />
+      <SeriesPoster url={series.posterURL} size="w154" className="h-24 w-16" />
       <div className="min-w-0">
         <p className="font-semibold leading-5">{series.name}{series.year && <span className="font-normal text-muted-foreground"> ({series.year})</span>}</p>
         {series.originalName && series.originalName !== series.name && <p className="text-xs text-muted-foreground">Original title: {series.originalName}</p>}
@@ -38,7 +35,7 @@ function SeriesCard({ label, series }: { label: string; series: TmdbSeriesSummar
 }
 
 /** Edit show: find the correct TMDB series, compare it with the current match, and re-link only after confirmation. */
-export default function EditShowMatch({ showId, showName, currentTmdbId, onCancel, onApplied }: Props) {
+export default function EditShowMatch({ showId, showName, showPosterURL, currentTmdbId, onCancel, onApplied }: Props) {
   const [query, setQuery] = useState(showName);
   const search = useDebounce(query, 300);
   const [results, setResults] = useState<ShowSearchResult[]>([]);
@@ -83,25 +80,21 @@ export default function EditShowMatch({ showId, showName, currentTmdbId, onCance
       <Button type="button" variant="ghost" size="icon" aria-label={preview ? "Back to search results" : "Close Edit show"} onClick={() => (preview ? setPreview(null) : onCancel())}><ArrowLeft className="size-5" /></Button>
       <div className="min-w-0"><h2 id="edit-show-heading" className="text-lg font-semibold">Edit show</h2><p className="text-xs text-muted-foreground">{preview ? "Check the change before saving." : "Find the exact TV series on TMDB."}</p></div>
     </div>
+    <div className="flex items-center gap-3 rounded-xl border bg-card/60 p-2.5">
+      <SeriesPoster url={showPosterURL} className="h-14 w-10" />
+      <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Editing your saved show</p><p className="truncate font-semibold">{showName}</p><p className="text-xs text-muted-foreground">{currentTmdbId ? `Linked to TMDB ${currentTmdbId}` : "Not linked to TMDB"}</p></div>
+    </div>
     {error && <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</p>}
 
     {!preview && <>
-      <label className="relative block"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input aria-label="Search TMDB for the correct series" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search TV series" className="pl-9" autoFocus /></label>
+      <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 pb-2 pt-1">
+        <label className="relative block"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" aria-label="Search TMDB for the correct series" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search TV series" className="pl-9" /></label>
+      </div>
       <p className="text-xs text-muted-foreground">Same title? Compare the year, poster and description to pick the right adaptation.</p>
       {searching && <p className="text-sm text-muted-foreground">Searching TMDB…</p>}
       {!searching && search.trim().length >= 2 && !results.length && !error && <p className="text-sm text-muted-foreground">No TV series found. Try another spelling or the original title.</p>}
-      <ul className="space-y-2">{results.map(result => <li key={result.id}>
-        <button type="button" disabled={busy} onClick={() => choose(result.id)} className="flex w-full gap-3 rounded-xl border bg-card p-2.5 text-left transition-colors hover:border-primary/40 disabled:opacity-60">
-          <Poster url={result.posterURL} className="h-[4.5rem] w-12" />
-          <span className="min-w-0 flex-1">
-            <span className="flex items-baseline gap-2"><span className="truncate font-semibold">{result.name}</span>{result.year && <span className="shrink-0 text-sm text-muted-foreground">{result.year}</span>}</span>
-            {result.originalName && result.originalName !== result.name && <span className="block truncate text-xs text-muted-foreground">Original title: {result.originalName}</span>}
-            <span className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">{result.overview || "No description available."}</span>
-            {result.id === currentTmdbId && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary"><Check className="size-3" />Current match</span>}
-          </span>
-        </button>
-      </li>)}</ul>
+      <ul className="space-y-2">{results.map(result => <li key={result.id}><TmdbResultCard result={result} disabled={busy} current={result.id === currentTmdbId} onSelect={() => choose(result.id)} /></li>)}</ul>
     </>}
 
     {preview && <>
@@ -122,8 +115,8 @@ export default function EditShowMatch({ showId, showName, currentTmdbId, onCance
         </label>}
       </div>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => setPreview(null)}>Back</Button>
-        <Button type="button" disabled={busy || !preview.canApply || (preview.progress.needsAcknowledgement && !acknowledged)} onClick={apply}>{busy ? "Saving…" : "Use this series"}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => setPreview(null)}>Cancel</Button>
+        <Button type="button" disabled={busy || !preview.canApply || (preview.progress.needsAcknowledgement && !acknowledged)} onClick={apply}>{busy ? "Saving…" : "Confirm match"}</Button>
       </div>
     </>}
   </section>;
