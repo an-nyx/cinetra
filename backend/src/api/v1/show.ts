@@ -1,9 +1,17 @@
 import { Router, Request, Response } from "express";
 import { showModule } from '../../modules/show';
 import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.entity';
-import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError } from '../../services/episode-guide.service';
+import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming } from '../../services/episode-guide.service';
 
 const router = Router();
+
+// Adding, editing or removing a show can change the schedule: refresh Upcoming (in the background) after success.
+router.use((req, res, next) => {
+  if ((req.method === 'POST' && req.path === '/') || ((req.method === 'PUT' || req.method === 'DELETE') && /^\/[^/]+$/.test(req.path))) {
+    res.on('finish', () => { if (res.statusCode < 400) invalidateUpcoming(req.user.id); });
+  }
+  next();
+});
 
 function guideError(res: Response, error: unknown) {
   if (error instanceof EpisodeGuideError) res.status(error.status).json({ message: error.message });

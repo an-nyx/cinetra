@@ -2,17 +2,20 @@ import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 import { type EpisodeMetadata } from './legacy-progress.model';
-import { buildTrackingSummary, catalogFromTMDB, checkpointAfterUnwatch, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
+import { buildTrackingSummary, catalogFromTMDB, checkpointAfterUnwatch, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type CatalogMeta, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
 import { TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb/tmdb-auth';
 import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
 import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type ScheduleIdentity, type UpcomingItem } from './upcoming-schedule.model';
 import { chooseScheduleOnlyTMDBMatch, type ScheduleMatch } from './schedule-identity';
+import { mapLimit, SWRCache } from './swr-cache';
 
 const tmdb = new TMDBApiService();
 const today = () => new Date().toISOString().slice(0, 10);
 type Episode = EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; watchedAt: Date | null; episodeType?: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null };
-const catalogCache = new Map<string, { until: number; value: Promise<Catalog> }>();
-const upcomingCache = new Map<string, { until: number; value: Promise<Awaited<ReturnType<typeof buildUpcomingReleases>>> }>();
+// Catalogs: fresh for 1 hour, then served stale (up to 24 hours) while one background refresh runs.
+const catalogCache = new SWRCache<Catalog>({ freshMs: 60 * 60_000, staleMs: 24 * 60 * 60_000, retryMs: 5 * 60_000 });
+// Upcoming per user: fresh for 5 minutes, then served stale (up to 6 hours) while it rebuilds in the background.
+const upcomingCache = new SWRCache<Awaited<ReturnType<typeof buildUpcomingReleases>>>({ freshMs: 5 * 60_000, staleMs: 6 * 60 * 60_000, retryMs: 60_000, maxEntries: 200 });
 
 export class EpisodeGuideError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -23,18 +26,13 @@ const validNumber = (value: unknown, minimum: number) => typeof value === 'numbe
 async function catalogFor(show: { name: string; tmdbId: number | null }): Promise<Catalog> {
   if (!show.tmdbId) throw new EpisodeGuideError(404, 'TMDB match required to load episode metadata');
   const tmdbId = show.tmdbId;
-  const key = `tmdb:${tmdbId}`;
-  const cached = catalogCache.get(key);
-  if (cached && cached.until > Date.now()) return cached.value;
-  const value = (async (): Promise<Catalog> => {
+  return catalogCache.get(`tmdb:${tmdbId}`, async () => {
     const details = await tmdb.getShow(tmdbId);
     const numbers = (details.seasons || []).filter(s => s.season_number > 0).map(s => s.season_number);
     // A page that fails for a season that has not aired yet must not break released progress (see catalogFromTMDB).
     const settled = await Promise.allSettled(numbers.map(n => tmdb.getSeason(tmdbId, n)));
     return catalogFromTMDB(details, settled.map((r, i) => ({ season: numbers[i], data: r.status === 'fulfilled' ? r.value : null })), today());
-  })().catch(error => { if (!(error instanceof EpisodeGuideError && error.status === 404)) catalogCache.delete(key); throw error; });
-  catalogCache.set(key, { until: Date.now() + 60 * 60_000, value });
-  return value;
+  });
 }
 
 async function load(showId: string, userId: string) {
@@ -55,10 +53,8 @@ export function classifyMetadataFailure(error: unknown): MetadataFailure {
   return 'tmdb_unavailable';
 }
 
-export async function getTrackingSummary(showId: string, userId: string) {
-  const show = await prisma.show.findFirst({ where: { id: showId, userId } });
-  if (!show) throw new EpisodeGuideError(404, 'Show not found');
-  const watches = await prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } });
+type ShowRow = NonNullable<Awaited<ReturnType<typeof prisma.show.findFirst>>>;
+async function summarize(show: ShowRow, watches: { season: number; episode: number; watchedAt: Date }[]) {
   let catalog: Catalog | null = null;
   let metadataError: string | null = null;
   let metadataFailure: MetadataFailure | null = null;
@@ -70,12 +66,25 @@ export async function getTrackingSummary(showId: string, userId: string) {
   return buildTrackingSummary(show, catalog, metadataError, watches, today(), metadataFailure);
 }
 
+export async function getTrackingSummary(showId: string, userId: string) {
+  const show = await prisma.show.findFirst({ where: { id: showId, userId } });
+  if (!show) throw new EpisodeGuideError(404, 'Show not found');
+  const watches = await prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } });
+  return summarize(show, watches);
+}
+
+/** Every show's summary: two database queries for the whole library, and at most 12 catalogs loading at once. */
 export async function getLibraryTracking(userId: string) {
-  const shows = await prisma.show.findMany({ where: { userId }, select: { id: true } });
-  return Promise.all(shows.map(async show => {
-    try { return { ...(await getTrackingSummary(show.id, userId)), error: null }; }
+  const [shows, watches] = await Promise.all([
+    prisma.show.findMany({ where: { userId } }),
+    prisma.episodeWatch.findMany({ where: { show: { userId } }, select: { showId: true, season: true, episode: true, watchedAt: true } }),
+  ]);
+  const byShow = new Map<string, { season: number; episode: number; watchedAt: Date }[]>();
+  for (const w of watches) byShow.set(w.showId, [...(byShow.get(w.showId) || []), { season: w.season, episode: w.episode, watchedAt: w.watchedAt }]);
+  return mapLimit(shows, 12, async show => {
+    try { return { ...(await summarize(show, byShow.get(show.id) || [])), error: null }; }
     catch (error) { return { showId: show.id, error: error instanceof Error ? error.message : 'Episode guide unavailable' }; }
-  }));
+  });
 }
 
 const scheduleMatchCache = new Map<string, { until: number; value: Promise<ScheduleMatch | { tmdbId: null; reason: 'search_failed' }> }>();
@@ -106,52 +115,53 @@ async function buildUpcomingReleases(userId: string) {
       const match = await scheduleOnlyTMDBMatch(show, linkedTmdbIds);
       if (match.tmdbId !== null) { tmdbId = match.tmdbId; identity = 'schedule_match'; } else { unlinkedRejection = match.reason; identity = 'library_title'; }
     }
-    let details: Awaited<ReturnType<TMDBApiService['getShow']>> | null = null;
+    // Show-level details as Upcoming needs them, taken from the cached catalog (no extra TMDB requests).
+    let details: { name: string | null; original_name: string | null; overview: string | null; first_air_date: string | null; status: string | null; in_production: boolean | null; next_episode_to_air: CatalogMeta['nextEpisode'] } | null = null;
     let tmdbFailed = false;
     let tmdbErrorType: string | null = null;
     let tvmazeEntries = 0;
-    let tmdbSeasonFailures = 0;
+    const tmdbSeasonFailures = 0; // the catalog loads all seasons or fails as a whole
     let scheduleMetadataIncomplete = false;
     const canonical = new Map<string, { name: string; airDate: string | null }>();
     const releases = new Map<string, UpcomingItem>();
     try {
       if (!tmdbId) throw new EpisodeGuideError(404, 'No TMDB identity for schedule');
-      details = await tmdb.getShow(tmdbId);
-      const next = details.next_episode_to_air;
-      const seasons = (details.seasons || []).filter(season => season.season_number > 0 && season.episode_count > 0);
-      const currentSeason = next?.season_number || details.last_episode_to_air?.season_number || seasons[seasons.length - 1]?.season_number;
+      const catalog = await catalogFor({ name: show.name, tmdbId });
+      const meta = catalog.meta;
+      details = { name: meta?.name ?? null, original_name: meta?.originalName ?? null, overview: meta?.overview ?? null, first_air_date: meta?.firstAirDate ?? null, status: catalog.broadcastStatus, in_production: catalog.inProduction, next_episode_to_air: meta?.nextEpisode ?? null };
+      const next = meta?.nextEpisode ?? null;
+      const seasons = catalog.seasons.filter(season => season.number > 0 && season.episodeCount > 0);
+      const currentSeason = next?.season || meta?.lastAiredSeason || seasons[seasons.length - 1]?.number;
       const candidateSeasons = new Set<number>();
       if (currentSeason) candidateSeasons.add(currentSeason);
       for (const season of seasons) {
-        if (season.season_number >= (currentSeason || 1) && season.air_date && season.air_date >= todayDate) candidateSeasons.add(season.season_number);
+        const airDate = meta?.seasonAirDates[season.number];
+        if (season.number >= (currentSeason || 1) && airDate && airDate >= todayDate) candidateSeasons.add(season.number);
       }
       const seasonNumbers = [...candidateSeasons].sort((a, b) => a - b).slice(0, 4);
-      const pages = await Promise.all(seasonNumbers.map(async season => {
-        try { return { season, data: await tmdb.getSeason(tmdbId!, season) }; }
-        catch { tmdbSeasonFailures++; return { season, data: null }; }
-      }));
-      scheduleMetadataIncomplete = pages.some(page => {
-        const expected = seasons.find(season => season.season_number === page.season)?.episode_count;
-        const regular = (page.data?.episodes || []).filter(episode => episode.episode_number > 0);
-        return !page.data || regular.length < (expected || 0) || regular.some(episode => !episode.air_date);
+      const episodesOf = (season: number) => catalog.episodes.filter(episode => episode.season === season && episode.number > 0);
+      scheduleMetadataIncomplete = seasonNumbers.some(season => {
+        const expected = seasons.find(item => item.number === season)?.episodeCount || 0;
+        const regular = episodesOf(season);
+        return regular.length < expected || regular.some(episode => !episode.airDate);
       });
-      for (const page of pages) for (const episode of page.data?.episodes || []) {
-        if (episode.episode_number > 0) canonical.set(`${page.season}:${episode.episode_number}`, { name: episode.name || '', airDate: episode.air_date || null });
-        if (episode.episode_number > 0 && episode.air_date && episode.air_date >= todayDate) {
-          const key = `${page.season}:${episode.episode_number}`;
+      for (const season of seasonNumbers) for (const episode of episodesOf(season)) {
+        const key = `${season}:${episode.number}`;
+        canonical.set(key, { name: episode.name || '', airDate: episode.airDate });
+        if (episode.airDate && episode.airDate >= todayDate) {
           releases.set(key, {
             showId: show.id, showName: show.name, posterURL: show.posterURL, showStatus: show.status,
-            season: page.season, number: episode.episode_number, name: episode.name || '', airDate: episode.air_date,
-            airTimestamp: null, seasonPremiere: episode.episode_number === 1, scheduleSource: 'TMDB', scheduleConflict: false, scheduleIdentity: identity,
+            season, number: episode.number, name: episode.name || '', airDate: episode.airDate,
+            airTimestamp: null, seasonPremiere: episode.number === 1, scheduleSource: 'TMDB', scheduleConflict: false, scheduleIdentity: identity,
           });
         }
       }
-      if (next && next.season_number > 0 && next.episode_number > 0 && next.air_date >= todayDate) {
-        const key = `${next.season_number}:${next.episode_number}`;
+      if (next && next.season > 0 && next.number > 0 && next.airDate && next.airDate >= todayDate) {
+        const key = `${next.season}:${next.number}`;
         if (!releases.has(key)) releases.set(key, {
           showId: show.id, showName: show.name, posterURL: show.posterURL, showStatus: show.status,
-          season: next.season_number, number: next.episode_number, name: next.name || '', airDate: next.air_date,
-          airTimestamp: null, seasonPremiere: next.episode_number === 1, scheduleSource: 'TMDB', scheduleConflict: false, scheduleIdentity: identity,
+          season: next.season, number: next.number, name: next.name || '', airDate: next.airDate,
+          airTimestamp: null, seasonPremiere: next.number === 1, scheduleSource: 'TMDB', scheduleConflict: false, scheduleIdentity: identity,
         });
       }
     } catch (error) {
@@ -203,12 +213,8 @@ async function buildUpcomingReleases(userId: string) {
       tba: isReturningWithoutDate(broadcastStatus, releases.size > 0) ? { showId: show.id, showName: show.name, posterURL: show.posterURL, broadcastStatus } : null,
     };
   };
-  const results: Awaited<ReturnType<typeof fetchOne>>[] = [];
-  // Each show performs at most one details call and a small set of relevant
-  // season calls. Keep the show-level concurrency low to avoid TMDB burst limits.
-  for (let index = 0; index < shows.length; index += 8) {
-    results.push(...await Promise.all(shows.slice(index, index + 8).map(fetchOne)));
-  }
+  // Linked shows read their cached catalog; TVMaze lookups are rate-limited separately.
+  const results = await mapLimit(shows, 8, fetchOne);
   const unique = new Map<string, (typeof results)[number]['releases'][number]>();
   for (const release of results.flatMap(result => result.releases)) {
     const key = release.season && release.number ? `${release.showId}:${release.season}:${release.number}` : `${release.showId}:${release.airDate}:${release.name.toLocaleLowerCase()}`;
@@ -243,12 +249,47 @@ async function buildUpcomingReleases(userId: string) {
 }
 
 export function getUpcomingReleases(userId: string) {
-  const cached = upcomingCache.get(userId);
-  if (cached && cached.until > Date.now()) return cached.value;
-  const value = buildUpcomingReleases(userId).catch(error => { upcomingCache.delete(userId); throw error; });
-  if (upcomingCache.size > 100) upcomingCache.delete(upcomingCache.keys().next().value!);
-  upcomingCache.set(userId, { until: Date.now() + 5 * 60_000, value });
-  return value;
+  return upcomingCache.get(userId, () => buildUpcomingReleases(userId));
+}
+
+/** The library changed (show added, removed or re-linked): the next request gets the current list and rebuilds it. */
+export function invalidateUpcoming(userId: string) {
+  upcomingCache.delete(userId);
+}
+
+let warmup: { state: 'idle' | 'running' | 'done' | 'failed'; startedAt?: string; finishedAt?: string; catalogs?: number; users?: number } = { state: 'idle' };
+/**
+ * Fill the caches in the background after the server starts, so the first visitor after a deploy does not wait for
+ * hundreds of TMDB requests and rate-limited TVMaze lookups. Read-only; failures are logged and ignored.
+ */
+export async function warmCaches() {
+  if (warmup.state === 'running') return;
+  warmup = { state: 'running', startedAt: new Date().toISOString() };
+  try {
+    const linked = await prisma.show.findMany({ where: { tmdbId: { not: null } }, select: { name: true, tmdbId: true }, distinct: ['tmdbId'] });
+    await mapLimit(linked, 6, show => catalogFor(show).catch(() => null));
+    const users = await prisma.show.findMany({ select: { userId: true }, distinct: ['userId'] });
+    for (const { userId } of users) await getUpcomingReleases(userId).catch(() => null);
+    warmup = { ...warmup, state: 'done', finishedAt: new Date().toISOString(), catalogs: catalogCache.size, users: users.length };
+  } catch {
+    warmup = { ...warmup, state: 'failed', finishedAt: new Date().toISOString() };
+  }
+  console.log(`Cache warm-up ${warmup.state}: ${warmup.catalogs ?? 0} catalogs, ${warmup.users ?? 0} users`);
+}
+
+/** Public, non-sensitive health: whether TMDB authentication works and whether caches are warm. No user data. */
+const tmdbHealthCache = new SWRCache<{ status: 'ok' | 'auth_failed' | 'not_configured' | 'unavailable'; httpStatus: number | null; checkedAt: string }>({ freshMs: 5 * 60_000, staleMs: 5 * 60_000 });
+export async function getHealth() {
+  const tmdbHealth = await tmdbHealthCache.get('tmdb', async () => {
+    try { await tmdb.ping(); return { status: 'ok' as const, httpStatus: 200, checkedAt: new Date().toISOString() }; }
+    catch (error) {
+      const failure = classifyMetadataFailure(error);
+      const httpStatus = axios.isAxiosError(error) ? error.response?.status ?? null : null;
+      const notConfigured = error instanceof Error && error.message === TMDB_AUTH_CONFIGURATION_ERROR;
+      return { status: notConfigured ? 'not_configured' as const : failure === 'tmdb_auth_failed' ? 'auth_failed' as const : 'unavailable' as const, httpStatus, checkedAt: new Date().toISOString() };
+    }
+  });
+  return { tmdb: tmdbHealth, caches: { catalogs: catalogCache.size, upcomingUsers: upcomingCache.size, warmup } };
 }
 
 export async function getEpisodeGuide(showId: string, userId: string, season: number) {

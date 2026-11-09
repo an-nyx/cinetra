@@ -4,8 +4,15 @@ import {
 } from './legacy-progress.model';
 
 export type CatalogEpisode = EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; episodeType?: string | null };
+/** Show-level TMDB details kept with the catalog so Upcoming can reuse it instead of re-downloading. */
+export type CatalogMeta = {
+  name: string | null; originalName: string | null; overview: string | null; firstAirDate: string | null;
+  nextEpisode: { season: number; number: number; name: string; airDate: string | null } | null;
+  lastAiredSeason: number | null; seasonAirDates: Record<number, string | null>;
+};
 export type Catalog = Omit<EpisodeCatalog, 'episodes'> & {
   episodes: CatalogEpisode[]; source: 'TMDB'; broadcastStatus: string | null; inProduction: boolean | null; nextEpisodeAnnounced: boolean;
+  meta?: CatalogMeta;
 };
 export type TrackedShow = { id: string; name: string; posterURL: string | null; status: string | null; completed: boolean; seasonsWatched: number; episodesWatched: number };
 export type WatchRecord = { season: number; episode: number; watchedAt: Date };
@@ -62,7 +69,12 @@ function describeMetadataGap(catalog: Catalog, today: string) {
   return 'TMDB episode data is incomplete.';
 }
 
-type TMDBDetailsLike = { status?: string | null; in_production?: boolean | null; next_episode_to_air?: unknown; seasons?: { season_number: number; episode_count: number; air_date?: string | null }[] };
+type TMDBEpisodeRef = { season_number: number; episode_number: number; name?: string; air_date?: string | null };
+type TMDBDetailsLike = {
+  name?: string | null; original_name?: string | null; overview?: string | null; first_air_date?: string | null;
+  status?: string | null; in_production?: boolean | null; next_episode_to_air?: TMDBEpisodeRef | null; last_episode_to_air?: TMDBEpisodeRef | null;
+  seasons?: { season_number: number; episode_count: number; air_date?: string | null }[];
+};
 type TMDBSeasonLike = { episodes?: { episode_number: number; name?: string; air_date?: string | null; runtime?: number | null; episode_type?: string | null }[] };
 
 /**
@@ -80,6 +92,12 @@ export function catalogFromTMDB(details: TMDBDetailsLike, pages: { season: numbe
   return {
     source: 'TMDB', seasons: seasons.map(s => ({ number: s.season_number, episodeCount: s.episode_count })),
     broadcastStatus: details.status || null, inProduction: typeof details.in_production === 'boolean' ? details.in_production : null, nextEpisodeAnnounced: !!details.next_episode_to_air,
+    meta: {
+      name: details.name || null, originalName: details.original_name || null, overview: details.overview || null, firstAirDate: details.first_air_date || null,
+      nextEpisode: details.next_episode_to_air ? { season: details.next_episode_to_air.season_number, number: details.next_episode_to_air.episode_number, name: details.next_episode_to_air.name || '', airDate: details.next_episode_to_air.air_date || null } : null,
+      lastAiredSeason: details.last_episode_to_air?.season_number ?? null,
+      seasonAirDates: Object.fromEntries(seasons.map(s => [s.season_number, s.air_date || null])),
+    },
     episodes: pages.flatMap(page => (page.data?.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: page.season, number: e.episode_number, name: e.name || '', airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null, episodeType: e.episode_type || null }))),
   };
 }
