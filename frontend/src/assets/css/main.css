@@ -270,9 +270,9 @@ h1, h2, h3 { letter-spacing: -0.035em; }
   [data-slot="skeleton"]::after { animation: none !important; }
 }
 
-/* Size compact phone posters from their column width, independent of browser toolbar height. */
+/* Keep phone posters compact and sized only by their grid column, independent of browser chrome. */
 @media (max-width: 639px) {
-  .compact-show-poster { aspect-ratio: 4 / 3; }
+  .compact-show-poster { aspect-ratio: 1 / 1.07; }
 }
 
 /* Compact Home dashboard and Upcoming calendar (phone-first). */
