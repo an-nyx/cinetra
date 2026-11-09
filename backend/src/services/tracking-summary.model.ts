@@ -1,5 +1,5 @@
 import {
-  calculateLegacyCoverage, calculateTrackingProgress, episodeKey, mergeEpisodeWatchState,
+  calculateLegacyCoverage, calculateTrackingProgress, episodeKey, isReleasedMetadataReliable, mergeEpisodeWatchState,
   type BroadcastStatus, type EpisodeCatalog, type EpisodeMetadata,
 } from './legacy-progress.model';
 
@@ -62,6 +62,70 @@ function describeMetadataGap(catalog: Catalog, today: string) {
   return 'TMDB episode data is incomplete.';
 }
 
+type TMDBDetailsLike = { status?: string | null; in_production?: boolean | null; next_episode_to_air?: unknown; seasons?: { season_number: number; episode_count: number; air_date?: string | null }[] };
+type TMDBSeasonLike = { episodes?: { episode_number: number; name?: string; air_date?: string | null; runtime?: number | null; episode_type?: string | null }[] };
+
+/**
+ * Build the catalog from TMDB show details and per-season pages. A season page that could not be loaded is tolerated
+ * only when that season has not started airing (announced, undated or future): it then contributes no episodes, so an
+ * announcement can never break or reduce released progress. A missing page for a season that has aired is an error.
+ */
+export function catalogFromTMDB(details: TMDBDetailsLike, pages: { season: number; data: TMDBSeasonLike | null }[], today: string): Catalog {
+  const seasons = (details.seasons || []).filter(s => s.season_number > 0);
+  for (const page of pages) {
+    if (page.data) continue;
+    const airDate = seasons.find(s => s.season_number === page.season)?.air_date;
+    if (airDate && airDate <= today) throw new Error(`TMDB season ${page.season} could not be loaded`);
+  }
+  return {
+    source: 'TMDB', seasons: seasons.map(s => ({ number: s.season_number, episodeCount: s.episode_count })),
+    broadcastStatus: details.status || null, inProduction: typeof details.in_production === 'boolean' ? details.in_production : null, nextEpisodeAnnounced: !!details.next_episode_to_air,
+    episodes: pages.flatMap(page => (page.data?.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: page.season, number: e.episode_number, name: e.name || '', airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null, episodeType: e.episode_type || null }))),
+  };
+}
+
+export type Checkpoint = { seasonsWatched: number; episodesWatched: number };
+const releasedRegular = (catalog: Catalog, today: string) => regularOf(catalog).filter(e => !!e.airDate && e.airDate <= today);
+const positionOf = (catalog: Catalog, episode: { season: number; number: number }): Checkpoint => ({
+  seasonsWatched: episode.season, episodesWatched: regularOf(catalog).filter(e => e.season === episode.season && e.number <= episode.number).length,
+});
+
+/**
+ * After a user marks episodes watched: advance the saved checkpoint through every released episode that directly
+ * follows it and now has an individual record. Returns null when nothing should change. Never runs for shows without
+ * a saved position, for positions that need review, or when released-episode metadata is unreliable.
+ */
+export function checkpointAfterWatch(show: TrackedShow, catalog: Catalog, watches: { season: number; episode: number }[], today: string): Checkpoint | null {
+  if (show.seasonsWatched === 0 && show.episodesWatched === 0) return null;
+  const legacy = calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today);
+  if (legacy.needsReview || !isReleasedMetadataReliable(catalog, today)) return null;
+  const explicit = new Set(watches.map(w => episodeKey(w.season, w.episode)));
+  let reached: CatalogEpisode | null = null;
+  for (const episode of releasedRegular(catalog, today)) {
+    const key = episodeKey(episode.season, episode.number);
+    if (legacy.covered.has(key)) continue;
+    if (!explicit.has(key)) break;
+    reached = episode;
+  }
+  return reached ? positionOf(catalog, reached) : null;
+}
+
+/**
+ * After a user un-marks the episode the checkpoint points at (it has an individual record and is covered by the
+ * position): step the checkpoint back by exactly one episode. Returns null for any other episode.
+ */
+export function checkpointAfterUnwatch(show: TrackedShow, catalog: Catalog, season: number, episode: number, today: string): Checkpoint | null {
+  if (show.seasonsWatched === 0 && show.episodesWatched === 0) return null;
+  const legacy = calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today);
+  if (legacy.needsReview) return null;
+  const covered = regularOf(catalog).filter(e => legacy.covered.has(episodeKey(e.season, e.number)));
+  const last = covered[covered.length - 1];
+  if (!last || last.season !== season || last.number !== episode) return null;
+  const index = positionOf(catalog, last).episodesWatched;
+  if (index > 1) return { seasonsWatched: season, episodesWatched: index - 1 };
+  return season === 1 ? { seasonsWatched: 0, episodesWatched: 0 } : { seasonsWatched: season, episodesWatched: 0 };
+}
+
 /** Saved position plus explicit records, merged per episode. A show without a saved position contributes no coverage. */
 export function mergeShowEpisodes(show: TrackedShow, catalog: Catalog | null, watches: WatchRecord[], today: string) {
   const watchMap = new Map(watches.map(w => [episodeKey(w.season, w.episode), w.watchedAt]));
@@ -111,7 +175,12 @@ export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null,
     watchedCount: watched, explicitWatchedCount: watches.length, legacyInferredCount, releasedCount: released.length, remainingCount: remaining.length,
     progressPercent: progress.progressPercent, progressUnavailable, broadcastStatus, viewingState: progress.viewingState, completionEligible: fullyWatched, finalSeason, finalityConfirmed, metadataError, statusProgressNote,
     lastEpisode: last, nextEpisode: progress.progressReliable ? remaining[0] || null : null, upcomingEpisode: upcoming[0] || null,
-    newEpisodes: remaining.filter(e => !!last && e.airDate! > last.watchedAt!.toISOString().slice(0, 10)).length,
+    // "New" = released and unwatched, aired after your latest watch (its date, or for a saved position without
+    // individual records, the air date of the latest episode it covers).
+    newEpisodes: (() => {
+      const since = last ? last.watchedAt!.toISOString().slice(0, 10) : released.filter(e => e.watched).map(e => e.airDate!).sort().at(-1);
+      return since ? remaining.filter(e => e.airDate! > since).length : 0;
+    })(),
     recentHistory: [...watches].sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime()).slice(0, 5),
   };
 }

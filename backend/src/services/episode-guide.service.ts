@@ -2,7 +2,7 @@ import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 import { type EpisodeMetadata } from './legacy-progress.model';
-import { buildTrackingSummary, mergeShowEpisodes, type Catalog, type MetadataFailure } from './tracking-summary.model';
+import { buildTrackingSummary, catalogFromTMDB, checkpointAfterUnwatch, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
 import { TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb/tmdb-auth';
 import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
 import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type ScheduleIdentity, type UpcomingItem } from './upcoming-schedule.model';
@@ -28,9 +28,10 @@ async function catalogFor(show: { name: string; tmdbId: number | null }): Promis
   if (cached && cached.until > Date.now()) return cached.value;
   const value = (async (): Promise<Catalog> => {
     const details = await tmdb.getShow(tmdbId);
-    const seasons = (details.seasons || []).filter(s => s.season_number > 0).map(s => ({ number: s.season_number, episodeCount: s.episode_count }));
-    const pages = await Promise.all(seasons.map(s => tmdb.getSeason(tmdbId, s.number)));
-    return { source: 'TMDB', seasons, broadcastStatus: details.status || null, inProduction: typeof details.in_production === 'boolean' ? details.in_production : null, nextEpisodeAnnounced: !!details.next_episode_to_air, episodes: pages.flatMap((page, i) => (page.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: seasons[i].number, number: e.episode_number, name: e.name, airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null, episodeType: e.episode_type || null }))) };
+    const numbers = (details.seasons || []).filter(s => s.season_number > 0).map(s => s.season_number);
+    // A page that fails for a season that has not aired yet must not break released progress (see catalogFromTMDB).
+    const settled = await Promise.allSettled(numbers.map(n => tmdb.getSeason(tmdbId, n)));
+    return catalogFromTMDB(details, settled.map((r, i) => ({ season: numbers[i], data: r.status === 'fulfilled' ? r.value : null })), today());
   })().catch(error => { if (!(error instanceof EpisodeGuideError && error.status === 404)) catalogCache.delete(key); throw error; });
   catalogCache.set(key, { until: Date.now() + 60 * 60_000, value });
   return value;
@@ -257,28 +258,50 @@ export async function getEpisodeGuide(showId: string, userId: string, season: nu
   return { seasons: catalog.seasons, season, episodes: episodes.filter(e => e.season === season), watched: watches };
 }
 
+/** Move the saved checkpoint only if it is still what was read; a concurrent edit is never overwritten. */
+async function moveCheckpoint(tx: Pick<typeof prisma, 'show'>, show: { id: string; seasonsWatched: number; episodesWatched: number }, to: Checkpoint) {
+  await tx.show.updateMany({ where: { id: show.id, seasonsWatched: show.seasonsWatched, episodesWatched: show.episodesWatched }, data: to });
+}
+
 export async function setEpisodeWatched(showId: string, userId: string, season: number, episode: number, watched: boolean) {
   if (!validNumber(season, 1) || !validNumber(episode, 1) || typeof watched !== 'boolean') throw new EpisodeGuideError(400, 'Invalid episode update');
-  const { episodes } = await load(showId, userId);
+  const { show, catalog, episodes, watches } = await load(showId, userId);
   const found = episodes.find(e => e.season === season && e.number === episode);
   if (!found) throw new EpisodeGuideError(404, 'Episode not found');
   if (found.watchSource === 'legacy' || found.watchSource === 'both') {
-    if (!watched) throw new EpisodeGuideError(409, 'This episode is covered by the saved legacy position. Use Edit Progress to change that position.');
+    if (watched) return getTrackingSummary(showId, userId);
+    // Un-marking the episode the checkpoint points at (logged individually) steps the checkpoint back by one.
+    const back = found.watchSource === 'both' ? checkpointAfterUnwatch(show, catalog, season, episode, today()) : null;
+    if (!back) throw new EpisodeGuideError(409, 'This episode is covered by the saved legacy position. Use Edit Progress to change that position.');
+    await prisma.$transaction(async tx => {
+      await tx.episodeWatch.deleteMany({ where: { showId, season, episode } });
+      await moveCheckpoint(tx, show, back);
+    });
     return getTrackingSummary(showId, userId);
   }
   if (watched && found.watched) return getTrackingSummary(showId, userId);
   if (watched && (!found.airDate || found.airDate > today())) throw new EpisodeGuideError(400, 'Episode has not aired');
-  if (watched) await prisma.episodeWatch.upsert({ where: { showId_season_episode: { showId, season, episode } }, create: { showId, season, episode }, update: {} });
-  else await prisma.episodeWatch.deleteMany({ where: { showId, season, episode } });
+  if (watched) {
+    await prisma.$transaction(async tx => {
+      await tx.episodeWatch.upsert({ where: { showId_season_episode: { showId, season, episode } }, create: { showId, season, episode }, update: {} });
+      // Watching the episode right after the saved checkpoint advances it (user action only; never from metadata).
+      const forward = checkpointAfterWatch(show, catalog, [...watches, { season, episode }], today());
+      if (forward) await moveCheckpoint(tx, show, forward);
+    });
+  } else await prisma.episodeWatch.deleteMany({ where: { showId, season, episode } });
   return getTrackingSummary(showId, userId);
 }
 
 export async function setSeasonWatched(showId: string, userId: string, season: number) {
   if (!validNumber(season, 1)) throw new EpisodeGuideError(400, 'Invalid season');
-  const { catalog, episodes } = await load(showId, userId);
+  const { show, catalog, episodes, watches } = await load(showId, userId);
   if (!catalog.seasons.some(s => s.number === season)) throw new EpisodeGuideError(404, 'Season not found');
   const aired = episodes.filter(e => e.season === season && e.airDate && e.airDate <= today() && !e.watched);
-  await prisma.episodeWatch.createMany({ data: aired.map(e => ({ showId, season, episode: e.number })), skipDuplicates: true });
+  await prisma.$transaction(async tx => {
+    await tx.episodeWatch.createMany({ data: aired.map(e => ({ showId, season, episode: e.number })), skipDuplicates: true });
+    const forward = checkpointAfterWatch(show, catalog, [...watches, ...aired.map(e => ({ season, episode: e.number }))], today());
+    if (forward) await moveCheckpoint(tx, show, forward);
+  });
   return getTrackingSummary(showId, userId);
 }
 
