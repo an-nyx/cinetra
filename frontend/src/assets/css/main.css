@@ -158,6 +158,28 @@ button, a, input, select, textarea { touch-action: manipulation; }
 }
 
 @media (max-width: 767px) {
+  [data-slot="dialog-content"].account-settings-dialog {
+    box-sizing: border-box;
+    top: max(0.75rem, env(safe-area-inset-top));
+    bottom: auto;
+    left: 50%;
+    width: calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right));
+    max-width: 600px;
+    max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)) - max(0.75rem, env(safe-area-inset-bottom)));
+    transform: translate(-50%, 0);
+    translate: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 1.5rem;
+    padding: 1.5rem 1.25rem max(1.25rem, env(safe-area-inset-bottom));
+  }
+  [data-slot="dialog-content"].account-settings-dialog > [data-slot="dialog-header"] {
+    min-width: 0;
+    padding-right: 3rem;
+  }
+
   [data-slot="button"], [data-slot="select-trigger"], [data-slot="dropdown-menu-trigger"] { min-height: 44px; }
   [data-slot="button"][data-size="icon"] { min-width: 44px; }
   [data-slot="input"], [data-slot="textarea"], [data-slot="input-group-control"] { font-size: 16px; }
