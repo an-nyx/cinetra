@@ -4,11 +4,14 @@ import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
 import { positionDetails, viewingStateLabel } from "@/lib/tracking";
 import { posterSrc } from "@/lib/poster";
+import { personalStatus, personalStatusColors, personalStatusLabels } from "@/lib/show-library";
 
 interface ShowProps {
   id: string;
   name: string;
   favorite: boolean;
+  status?: ShowType["status"];
+  completed: boolean;
   posterURL: string;
   setSelectedShow: React.Dispatch<React.SetStateAction<string>>;
   shows: ShowType[];
@@ -22,6 +25,8 @@ export default function Show({
   id,
   name,
   favorite,
+  status,
+  completed,
   posterURL,
   setSelectedShow,
   shows,
@@ -29,6 +34,8 @@ export default function Show({
   tracking,
   onMarkNext,
 }: ShowProps) {
+  const savedStatus = personalStatus({ status, completed });
+  const borderColor = personalStatusColors[savedStatus];
   const toggleFavorite = async (id: string, favorite: boolean) => {
     try {
       await ShowService.toggleFavorite(id, !favorite);
@@ -49,6 +56,7 @@ export default function Show({
     <article className="group relative min-w-0">
       <button
         type="button"
+        style={borderColor ? { borderColor, borderWidth: 2 } : undefined}
         className="cinema-poster relative block aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-muted text-left transition-[transform,box-shadow,border-color] duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-[0_20px_45px_rgba(0,0,0,0.35)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none"
         onClick={() => setSelectedShow(id)}
         aria-label={`Open ${name}`}
@@ -59,7 +67,8 @@ export default function Show({
         {tracking && tracking.progressPercent !== null && <span className="absolute bottom-0 left-0 h-1 bg-primary transition-[width] duration-500" style={{ width: `${tracking.progressPercent}%` }} />}
         <span className="absolute inset-x-0 bottom-0 line-clamp-2 p-3 pb-4 text-sm font-semibold leading-5 text-white sm:text-base">{name}</span>
       </button>
-        {tracking && !tracking.error && <div className="mt-3 space-y-2 px-1"><div className="flex items-center justify-between gap-1 text-xs"><span className="truncate text-muted-foreground">{viewingStateLabel(tracking)}</span><span className="shrink-0 font-semibold text-primary" title={tracking.progressUnavailable?.detail}>{tracking.progressPercent === null ? tracking.progressUnavailable?.label || 'Unavailable' : `${tracking.progressPercent}%`}</span></div>{positionDetails(tracking) && <p className="truncate text-xs text-muted-foreground">{positionDetails(tracking)}</p>}{tracking.newEpisodes > 0 && <span className="cinema-tag">{tracking.newEpisodes} new episode{tracking.newEpisodes === 1 ? '' : 's'}</span>}{tracking.nextEpisode && onMarkNext && <button type="button" className="min-h-10 w-full rounded-xl border border-primary/35 px-2 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onMarkNext(tracking)}>Mark next watched</button>}</div>}
+      <p className="mt-2 px-1 text-xs font-medium text-foreground/80">Personal status: {personalStatusLabels[savedStatus]}</p>
+      {tracking && !tracking.error && <div className="mt-3 space-y-2 px-1"><div className="flex items-center justify-between gap-1 text-xs"><span className="truncate text-muted-foreground">{viewingStateLabel(tracking)}</span><span className="shrink-0 font-semibold text-primary" title={tracking.progressUnavailable?.detail}>{tracking.progressPercent === null ? tracking.progressUnavailable?.label || 'Unavailable' : `${tracking.progressPercent}%`}</span></div>{positionDetails(tracking) && <p className="truncate text-xs text-muted-foreground">{positionDetails(tracking)}</p>}{tracking.newEpisodes > 0 && <span className="cinema-tag">{tracking.newEpisodes} new episode{tracking.newEpisodes === 1 ? '' : 's'}</span>}{tracking.nextEpisode && onMarkNext && <button type="button" className="min-h-10 w-full rounded-xl border border-primary/35 px-2 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onMarkNext(tracking)}>Mark next watched</button>}</div>}
       <button
         type="button"
         className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-primary"
