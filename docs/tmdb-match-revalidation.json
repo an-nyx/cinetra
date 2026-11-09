@@ -1,0 +1,2009 @@
+{
+  "createdAt": "2026-11-09T08:46:31.635Z",
+  "readOnly": true,
+  "proposedAdds": 90,
+  "excludedOrHeld": 0,
+  "duplicateIdConflicts": 0,
+  "progressExceptions": [
+    {
+      "showId": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+      "name": "The Book of Boba Fett",
+      "progress": "S1E8",
+      "tmdbSeasonEpisodes": 7
+    }
+  ],
+  "missingSelectedSeason": [
+    {
+      "showId": "2ebe67e5-fd57-43b7-9c89-0f6ecb462a65",
+      "name": "3 Body Problem",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "1560e100-c8d1-4ed8-a0d2-c8410794fc4e",
+      "name": "Avatar: The Last Airbender",
+      "progress": "S3E1"
+    },
+    {
+      "showId": "2707daff-a91e-40a8-b732-8968fcce46bb",
+      "name": "Alien: Earth",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "6dd0d0fe-0ca0-4217-832d-ccd6124ec64f",
+      "name": "Bodyguard",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "3b5470df-735d-41d0-91bf-ef30f1ff8f6b",
+      "name": "Berlin",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "473ba306-ec1d-4503-9362-621aa2957de6",
+      "name": "Detective Forst",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "049add53-7371-481f-bf05-7c3926c4c312",
+      "name": "Inside Man",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "518fa390-3ed3-488c-ba03-e296723efef0",
+      "name": "Memory of a Killer",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "66ba88e9-7b61-43ab-a1ef-eb32df3e0376",
+      "name": "Invasion",
+      "progress": "S4E0"
+    },
+    {
+      "showId": "63b13721-67d6-49cb-9622-a8d33f8c1d03",
+      "name": "Robin Hood",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "b3652803-694e-45c4-882f-7da830ed7912",
+      "name": "Presumed Innocent",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "9af9e207-c40a-419d-975f-edae5ce45a39",
+      "name": "Shōgun",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "e20b6447-0767-4b90-8546-2a162f57bda2",
+      "name": "Money Heist",
+      "progress": "S5E10"
+    },
+    {
+      "showId": "98d4e0cc-eec8-4be1-b022-b46e0b6c2f2b",
+      "name": "No Way Out: The Roulette",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "e7fa6b1b-9cf1-42df-91b5-6ef24e2f3841",
+      "name": "Shadow and Bone",
+      "progress": "S3E0"
+    },
+    {
+      "showId": "7c08a7d7-314e-446e-9440-825c3b206533",
+      "name": "The Day of the Jackal",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "07f51733-e451-4ae6-9379-e0cdcfffec46",
+      "name": "The Eternaut",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "2a13d480-119d-4590-a5f0-3fbaaef738a8",
+      "name": "The Last of Us",
+      "progress": "S3E1"
+    },
+    {
+      "showId": "c3856ae2-0450-4b02-a315-db3be066560f",
+      "name": "The Peripheral",
+      "progress": "S2E0"
+    },
+    {
+      "showId": "ae80e32e-6d58-4033-b4ef-570722e99e8e",
+      "name": "Who Were We Running From?",
+      "progress": "S2E0"
+    }
+  ],
+  "results": [
+    {
+      "showId": "2ebe67e5-fd57-43b7-9c89-0f6ecb462a65",
+      "name": "3 Body Problem",
+      "progress": "S2E0",
+      "tmdbId": 108545,
+      "providerTitle": "3 Body Problem",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "3 Body Problem",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "1560e100-c8d1-4ed8-a0d2-c8410794fc4e",
+      "name": "Avatar: The Last Airbender",
+      "progress": "S3E1",
+      "tmdbId": 82452,
+      "providerTitle": "Avatar: The Last Airbender",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Avatar: The Last Airbender",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e3f71349-eed0-4c03-b076-7fb5ae765d92",
+      "name": "Ahsoka",
+      "progress": "S1E8",
+      "tmdbId": 114461,
+      "providerTitle": "Ahsoka",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "Ahsoka",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "21856a28-f1ca-4d0a-93ce-da74f87ff655",
+      "name": "2 Broke Girls",
+      "progress": "S1E9",
+      "tmdbId": 39340,
+      "providerTitle": "2 Broke Girls",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2011",
+        "originalTitle": "2 Broke Girls",
+        "altTitleMatch": false,
+        "seasonCount": 6,
+        "selectedSeasonEpisodeCount": 24,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c73335a7-932e-432b-903b-1a7e377c9144",
+      "name": "Alice in Borderland",
+      "progress": "S0E0",
+      "tmdbId": 110316,
+      "providerTitle": "Alice in Borderland",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2020",
+        "originalTitle": "今際の国のアリス",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "2707daff-a91e-40a8-b732-8968fcce46bb",
+      "name": "Alien: Earth",
+      "progress": "S2E0",
+      "tmdbId": 157239,
+      "providerTitle": "Alien: Earth",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "Alien: Earth",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "10228043-e138-42ee-9693-bc756e12a2f3",
+      "name": "All the Light We Cannot See",
+      "progress": "S1E4",
+      "tmdbId": 155421,
+      "providerTitle": "All the Light We Cannot See",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "All the Light We Cannot See",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 4,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "fa4ef113-bdb8-4716-835e-8e0fbcc10fc7",
+      "name": "Another Life",
+      "progress": "S0E0",
+      "tmdbId": 79130,
+      "providerTitle": "Another Life",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "Another Life",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "ca41203b-3062-45fe-b483-73041bd209ab",
+      "name": "Blindspot",
+      "progress": "S5E11",
+      "tmdbId": 62710,
+      "providerTitle": "Blindspot",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2015",
+        "originalTitle": "Blindspot",
+        "altTitleMatch": false,
+        "seasonCount": 5,
+        "selectedSeasonEpisodeCount": 11,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "6dd0d0fe-0ca0-4217-832d-ccd6124ec64f",
+      "name": "Bodyguard",
+      "progress": "S2E0",
+      "tmdbId": 80307,
+      "providerTitle": "Bodyguard",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2018",
+        "originalTitle": "Bodyguard",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "56cb75b3-73de-436a-b83f-d7a70559e255",
+      "name": "Berlin and the Lady with an Ermine",
+      "progress": "S1E8",
+      "tmdbId": 308014,
+      "providerTitle": "Berlin and the Lady with an Ermine",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "Berlín y la dama del armiño",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "5db694fb-e161-4148-81d7-f4c2a351f9f8",
+      "name": "Black Rabbit",
+      "progress": "S1E8",
+      "tmdbId": 249039,
+      "providerTitle": "Black Rabbit",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "Black Rabbit",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "3b5470df-735d-41d0-91bf-ef30f1ff8f6b",
+      "name": "Berlin",
+      "progress": "S2E0",
+      "tmdbId": 146176,
+      "providerTitle": "Berlin",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "Berlín",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "0facc4a1-5fe8-4650-be46-6c3f669371f8",
+      "name": "Andor",
+      "progress": "S2E12",
+      "tmdbId": 83867,
+      "providerTitle": "Andor",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2022",
+        "originalTitle": "Andor",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 12,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "97fe5f9d-2342-47ef-919a-561fb2fd2440",
+      "name": "Chernobyl",
+      "progress": "S1E5",
+      "tmdbId": 87108,
+      "providerTitle": "Chernobyl",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "Chernobyl",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 5,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "b9ce0a27-c5c4-493f-812a-b987596ccf4b",
+      "name": "Banshee",
+      "progress": "S0E0",
+      "tmdbId": 41727,
+      "providerTitle": "Banshee",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2013",
+        "originalTitle": "Banshee",
+        "altTitleMatch": false,
+        "seasonCount": 4,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "81f83a25-7a23-4c51-bdab-8d6a2cdb8f38",
+      "name": "Bosch: Legacy",
+      "progress": "S3E10",
+      "tmdbId": 153657,
+      "providerTitle": "Bosch: Legacy",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2022",
+        "originalTitle": "Bosch: Legacy",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "502d9236-41f7-42fc-95e9-8c9aa5223f40",
+      "name": "Designated Survivor",
+      "progress": "S0E0",
+      "tmdbId": 67026,
+      "providerTitle": "Designated Survivor",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2016",
+        "originalTitle": "Designated Survivor",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "6e072e57-3c04-4ff9-a923-6a206f1fd3ed",
+      "name": "Carnival Row",
+      "progress": "S2E0",
+      "tmdbId": 90027,
+      "providerTitle": "Carnival Row",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "Carnival Row",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e661768e-67b2-4083-b9a8-af3e605a4afd",
+      "name": "Colony",
+      "progress": "S3E13",
+      "tmdbId": 62858,
+      "providerTitle": "Colony",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2016",
+        "originalTitle": "Colony",
+        "altTitleMatch": false,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 13,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "d39d55ad-8e41-4701-a0a5-ec60b717a53b",
+      "name": "Disclaimer",
+      "progress": "S1E7",
+      "tmdbId": 147050,
+      "providerTitle": "Disclaimer",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Disclaimer",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 7,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "473ba306-ec1d-4503-9362-621aa2957de6",
+      "name": "Detective Forst",
+      "progress": "S2E0",
+      "tmdbId": 217522,
+      "providerTitle": "Detective Forst",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Forst",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "9c0c88dc-3fa3-4c39-8162-37c40557f0e3",
+      "name": "Game of Thrones",
+      "progress": "S8E6",
+      "tmdbId": 1399,
+      "providerTitle": "Game of Thrones",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2011",
+        "originalTitle": "Game of Thrones",
+        "altTitleMatch": false,
+        "seasonCount": 8,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "7f022400-b2a5-46cb-aa3b-29e34c9f464d",
+      "name": "Dogs of Berlin",
+      "progress": "S0E0",
+      "tmdbId": 76652,
+      "providerTitle": "Dogs of Berlin",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2018",
+        "originalTitle": "Dogs of Berlin",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c50cc4a0-c7b2-466e-8a56-4114371ee292",
+      "name": "Elite Force",
+      "progress": "S1E6",
+      "tmdbId": 281281,
+      "providerTitle": "Elite Force",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "GIGN",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "51c431cb-de16-4291-9c50-a976f0da6d48",
+      "name": "High Seas",
+      "progress": "S3E6",
+      "tmdbId": 88239,
+      "providerTitle": "High Seas",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "Alta mar",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "6d3c8571-bd3b-412b-b8a9-3799ecfb5803",
+      "name": "HIS & HERS",
+      "progress": "S1E6",
+      "tmdbId": 259731,
+      "providerTitle": "HIS & HERS",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "HIS & HERS",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "67acc4b0-0a33-4a26-81a7-9f3aad0ff6e2",
+      "name": "Fool Me Once",
+      "progress": "S1E8",
+      "tmdbId": 220801,
+      "providerTitle": "Fool Me Once",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Fool Me Once",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "670e1bcd-d17c-4fa2-9eaa-88d637e7b593",
+      "name": "Halo",
+      "progress": "S2E8",
+      "tmdbId": 52814,
+      "providerTitle": "Halo",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2022",
+        "originalTitle": "Halo",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "2e28ad33-9652-4e29-b6ef-0f5f6af67d23",
+      "name": "Farzi",
+      "progress": "S2E0",
+      "tmdbId": 132117,
+      "providerTitle": "Farzi",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "फर्जी",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 0,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e9b70733-4d1e-44ef-b98e-8ceef2fa0a82",
+      "name": "Homeland",
+      "progress": "S8E12",
+      "tmdbId": 1407,
+      "providerTitle": "Homeland",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2011",
+        "originalTitle": "Homeland",
+        "altTitleMatch": false,
+        "seasonCount": 8,
+        "selectedSeasonEpisodeCount": 12,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "d7459f58-b2a4-4e99-820e-6623fb7b6f69",
+      "name": "Humans",
+      "progress": "S3E8",
+      "tmdbId": 62822,
+      "providerTitle": "Humans",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2015",
+        "originalTitle": "Humans",
+        "altTitleMatch": false,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "049add53-7371-481f-bf05-7c3926c4c312",
+      "name": "Inside Man",
+      "progress": "S2E0",
+      "tmdbId": 121710,
+      "providerTitle": "Inside Man",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2022",
+        "originalTitle": "Inside Man",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "877e81d7-fdc0-48e7-b3d3-f3e048caf50f",
+      "name": "In Flight",
+      "progress": "S0E0",
+      "tmdbId": 276563,
+      "providerTitle": "In Flight",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "In Flight",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "518fa390-3ed3-488c-ba03-e296723efef0",
+      "name": "Memory of a Killer",
+      "progress": "S2E0",
+      "tmdbId": 291339,
+      "providerTitle": "Memory of a Killer",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 0.96,
+        "releaseYear": "2026",
+        "originalTitle": "Memory of a Killer",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c8a5d1fb-fbc4-400a-8cfa-24d427798ada",
+      "name": "I Will Find You",
+      "progress": "S1E8",
+      "tmdbId": 278178,
+      "providerTitle": "I Will Find You",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "I Will Find You",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e8d123d7-9135-4dcf-b243-24fe75e4e2d0",
+      "name": "Kingdom",
+      "progress": "S0E0",
+      "tmdbId": 70593,
+      "providerTitle": "Kingdom",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "킹덤",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "66ba88e9-7b61-43ab-a1ef-eb32df3e0376",
+      "name": "Invasion",
+      "progress": "S4E0",
+      "tmdbId": 127235,
+      "providerTitle": "Invasion",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2021",
+        "originalTitle": "Invasion",
+        "altTitleMatch": false,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "31ac6e87-10c1-425b-81fa-a9369859eb92",
+      "name": "Marvel's Iron Fist",
+      "progress": "S2E8",
+      "tmdbId": 62127,
+      "providerTitle": "Marvel's Iron Fist",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "Marvel's Iron Fist",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "2c8c52a7-b152-41d6-a5fd-9c64b0e564f1",
+      "name": "Les Misérables",
+      "progress": "S0E0",
+      "tmdbId": 81224,
+      "providerTitle": "Les Misérables",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2018",
+        "originalTitle": "Les Misérables",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "63b13721-67d6-49cb-9622-a8d33f8c1d03",
+      "name": "Robin Hood",
+      "progress": "S2E0",
+      "tmdbId": 272418,
+      "providerTitle": "Robin Hood",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "Robin Hood",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "398390f8-e0f3-4f56-be1e-df6eccd6cdfe",
+      "name": "Mr. & Mrs. Smith",
+      "progress": "S2E0",
+      "tmdbId": 118642,
+      "providerTitle": "Mr. & Mrs. Smith",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Mr. & Mrs. Smith",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 0,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "3474505a-55ee-4f97-babe-b2de8611a8b0",
+      "name": "Salvation",
+      "progress": "S2E13",
+      "tmdbId": 70513,
+      "providerTitle": "Salvation",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "Salvation",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 13,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "b3652803-694e-45c4-882f-7da830ed7912",
+      "name": "Presumed Innocent",
+      "progress": "S2E0",
+      "tmdbId": 156933,
+      "providerTitle": "Presumed Innocent",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Presumed Innocent",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "9af9e207-c40a-419d-975f-edae5ce45a39",
+      "name": "Shōgun",
+      "progress": "S2E0",
+      "tmdbId": 126308,
+      "providerTitle": "Shōgun",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "Shōgun",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e20b6447-0767-4b90-8546-2a162f57bda2",
+      "name": "Money Heist",
+      "progress": "S5E10",
+      "tmdbId": 71446,
+      "providerTitle": "Money Heist",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "La casa de papel",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "98d4e0cc-eec8-4be1-b022-b46e0b6c2f2b",
+      "name": "No Way Out: The Roulette",
+      "progress": "S2E0",
+      "tmdbId": 230351,
+      "providerTitle": "No Way Out: The Roulette",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "노 웨이 아웃: 더 룰렛",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "66945c24-a9fa-48b7-b8d6-ebce529a86a3",
+      "name": "Persona",
+      "progress": "S1E10",
+      "tmdbId": 77994,
+      "providerTitle": "Persona",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2018",
+        "originalTitle": "Şahsiyet",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 12,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e7fa6b1b-9cf1-42df-91b5-6ef24e2f3841",
+      "name": "Shadow and Bone",
+      "progress": "S3E0",
+      "tmdbId": 85720,
+      "providerTitle": "Shadow and Bone",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2021",
+        "originalTitle": "Shadow and Bone",
+        "altTitleMatch": true,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "f9c68b9c-8218-438a-b974-8ae94855c371",
+      "name": "Spider-Noir",
+      "progress": "S1E8",
+      "tmdbId": 220102,
+      "providerTitle": "Spider-Noir",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "Spider-Noir",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "90f48675-27b4-424d-b9ee-9aa7c8fa1174",
+      "name": "Shadowhunters",
+      "progress": "S2E0",
+      "tmdbId": 63210,
+      "providerTitle": "Shadowhunters",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2016",
+        "originalTitle": "Shadowhunters",
+        "altTitleMatch": false,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 20,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "b3e0ea07-777f-4b39-9853-c66dacb90304",
+      "name": "Steal",
+      "progress": "S1E6",
+      "tmdbId": 254071,
+      "providerTitle": "Steal",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "Steal",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "6fa16978-d15f-4635-875f-19f5c9fa1115",
+      "name": "Task",
+      "progress": "S1E7",
+      "tmdbId": 228305,
+      "providerTitle": "Task",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "Task",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 7,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "afdebfd0-467a-4330-8b2b-f1cc12966be4",
+      "name": "Sherlock",
+      "progress": "S0E0",
+      "tmdbId": 19885,
+      "providerTitle": "Sherlock",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2010",
+        "originalTitle": "Sherlock",
+        "altTitleMatch": false,
+        "seasonCount": 4,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "deb11f33-a2a3-4c19-943c-0cff537de81c",
+      "name": "Tell Me a Story",
+      "progress": "S0E0",
+      "tmdbId": 81747,
+      "providerTitle": "Tell Me a Story",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2018",
+        "originalTitle": "Tell Me a Story",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c0f0e960-d110-4fe5-92e5-9490e2a300d3",
+      "name": "Stranger Things",
+      "progress": "S5E8",
+      "tmdbId": 66732,
+      "providerTitle": "Stranger Things",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2016",
+        "originalTitle": "Stranger Things",
+        "altTitleMatch": false,
+        "seasonCount": 5,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "f7d1164c-70f8-4784-9189-cfd2f55db2fd",
+      "name": "The Continental: From the World of John Wick",
+      "progress": "S1E3",
+      "tmdbId": 72710,
+      "providerTitle": "The Continental: From the World of John Wick",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "The Continental: From the World of John Wick",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 3,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "a9bfe0ef-4a0b-414d-a710-24c3c88976de",
+      "name": "The Gifted",
+      "progress": "S0E0",
+      "tmdbId": 69629,
+      "providerTitle": "The Gifted",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "The Gifted",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "0e69a782-5ca1-43d6-95d7-620f18ebedfe",
+      "name": "The Handmaid's Tale",
+      "progress": "S6E10",
+      "tmdbId": 69478,
+      "providerTitle": "The Handmaid's Tale",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "The Handmaid's Tale",
+        "altTitleMatch": true,
+        "seasonCount": 6,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "dbf3466f-9b43-4c74-9c85-34a6100e14e7",
+      "name": "The Gentlemen",
+      "progress": "S2E0",
+      "tmdbId": 236235,
+      "providerTitle": "The Gentlemen",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "The Gentlemen",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+      "name": "The Book of Boba Fett",
+      "progress": "S1E8",
+      "tmdbId": 115036,
+      "providerTitle": "The Book of Boba Fett",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2021",
+        "originalTitle": "The Book of Boba Fett",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 7,
+        "positionExceedsSeason": true,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "7c08a7d7-314e-446e-9440-825c3b206533",
+      "name": "The Day of the Jackal",
+      "progress": "S2E0",
+      "tmdbId": 222766,
+      "providerTitle": "The Day of the Jackal",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "The Day of the Jackal",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "07f51733-e451-4ae6-9379-e0cdcfffec46",
+      "name": "The Eternaut",
+      "progress": "S2E0",
+      "tmdbId": 226362,
+      "providerTitle": "The Eternaut",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "El Eternauta",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c5b94cfe-fd8d-4890-aa40-0ce5051c4cd1",
+      "name": "The Inmate",
+      "progress": "S0E0",
+      "tmdbId": 82585,
+      "providerTitle": "The Inmate",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2018",
+        "originalTitle": "El recluso",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "acb58546-2f6e-41ae-a362-f3e8a066bb3a",
+      "name": "The Mandalorian",
+      "progress": "S3E8",
+      "tmdbId": 82856,
+      "providerTitle": "The Mandalorian",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "The Mandalorian",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "2f31722a-7d2a-43f5-86ab-2a4f36e5384e",
+      "name": "The Killing",
+      "progress": "S4E6",
+      "tmdbId": 34415,
+      "providerTitle": "The Killing",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2011",
+        "originalTitle": "The Killing",
+        "altTitleMatch": false,
+        "seasonCount": 4,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "2a13d480-119d-4590-a5f0-3fbaaef738a8",
+      "name": "The Last of Us",
+      "progress": "S3E1",
+      "tmdbId": 100088,
+      "providerTitle": "The Last of Us",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "The Last of Us",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "ca2aea8c-3f53-44e3-a958-62c643fcaecb",
+      "name": "The Night Agent",
+      "progress": "S4E0",
+      "tmdbId": 129552,
+      "providerTitle": "The Night Agent",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "The Night Agent",
+        "altTitleMatch": false,
+        "seasonCount": 4,
+        "selectedSeasonEpisodeCount": 0,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "5875c41f-5a6e-4092-ae50-c21ff9db851b",
+      "name": "The Last Kingdom",
+      "progress": "S0E0",
+      "tmdbId": 63333,
+      "providerTitle": "The Last Kingdom",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2015",
+        "originalTitle": "The Last Kingdom",
+        "altTitleMatch": false,
+        "seasonCount": 5,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "6ebd6132-0245-4869-a180-62dbdcb85b78",
+      "name": "The I-Land",
+      "progress": "S0E0",
+      "tmdbId": 90755,
+      "providerTitle": "The I-Land",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "The I-Land",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "11c2c390-6fde-462d-b076-c34ada705faf",
+      "name": "The Mist",
+      "progress": "S1E10",
+      "tmdbId": 68315,
+      "providerTitle": "The Mist",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "The Mist",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "d794f9d9-acd2-46b9-8a35-ad4202e0c6a8",
+      "name": "The Last Frontier",
+      "progress": "S1E10",
+      "tmdbId": 221079,
+      "providerTitle": "The Last Frontier",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "The Last Frontier",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "abb5a92c-060b-4337-b4b5-56a8f3f238c2",
+      "name": "The Outsider",
+      "progress": "S0E0",
+      "tmdbId": 84661,
+      "providerTitle": "The Outsider",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2020",
+        "originalTitle": "The Outsider",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "bcb54198-a15f-489a-bf04-8792ad380548",
+      "name": "The Penguin",
+      "progress": "S1E8",
+      "tmdbId": 194764,
+      "providerTitle": "The Penguin",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2024",
+        "originalTitle": "The Penguin",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "fb684443-ba20-46a4-b48c-05a3c289bdec",
+      "name": "Thieves of the Wood",
+      "progress": "S0E0",
+      "tmdbId": 93533,
+      "providerTitle": "Thieves of the Wood",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2020",
+        "originalTitle": "De Bende van Jan de Lichte",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "0e8ddf37-163f-43db-9285-7fc34868fad6",
+      "name": "The Night Of",
+      "progress": "S1E8",
+      "tmdbId": 66276,
+      "providerTitle": "The Night Of",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2016",
+        "originalTitle": "The Night Of",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "3e70d533-0644-48dd-acb0-d975df9ab41a",
+      "name": "The Sinner",
+      "progress": "S4E8",
+      "tmdbId": 39852,
+      "providerTitle": "The Sinner",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2017",
+        "originalTitle": "The Sinner",
+        "altTitleMatch": false,
+        "seasonCount": 4,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "c3856ae2-0450-4b02-a315-db3be066560f",
+      "name": "The Peripheral",
+      "progress": "S2E0",
+      "tmdbId": 95403,
+      "providerTitle": "The Peripheral",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2022",
+        "originalTitle": "The Peripheral",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "e6076c79-51e6-4536-ada3-b82ac0302415",
+      "name": "The Walking Dead: Dead City",
+      "progress": "S3E8",
+      "tmdbId": 194583,
+      "providerTitle": "The Walking Dead: Dead City",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "The Walking Dead: Dead City",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 8,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "b2f466cb-4fa8-46f7-86b9-619fe6bddad7",
+      "name": "The Walking Dead: The Ones Who Live",
+      "progress": "S1E4",
+      "tmdbId": 206586,
+      "providerTitle": "The Walking Dead: The Ones Who Live",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 0.57,
+        "releaseYear": "2024",
+        "originalTitle": "The Walking Dead: The Ones Who Live",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "9ff4fa12-49a5-4bf9-bd1a-77bc7080086c",
+      "name": "Two Graves",
+      "progress": "S0E0",
+      "tmdbId": 280888,
+      "providerTitle": "Two Graves",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "Dos tumbas",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "33f8ceb3-a8b1-4abe-b27c-49a00ce65b48",
+      "name": "White Collar",
+      "progress": "S6E6",
+      "tmdbId": 21510,
+      "providerTitle": "White Collar",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2009",
+        "originalTitle": "White Collar",
+        "altTitleMatch": false,
+        "seasonCount": 6,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "158244c8-2504-4ee4-9788-405c91c60a7d",
+      "name": "When They See Us",
+      "progress": "S0E0",
+      "tmdbId": 81355,
+      "providerTitle": "When They See Us",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2019",
+        "originalTitle": "When They See Us",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "ae80e32e-6d58-4033-b4ef-570722e99e8e",
+      "name": "Who Were We Running From?",
+      "progress": "S2E0",
+      "tmdbId": 219064,
+      "providerTitle": "Who Were We Running From?",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2023",
+        "originalTitle": "Biz Kimden Kaçıyorduk Anne?",
+        "altTitleMatch": true,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "f4f70f34-a276-4a4b-a418-8ecae3d5b068",
+      "name": "Unchosen",
+      "progress": "S1E6",
+      "tmdbId": 262848,
+      "providerTitle": "Unchosen",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "Unchosen",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "350d6eb7-a5d8-40f7-b215-b1cca058de16",
+      "name": "UNTAMED",
+      "progress": "S1E6",
+      "tmdbId": 248852,
+      "providerTitle": "UNTAMED",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2025",
+        "originalTitle": "UNTAMED",
+        "altTitleMatch": false,
+        "seasonCount": 1,
+        "selectedSeasonEpisodeCount": 6,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "8faead83-3ac2-4d30-a6f9-7d4705da06a2",
+      "name": "Widow's Bay",
+      "progress": "S1E10",
+      "tmdbId": 270476,
+      "providerTitle": "Widow's Bay",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2026",
+        "originalTitle": "Widow's Bay",
+        "altTitleMatch": false,
+        "seasonCount": 2,
+        "selectedSeasonEpisodeCount": 10,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "8af562cc-219b-48ec-aba0-b1b149019aa2",
+      "name": "Vikings",
+      "progress": "S6E20",
+      "tmdbId": 44217,
+      "providerTitle": "Vikings",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2013",
+        "originalTitle": "Vikings",
+        "altTitleMatch": true,
+        "seasonCount": 6,
+        "selectedSeasonEpisodeCount": 20,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "a8c65e23-a96e-450f-aa40-5804ab60c20a",
+      "name": "Westworld",
+      "progress": "S0E0",
+      "tmdbId": 63247,
+      "providerTitle": "Westworld",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2016",
+        "originalTitle": "Westworld",
+        "altTitleMatch": true,
+        "seasonCount": 4,
+        "selectedSeasonEpisodeCount": null,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    },
+    {
+      "showId": "840d9ddb-9496-48ed-9a8a-ca20da542b8a",
+      "name": "Who Killed Sara?",
+      "progress": "S3E0",
+      "tmdbId": 120168,
+      "providerTitle": "Who Killed Sara?",
+      "checks": {
+        "idReturned": true,
+        "title": true,
+        "posterMatch": true,
+        "descriptionOverlap": 1,
+        "releaseYear": "2021",
+        "originalTitle": "¿Quién mató a Sara?",
+        "altTitleMatch": true,
+        "seasonCount": 3,
+        "selectedSeasonEpisodeCount": 7,
+        "positionExceedsSeason": false,
+        "idConflictShowIds": []
+      },
+      "revalidated": "validated"
+    }
+  ]
+}

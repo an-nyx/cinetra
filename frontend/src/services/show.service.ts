@@ -48,6 +48,9 @@ export interface TrackingSummary {
   showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
   guideAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number; normalizedEpisode?: number; needsReview?: boolean } | null;
   watchedCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
+  broadcastStatus?: 'ended' | 'returning' | 'in_production' | 'planned' | 'unknown';
+  viewingState?: 'unknown' | 'fully_watched' | 'caught_up' | 'in_progress' | 'not_started';
+  completionEligible?: boolean; finalSeason?: number | null; finalityConfirmed?: boolean;
   lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
   newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
   error?: string | null;
