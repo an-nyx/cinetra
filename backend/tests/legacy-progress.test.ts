@@ -96,6 +96,16 @@ function effective(c: EpisodeCatalog, season: number, episode: number, explicit:
   assert.deepEqual(resolveTMDBRequestAuth({ TMDB_API_KEY: 'key' }), { params: { api_key: 'key' } });
   assert.deepEqual(resolveTMDBRequestAuth({ API_AUTHORIZATION: 'Bearer legacy' }), { headers: { Authorization: 'Bearer legacy' } });
   assert.equal(resolveTMDBRequestAuth({}), null);
+  // Literal env vars may keep surrounding quotes; credentials placed in the wrong variable still authenticate.
+  const v3 = '0123456789abcdef0123456789abcdef';
+  const v4 = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.sig_part-1';
+  assert.deepEqual(resolveTMDBRequestAuth({ API_AUTHORIZATION: '"Bearer legacy"' }), { headers: { Authorization: 'Bearer legacy' } });
+  assert.deepEqual(resolveTMDBRequestAuth({ API_AUTHORIZATION: `Bearer ${v3}` }), { params: { api_key: v3 } });
+  assert.deepEqual(resolveTMDBRequestAuth({ TMDB_READ_ACCESS_TOKEN: `'${v3}'` }), { params: { api_key: v3 } });
+  assert.deepEqual(resolveTMDBRequestAuth({ TMDB_API_KEY: v4 }), { headers: { Authorization: `Bearer ${v4}` } });
+  assert.equal(resolveTMDBRequestAuth({ API_AUTHORIZATION: '""' }), null);
+  assert.deepEqual(resolveTMDBRequestAuth({ API_AUTHORIZATION: 'bearer legacy' }), { headers: { Authorization: 'Bearer legacy' } });
+  assert.deepEqual(resolveTMDBRequestAuth({ API_AUTHORIZATION: v4 }), { headers: { Authorization: `Bearer ${v4}` } });
 }
 
 // Missing catalog data does not invent episodes or a percentage.
@@ -103,7 +113,8 @@ function effective(c: EpisodeCatalog, season: number, episode: number, explicit:
   const noCatalog = calculateLegacyCoverage(2, 5, null, today);
   assert.equal(noCatalog.known, false);
   assert.equal(noCatalog.covered.size, 0);
-  const progress = calculateTrackingProgress([], null, false, 'unknown', null, false, today);
+  // A saved position exists (S02E05), so this is activity with unknown coverage, never "not started".
+  const progress = calculateTrackingProgress([], null, false, 'unknown', null, false, today, true);
   assert.equal(progress.progressPercent, null);
   assert.equal(progress.viewingState, 'unknown');
 }
@@ -116,7 +127,7 @@ function effective(c: EpisodeCatalog, season: number, episode: number, explicit:
   assert.equal(merged.filter(episode => episode.watched).length, 2);
   const progress = calculateTrackingProgress(merged, c, legacy.needsReview, 'ended', false, false, today);
   assert.equal(progress.progressPercent, null);
-  assert.equal(progress.viewingState, 'unknown');
+  assert.equal(progress.viewingState, 'needs_review'); // surfaced for review, never guessed or rewritten
   assert.equal(progress.fullyWatched, false);
 }
 

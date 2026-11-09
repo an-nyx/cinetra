@@ -118,6 +118,15 @@ export function mergeEpisodeWatchState<T extends EpisodeMetadata & { watchedAt: 
   });
 }
 
+export type BroadcastStatus = 'ended' | 'canceled' | 'returning' | 'in_production' | 'planned' | 'unknown';
+export type ViewingState = 'not_started' | 'in_progress' | 'caught_up' | 'fully_watched' | 'needs_review' | 'unknown';
+/** Statuses after which no further episodes are expected. TMDB reports cancelled series as "Canceled". */
+export const FINAL_BROADCAST_STATUSES: readonly BroadcastStatus[] = ['ended', 'canceled'];
+const CONTINUING_BROADCAST_STATUSES: readonly BroadcastStatus[] = ['returning', 'in_production', 'planned'];
+const isReleased = (episode: EpisodeMetadata, now: string) => !!episode.airDate && episode.airDate <= now;
+const byOrder = (a: EpisodeMetadata, b: EpisodeMetadata) => a.season - b.season || a.number - b.number;
+
+/** Every season's episode list is complete and every episode is dated: required to confirm a series has finished. */
 export function isCatalogComplete(catalog: EpisodeCatalog | null) {
   if (!catalog || !catalog.seasons.length) return false;
   const episodes = catalog.episodes.filter(regular);
@@ -125,30 +134,61 @@ export function isCatalogComplete(catalog: EpisodeCatalog | null) {
     episodes.every(episode => !!episode.airDate);
 }
 
+/**
+ * Released-episode progress can be trusted when every season that has aired episodes is complete and no undated
+ * episode sits before an aired one. Announced episodes without an air date are simply not released yet, so they
+ * do not make otherwise complete released-episode metadata unreliable.
+ */
+export function isReleasedMetadataReliable(catalog: EpisodeCatalog | null, now = new Date().toISOString().slice(0, 10)) {
+  if (!catalog || !catalog.seasons.length) return false;
+  const episodes = catalog.episodes.filter(regular).sort(byOrder);
+  if (!episodes.length) return false;
+  const lastReleased = episodes.map(episode => isReleased(episode, now)).lastIndexOf(true);
+  if (episodes.slice(0, Math.max(0, lastReleased)).some(episode => !episode.airDate)) return false;
+  return catalog.seasons.filter(season => season.number > 0).every(season => {
+    const inSeason = episodes.filter(episode => episode.season === season.number);
+    return !inSeason.some(episode => isReleased(episode, now)) || inSeason.length === season.episodeCount;
+  });
+}
+
+/** Whole-number percentage that reaches 100 only when every released episode is watched, and 0 only when none is. */
+export function releasedProgressPercent(watched: number, released: number) {
+  if (released <= 0) return null;
+  if (watched >= released) return 100;
+  if (watched <= 0) return 0;
+  return Math.min(99, Math.max(1, Math.round(watched / released * 100)));
+}
+
 export function calculateTrackingProgress<T extends EpisodeMetadata & { watched: boolean; watchSource?: WatchSource }>(
   episodes: T[],
   catalog: EpisodeCatalog | null,
   legacyNeedsReview: boolean,
-  broadcastStatus: 'ended' | 'returning' | 'in_production' | 'planned' | 'unknown',
+  broadcastStatus: BroadcastStatus,
   inProduction: boolean | null,
   nextEpisodeAnnounced: boolean,
   now = new Date().toISOString().slice(0, 10),
+  /** Whether a saved position or any individual watch record exists, including records that match no episode. */
+  hasActivity = episodes.some(episode => episode.watched),
 ) {
   const regularEpisodes = episodes.filter(regular);
-  const releasedEpisodes = regularEpisodes.filter(episode => !!episode.airDate && episode.airDate <= now);
+  const releasedEpisodes = regularEpisodes.filter(episode => isReleased(episode, now));
   const remainingEpisodes = releasedEpisodes.filter(episode => !episode.watched);
   const metadataComplete = isCatalogComplete(catalog);
+  const releasedMetadataReliable = isReleasedMetadataReliable(catalog, now);
   const explicitCoverageComplete = regularEpisodes.length > 0 && regularEpisodes.every(episode => episode.watchSource === 'explicit' || episode.watchSource === 'both');
   const unresolvedLegacyConflict = legacyNeedsReview && !explicitCoverageComplete;
   const finalSeason = catalog?.seasons.map(season => season.number).sort((a, b) => a - b).at(-1) ?? null;
-  const finalityConfirmed = broadcastStatus === 'ended' && inProduction === false && !nextEpisodeAnnounced && metadataComplete && regularEpisodes.every(episode => !!episode.airDate && episode.airDate <= now);
-  const fullyWatched = finalityConfirmed && !unresolvedLegacyConflict && regularEpisodes.length > 0 && regularEpisodes.every(episode => episode.watched && !!episode.airDate && episode.airDate <= now);
-  const continuing = ['returning', 'in_production', 'planned'].includes(broadcastStatus) || nextEpisodeAnnounced;
-  const progressReliable = metadataComplete && !unresolvedLegacyConflict;
+  const finalityConfirmed = FINAL_BROADCAST_STATUSES.includes(broadcastStatus) && inProduction === false && !nextEpisodeAnnounced && metadataComplete && regularEpisodes.every(episode => isReleased(episode, now));
+  const fullyWatched = finalityConfirmed && !unresolvedLegacyConflict && regularEpisodes.length > 0 && regularEpisodes.every(episode => episode.watched && isReleased(episode, now));
+  const continuing = CONTINUING_BROADCAST_STATUSES.includes(broadcastStatus) || nextEpisodeAnnounced;
+  const progressReliable = releasedMetadataReliable && !unresolvedLegacyConflict;
   const caughtUp = !fullyWatched && continuing && progressReliable && releasedEpisodes.length > 0 && remainingEpisodes.length === 0;
-  const viewingState = fullyWatched ? 'fully_watched' : caughtUp ? 'caught_up' : remainingEpisodes.length > 0 ? 'in_progress' : 'unknown';
-  const progressPercent = progressReliable && releasedEpisodes.length > 0
-    ? Math.round((releasedEpisodes.length - remainingEpisodes.length) / releasedEpisodes.length * 100)
-    : null;
-  return { regularEpisodes, releasedEpisodes, remainingEpisodes, metadataComplete, finalSeason, finalityConfirmed, fullyWatched, caughtUp, viewingState, progressPercent };
+  const viewingState: ViewingState = !hasActivity ? 'not_started'
+    : unresolvedLegacyConflict ? 'needs_review'
+      : fullyWatched ? 'fully_watched'
+        : caughtUp ? 'caught_up'
+          : remainingEpisodes.length > 0 ? 'in_progress'
+            : 'unknown';
+  const progressPercent = progressReliable ? releasedProgressPercent(releasedEpisodes.length - remainingEpisodes.length, releasedEpisodes.length) : null;
+  return { regularEpisodes, releasedEpisodes, remainingEpisodes, metadataComplete, releasedMetadataReliable, progressReliable, unresolvedLegacyConflict, finalSeason, finalityConfirmed, fullyWatched, caughtUp, viewingState, progressPercent };
 }

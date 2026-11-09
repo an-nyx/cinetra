@@ -1,6 +1,7 @@
 import { TMDBService, SearchResult } from './tmdb.service';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { resolveTMDBRequestAuth, TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb-auth';
+import { sanitizeTMDBError, tmdbSecrets } from './tmdb-error';
 
 interface ApiResponse {
   results: Array<{
@@ -31,9 +32,12 @@ export class TMDBApiService implements TMDBService {
     return value;
   }
 
+  private secrets: string[];
+
   constructor() {
     const auth = resolveTMDBRequestAuth(process.env);
     this.hasAuthentication = !!auth;
+    this.secrets = tmdbSecrets(auth);
     this.fetcher = axios.create({
       baseURL: 'https://api.themoviedb.org/3',
       ...auth,
@@ -41,9 +45,14 @@ export class TMDBApiService implements TMDBService {
     })
   }
 
-  private get<T>(url: string, config?: { params?: Record<string, string | number> }) {
+  /** Every TMDB request goes through here, so no raw Axios error (which embeds the credential) can escape. */
+  private async get<T>(url: string, config?: { params?: Record<string, string | number> }) {
     if (!this.hasAuthentication) throw new Error(TMDB_AUTH_CONFIGURATION_ERROR);
-    return this.fetcher.get<T>(url, config);
+    try {
+      return await this.fetcher.get<T>(url, config);
+    } catch (error) {
+      throw sanitizeTMDBError(error, this.secrets);
+    }
   }
 
   async searchShows(query: string): Promise<SearchResult[]> {
@@ -79,6 +88,14 @@ export class TMDBApiService implements TMDBService {
       console.error('TMDB API Error:', axios.isAxiosError(err) ? `HTTP ${err.response?.status ?? 'network error'}` : 'Unexpected error');
       throw err;
     }
+  }
+
+  /** Raw TV search candidates (first page) for schedule-only identity checks. Never used to create or link shows. */
+  async searchTVCandidates(query: string): Promise<Array<{ id: number; name?: string; original_name?: string; overview?: string; first_air_date?: string }>> {
+    query = query?.trim().slice(0, 100);
+    if (!query) return [];
+    const response = await this.cached(`candidates:tv:${query.toLowerCase()}`, () => this.get<{ results: Array<{ id: number; name?: string; original_name?: string; overview?: string; first_air_date?: string }> }>('/search/tv', { params: { query } }));
+    return response.data.results || [];
   }
 
   async getShow(id: number): Promise<TMDBShowDetails> {

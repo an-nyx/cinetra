@@ -100,7 +100,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
   };
 
   return <Dialog open={!!selectedShow} onOpenChange={open => { if (!open) closeModal(); }}>
-    <DialogContent className="fixed inset-0 left-0 top-0 h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex flex-col overflow-hidden rounded-none p-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[92vh] sm:w-full sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
+    <DialogContent className="fixed inset-0 left-0 top-0 h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex flex-col overflow-hidden rounded-none p-0 [&>[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] sm:[&>[data-slot=dialog-close]]:top-3 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[92vh] sm:w-full sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
       <DialogHeader className="shrink-0 border-b bg-background px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-7 sm:py-5">
         <p className="cinema-eyebrow">The watch room</p>
         <DialogTitle className="pr-8 text-2xl sm:text-3xl">{show?.name || 'TV show'}</DialogTitle>
@@ -130,13 +130,15 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
         {summary && <div className="space-y-5">
           <section className="cinema-surface p-5 sm:p-6">
             {summary.statusProgressNote && <p role="status" className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">{summary.statusProgressNote}</p>}
-            <div className="mb-2 flex items-end justify-between"><div><p className="cinema-eyebrow">Your progress</p><p className="mt-1 text-3xl font-semibold">{summary.progressPercent === null ? "Unavailable" : `${summary.progressPercent}%`} {summary.progressPercent !== null && <span className="text-sm font-normal text-muted-foreground">of released episodes</span>}</p></div><span className="text-sm text-muted-foreground">{summary.countDataAvailable ? `${summary.watchedCount}/${summary.releasedCount} watched` : 'Episode count unavailable'}</span></div>
+            <div className="mb-2 flex items-end justify-between"><div><p className="cinema-eyebrow">Your progress</p><p className="mt-1 text-3xl font-semibold">{summary.progressPercent === null ? summary.progressUnavailable?.label || "Unavailable" : `${summary.progressPercent}%`} {summary.progressPercent !== null && <span className="text-sm font-normal text-muted-foreground">of released episodes</span>}</p></div><span className="text-sm text-muted-foreground">{summary.countDataAvailable ? `${summary.watchedCount}/${summary.releasedCount} watched` : 'Episode count unavailable'}</span></div>
+            {summary.progressPercent === null && summary.progressUnavailable && <p role="status" className="mb-3 rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">Why no percentage: </span>{summary.progressUnavailable.detail}</p>}
             <p className="mb-4 text-xs text-muted-foreground">{summary.explicitWatchedCount} individually logged · {summary.legacyInferredCount} covered by saved position</p>
             {summary.progressPercent !== null && <div role="progressbar" aria-valuenow={summary.progressPercent} aria-valuemin={0} aria-valuemax={100} aria-label="Released episode progress" className="cinema-progress h-2"><span style={{ width: `${summary.progressPercent}%` }} /></div>}
             {summary.legacyPosition && <p className="mt-2 text-xs text-muted-foreground">The saved position is reflected in watched episodes without creating episode records.</p>}
             {summary.legacyPosition?.needsReview && <p role="status" className="mt-2 text-sm text-amber-300">The saved position does not fit the available TMDB episode metadata. It is preserved and needs review.</p>}
             {summary.viewingState === 'fully_watched' && <p className="mt-2 font-medium text-primary">Fully watched · series completion verified</p>}
             {summary.viewingState === 'caught_up' && <p className="mt-2 text-sm text-muted-foreground">Caught up with currently released episodes. Future episodes may follow.</p>}
+            {summary.viewingState === 'not_started' && <p className="mt-2 text-sm text-muted-foreground">Not started · no saved position or watched episodes yet.</p>}
           </section>
           <div className="grid gap-3 sm:grid-cols-2">
             <section className="cinema-surface border-primary/30 bg-primary/5 p-5">
