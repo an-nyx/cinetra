@@ -1,9 +1,7 @@
 import * as React from "react";
+import BrandLogo from "@/components/brand-logo";
 import { useState, useEffect } from "react";
 import { UserService } from "@/services";
-import {
-  IconInnerShadowTop,
-} from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -74,9 +72,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Cinetra</span>
+              <a href="/" aria-label="Cinetra home">
+                <BrandLogo size={24} wordmark={false} />
+                <span className="text-base font-semibold">Cinetra<span className="text-primary">.</span></span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -4,6 +4,7 @@ import { CalendarDays, Film, House, LogOut, Tv, UserRound } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
+import BrandLogo from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { AuthService } from "@/services";
 import AccountModal from "@/modals/AccountModal";
@@ -24,9 +25,8 @@ export default function HomePage() {
       <SidebarInset className="min-w-0">
         <header className="app-header sticky top-0 z-30 flex min-h-16 shrink-0 items-center gap-3 border-b bg-background/95 px-4 md:backdrop-blur-xl md:px-6">
           <SidebarTrigger className="hidden md:flex" />
-          <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Film className="size-5" /></span>
-            <span className="text-lg">cinetra<span className="text-primary">.</span></span>
+          <Link to="/" aria-label="Cinetra home" className="font-semibold tracking-tight">
+            <BrandLogo />
           </Link>
           <div className="ml-auto flex items-center gap-2">
             <ModeToggle />
