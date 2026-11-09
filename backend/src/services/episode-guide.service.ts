@@ -2,7 +2,7 @@ import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 import { type EpisodeMetadata } from './legacy-progress.model';
-import { buildTrackingSummary, catalogFromTMDB, checkpointAfterUnwatch, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type CatalogMeta, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
+import { buildTrackingSummary, catalogFromTMDB, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type CatalogMeta, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
 import { TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb/tmdb-auth';
 import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
 import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type ScheduleIdentity, type UpcomingItem } from './upcoming-schedule.model';
@@ -306,30 +306,42 @@ async function moveCheckpoint(tx: Pick<typeof prisma, 'show'>, show: { id: strin
 
 export async function setEpisodeWatched(showId: string, userId: string, season: number, episode: number, watched: boolean) {
   if (!validNumber(season, 1) || !validNumber(episode, 1) || typeof watched !== 'boolean') throw new EpisodeGuideError(400, 'Invalid episode update');
-  const { show, catalog, episodes, watches } = await load(showId, userId);
-  const found = episodes.find(e => e.season === season && e.number === episode);
+  const { catalog } = await load(showId, userId);
+  const found = catalog.episodes.find(e => e.season === season && e.number === episode);
   if (!found) throw new EpisodeGuideError(404, 'Episode not found');
-  if (found.watchSource === 'legacy' || found.watchSource === 'both') {
-    if (watched) return getTrackingSummary(showId, userId);
-    // Un-marking the episode the checkpoint points at (logged individually) steps the checkpoint back by one.
-    const back = found.watchSource === 'both' ? checkpointAfterUnwatch(show, catalog, season, episode, today()) : null;
-    if (!back) throw new EpisodeGuideError(409, 'This episode is covered by the saved legacy position. Use Edit Progress to change that position.');
-    await prisma.$transaction(async tx => {
-      await tx.episodeWatch.deleteMany({ where: { showId, season, episode } });
-      await moveCheckpoint(tx, show, back);
-    });
-    return getTrackingSummary(showId, userId);
-  }
-  if (watched && found.watched) return getTrackingSummary(showId, userId);
   if (watched && (!found.airDate || found.airDate > today())) throw new EpisodeGuideError(400, 'Episode has not aired');
-  if (watched) {
-    await prisma.$transaction(async tx => {
-      await tx.episodeWatch.upsert({ where: { showId_season_episode: { showId, season, episode } }, create: { showId, season, episode }, update: {} });
-      // Watching the episode right after the saved checkpoint advances it (user action only; never from metadata).
+  await prisma.$transaction(async tx => {
+    // Serialize episode changes with saved-position edits for this show.
+    await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
+    const show = await tx.show.findFirst({ where: { id: showId, userId } });
+    if (!show) throw new EpisodeGuideError(404, 'Show not found');
+    const watches = await tx.episodeWatch.findMany({ where: { showId } });
+    const existing = watches.find(w => w.season === season && w.episode === episode);
+    const merged = mergeShowEpisodes(show, catalog, watches, today()).episodes.find(e => e.season === season && e.number === episode);
+    if (watched) {
+      if (existing || merged?.watched) return;
       const forward = checkpointAfterWatch(show, catalog, [...watches, { season, episode }], today());
-      if (forward) await moveCheckpoint(tx, show, forward);
-    });
-  } else await prisma.episodeWatch.deleteMany({ where: { showId, season, episode } });
+      await tx.episodeWatch.create({ data: { showId, season, episode, ...(forward ? {
+        checkpointBeforeSeason: show.seasonsWatched, checkpointBeforeEpisode: show.episodesWatched,
+        checkpointAfterSeason: forward.seasonsWatched, checkpointAfterEpisode: forward.episodesWatched,
+      } : {}) } });
+      if (forward) await tx.show.update({ where: { id: showId }, data: forward });
+    } else {
+      if (!existing) {
+        if (merged?.watched) throw new EpisodeGuideError(409, 'This episode is covered by the saved position. Use Edit progress to correct it.');
+        return;
+      }
+      const canUndo = existing.checkpointBeforeSeason !== null && existing.checkpointBeforeEpisode !== null &&
+        show.seasonsWatched === existing.checkpointAfterSeason && show.episodesWatched === existing.checkpointAfterEpisode;
+      if (canUndo) await tx.show.update({ where: { id: showId }, data: { seasonsWatched: existing.checkpointBeforeSeason!, episodesWatched: existing.checkpointBeforeEpisode! } });
+      else if (merged?.watchSource === 'both') {
+        // The individual record can be removed, but the independent saved position still covers it.
+        // Older undo links are no longer safe after removing an episode under that position.
+        await tx.episodeWatch.updateMany({ where: { showId }, data: { checkpointBeforeSeason: null, checkpointBeforeEpisode: null, checkpointAfterSeason: null, checkpointAfterEpisode: null } });
+      }
+      await tx.episodeWatch.delete({ where: { id: existing.id } });
+    }
+  });
   return getTrackingSummary(showId, userId);
 }
 

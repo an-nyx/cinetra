@@ -45,10 +45,14 @@ export class ShowPrismaRepository implements ShowRepository {
       return null;
     }
 
-    const updatedShow = await this.prisma.show.update({
-      where: { id: showId },
-      data: showData
+    const updatedShow = await this.prisma.$transaction(async tx => {
+      const result = await tx.show.update({ where: { id: showId }, data: showData });
+      if (showData.seasonsWatched !== undefined || showData.episodesWatched !== undefined) {
+        await tx.episodeWatch.updateMany({ where: { showId }, data: { checkpointBeforeSeason: null, checkpointBeforeEpisode: null, checkpointAfterSeason: null, checkpointAfterEpisode: null } });
+      }
+      return result;
     });
+
     return updatedShow;
   }
 
