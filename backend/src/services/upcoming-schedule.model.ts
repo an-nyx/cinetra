@@ -41,3 +41,19 @@ export function mergeUpcomingItems(items: UpcomingItem[]) {
 export function isReturningWithoutDate(broadcastStatus: string | null | undefined, hasDatedRelease: boolean) {
   return !hasDatedRelease && ['Returning Series', 'In Production', 'Planned'].includes(broadcastStatus || '');
 }
+
+export type TVMazeNeedInput = {
+  tmdbResponded: boolean; tmdbFailed: boolean; tmdbSeasonFailures: number; scheduleMetadataIncomplete: boolean;
+  tmdbReleaseCount: number; broadcastStatus: string | null | undefined; inProduction: boolean | null | undefined; nextEpisodeAnnounced: boolean;
+};
+
+/**
+ * TVMaze is a schedule-only supplement. Query it only when TMDB could not provide a usable schedule, and never for a
+ * series TMDB definitively reports as over (Ended/Canceled, not in production, nothing announced, nothing dated ahead).
+ */
+export function needsTVMazeSupplement(input: TVMazeNeedInput) {
+  const definitivelyOver = input.tmdbResponded && ['Ended', 'Canceled'].includes(input.broadcastStatus || '')
+    && input.inProduction === false && !input.nextEpisodeAnnounced && input.tmdbReleaseCount === 0;
+  if (definitivelyOver) return false;
+  return input.tmdbFailed || input.tmdbSeasonFailures > 0 || input.scheduleMetadataIncomplete || input.tmdbReleaseCount < 2;
+}

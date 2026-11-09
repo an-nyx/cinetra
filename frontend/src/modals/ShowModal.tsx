@@ -137,6 +137,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
             {summary.legacyPosition?.needsReview && <p role="status" className="mt-2 text-sm text-amber-300">The saved position does not fit the available TMDB episode metadata. It is preserved and needs review.</p>}
             {summary.viewingState === 'fully_watched' && <p className="mt-2 font-medium text-primary">Fully watched · series completion verified</p>}
             {summary.viewingState === 'caught_up' && <p className="mt-2 text-sm text-muted-foreground">Caught up with currently released episodes. Future episodes may follow.</p>}
+            {summary.viewingState === 'not_started' && <p className="mt-2 text-sm text-muted-foreground">Not started · no saved position or watched episodes yet.</p>}
           </section>
           <div className="grid gap-3 sm:grid-cols-2">
             <section className="cinema-surface border-primary/30 bg-primary/5 p-5">

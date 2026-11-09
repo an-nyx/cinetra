@@ -1,14 +1,14 @@
 import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
-import { calculateLegacyCoverage, calculateTrackingProgress, episodeKey, mergeEpisodeWatchState, type EpisodeCatalog, type EpisodeMetadata } from './legacy-progress.model';
+import { type EpisodeMetadata } from './legacy-progress.model';
+import { buildTrackingSummary, mergeShowEpisodes, type Catalog } from './tracking-summary.model';
 import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
-import { isReturningWithoutDate, mergeUpcomingItems, type UpcomingItem } from './upcoming-schedule.model';
+import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type UpcomingItem } from './upcoming-schedule.model';
 
 const tmdb = new TMDBApiService();
 const today = () => new Date().toISOString().slice(0, 10);
 type Episode = EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; watchedAt: Date | null; episodeType?: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null };
-type Catalog = Omit<EpisodeCatalog, 'episodes'> & { episodes: (EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; episodeType?: string | null })[]; source: 'TMDB'; broadcastStatus: string | null; inProduction: boolean | null; nextEpisodeAnnounced: boolean };
 const catalogCache = new Map<string, { until: number; value: Promise<Catalog> }>();
 const upcomingCache = new Map<string, { until: number; value: Promise<Awaited<ReturnType<typeof buildUpcomingReleases>>> }>();
 
@@ -38,11 +38,8 @@ async function load(showId: string, userId: string) {
   const show = await prisma.show.findFirst({ where: { id: showId, userId } });
   if (!show) throw new EpisodeGuideError(404, 'Show not found');
   const [catalog, watches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } })]);
-  const watchMap = new Map(watches.map(w => [`${w.season}:${w.episode}`, w.watchedAt]));
-  const hasSavedPosition = show.seasonsWatched > 0 || show.episodesWatched > 0;
-  const legacy = calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today());
-  const episodes = mergeEpisodeWatchState(catalog.episodes.map(e => ({ ...e, watchedAt: watchMap.get(episodeKey(e.season, e.number)) || null })), watches, hasSavedPosition ? legacy : { ...legacy, covered: new Set<string>() });
-  return { show, catalog, episodes, watches, legacy: hasSavedPosition ? legacy : { ...legacy, covered: new Set<string>() } };
+  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today());
+  return { show, catalog, episodes, watches, legacy };
 }
 
 export async function getTrackingSummary(showId: string, userId: string) {
@@ -52,35 +49,7 @@ export async function getTrackingSummary(showId: string, userId: string) {
   let catalog: Catalog | null = null;
   let metadataError: string | null = null;
   try { catalog = await catalogFor(show); } catch (error) { metadataError = error instanceof Error ? error.message : 'TMDB metadata unavailable'; /* Saved positions remain available without a provider. */ }
-  const watchMap = new Map(watches.map(w => [`${w.season}:${w.episode}`, w.watchedAt]));
-  const hasSavedPosition = show.seasonsWatched > 0 || show.episodesWatched > 0;
-  const legacy = calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today());
-  const episodes = mergeEpisodeWatchState((catalog?.episodes || []).map(e => ({ ...e, watchedAt: watchMap.get(episodeKey(e.season, e.number)) || null })), watches, hasSavedPosition ? legacy : { ...legacy, covered: new Set<string>() });
-  episodes.sort((a, b) => a.season - b.season || a.number - b.number);
-  const upcoming = episodes.filter(e => e.airDate && e.airDate > today()).sort((a, b) => a.airDate!.localeCompare(b.airDate!));
-  const last = [...episodes].filter(e => e.watchedAt).sort((a, b) => b.watchedAt!.getTime() - a.watchedAt!.getTime())[0] || null;
-  const broadcastStatus = catalog?.broadcastStatus === 'Ended' ? 'ended' : catalog?.broadcastStatus === 'Returning Series' ? 'returning' : catalog?.broadcastStatus === 'In Production' ? 'in_production' : catalog?.broadcastStatus === 'Planned' ? 'planned' : 'unknown';
-  const progress = calculateTrackingProgress(episodes, catalog, legacy.needsReview, broadcastStatus, catalog?.inProduction ?? null, !!catalog?.nextEpisodeAnnounced);
-  const { releasedEpisodes: released, remainingEpisodes: remaining, finalSeason, finalityConfirmed, fullyWatched } = progress;
-  const viewingState = progress.viewingState === 'unknown' && !hasSavedPosition && !watches.length && catalog?.episodes.length ? 'not_started' : progress.viewingState;
-  const percent = progress.progressPercent;
-  const watched = released.length - remaining.length;
-  const manualCompleted = show.status === 'completed' || (!show.status && show.completed);
-  const statusProgressNote = manualCompleted && !fullyWatched
-    ? metadataError || !catalog ? 'Your personal status is Completed. TMDB episode data is unavailable, so completion cannot be verified.'
-      : remaining.length ? `Your personal status is Completed, but ${remaining.length} released episode${remaining.length === 1 ? '' : 's'} are not confirmed as watched. Your status has not been changed.`
-        : 'Your personal status is Completed, but available metadata does not verify completion. Your status has not been changed.'
-    : null;
-  const legacyInferredCount = episodes.filter(e => e.watchSource === 'legacy' || e.watchSource === 'both').length;
-  return {
-    showId, name: show.name, posterURL: show.posterURL, status: show.status || (show.completed ? 'completed' : null), source: catalog?.source || null,
-    guideAvailable: !!catalog && episodes.length > 0, countDataAvailable: progress.metadataComplete, legacyPosition: hasSavedPosition ? { fullSeasons: show.seasonsWatched, episodesInNextSeason: show.episodesWatched, normalizedSeason: legacy.normalizedSeason, normalizedEpisode: legacy.normalizedEpisode, needsReview: legacy.needsReview } : null,
-    watchedCount: watched, explicitWatchedCount: watches.length, legacyInferredCount, releasedCount: released.length, remainingCount: remaining.length,
-    progressPercent: percent, broadcastStatus, viewingState, completionEligible: fullyWatched, finalSeason, finalityConfirmed, metadataError, statusProgressNote,
-    lastEpisode: last, nextEpisode: progress.metadataComplete && !legacy.needsReview ? remaining[0] || null : null, upcomingEpisode: upcoming[0] || null,
-    newEpisodes: remaining.filter(e => !!last && e.airDate! > last.watchedAt!.toISOString().slice(0, 10)).length,
-    recentHistory: [...watches].sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime()).slice(0, 5),
-  };
+  return buildTrackingSummary(show, catalog, metadataError, watches, today());
 }
 
 export async function getLibraryTracking(userId: string) {
@@ -95,6 +64,12 @@ async function buildUpcomingReleases(userId: string) {
   const shows = await prisma.show.findMany({ where: { userId }, select: { id: true, name: true, overview: true, posterURL: true, status: true, tmdbId: true, tvmazeId: true } });
   const todayDate = today();
   const fetchOne = async (show: typeof shows[number]) => {
+    // A show without a TMDB association is not a provider failure: no request is made and it is counted separately.
+    if (!show.tmdbId) return {
+      releases: [] as UpcomingItem[], failed: false, noTmdbAssociation: true, tmdbResponded: false, tmdbFailed: false, tmdbErrorType: null as string | null,
+      tmdbSeasonFailures: 0, scheduleMetadataIncomplete: false, tvmazeQueried: false, tvmazeSkippedAsFinal: false, tvmazeVerified: false, tvmazeAmbiguous: false, tvmazeEntries: 0, tmdbEntries: 0,
+      tba: null as { showId: string; showName: string; posterURL: string | null; broadcastStatus: string } | null,
+    };
     let details: Awaited<ReturnType<TMDBApiService['getShow']>> | null = null;
     let tmdbFailed = false;
     let tmdbErrorType: string | null = null;
@@ -104,7 +79,6 @@ async function buildUpcomingReleases(userId: string) {
     const canonical = new Map<string, { name: string; airDate: string | null }>();
     const releases = new Map<string, UpcomingItem>();
     try {
-      if (!show.tmdbId) throw new EpisodeGuideError(404, 'TMDB match required for broadcast metadata');
       details = await tmdb.getShow(show.tmdbId);
       const next = details.next_episode_to_air;
       const seasons = (details.seasons || []).filter(season => season.season_number > 0 && season.episode_count > 0);
@@ -153,7 +127,12 @@ async function buildUpcomingReleases(userId: string) {
     // TVMaze is schedule-only. Identity must be corroborated by the canonical
     // TMDB title/year/overview, or by the stored library title and overview when
     // TMDB is unavailable. No TVMaze IDs or tracking metadata are persisted.
-    if (show.tmdbId && (tmdbFailed || tmdbSeasonFailures > 0 || scheduleMetadataIncomplete || releases.size < 2)) {
+    const tvmazeQueried = needsTVMazeSupplement({
+      tmdbResponded: !!details, tmdbFailed, tmdbSeasonFailures, scheduleMetadataIncomplete, tmdbReleaseCount: releases.size,
+      broadcastStatus: details?.status, inProduction: details?.in_production, nextEpisodeAnnounced: !!details?.next_episode_to_air,
+    });
+    const tvmazeSkippedAsFinal = !tvmazeQueried && (tmdbFailed || tmdbSeasonFailures > 0 || scheduleMetadataIncomplete || releases.size < 2);
+    if (tvmazeQueried) {
       const schedule = await getVerifiedTVMazeSchedule({
         tmdbName: details?.name, tmdbOriginalName: details?.original_name, tmdbOverview: details?.overview,
         firstAirDate: details?.first_air_date, libraryName: show.name, libraryOverview: show.overview,
@@ -180,8 +159,8 @@ async function buildUpcomingReleases(userId: string) {
     }
     const broadcastStatus = details?.status || '';
     return {
-      releases: [...releases.values()], failed: tmdbFailed && releases.size === 0,
-      tmdbResponded: !!details, tmdbFailed, tmdbErrorType, tmdbSeasonFailures, scheduleMetadataIncomplete, tvmazeVerified, tvmazeAmbiguous, tvmazeEntries,
+      releases: [...releases.values()], failed: tmdbFailed && releases.size === 0, noTmdbAssociation: false,
+      tmdbResponded: !!details, tmdbFailed, tmdbErrorType, tmdbSeasonFailures, scheduleMetadataIncomplete, tvmazeQueried, tvmazeSkippedAsFinal, tvmazeVerified, tvmazeAmbiguous, tvmazeEntries,
       tmdbEntries: [...releases.values()].filter(release => release.scheduleSource === 'TMDB').length,
       tba: isReturningWithoutDate(broadcastStatus, releases.size > 0) ? { showId: show.id, showName: show.name, posterURL: show.posterURL, broadcastStatus } : null,
     };
@@ -210,6 +189,8 @@ async function buildUpcomingReleases(userId: string) {
     tmdbFailureTypes: results.reduce((counts, result) => { if (result.tmdbErrorType) counts[result.tmdbErrorType] = (counts[result.tmdbErrorType] || 0) + 1; return counts; }, {} as Record<string, number>),
     scheduledTMDBEpisodes: results.reduce((count, result) => count + result.tmdbEntries, 0),
     scheduledTVMazeEpisodes: results.reduce((count, result) => count + result.tvmazeEntries, 0),
+    tvmazeQueriedShows: results.filter(result => result.tvmazeQueried).length,
+    tvmazeSkippedFinalShows: results.filter(result => result.tvmazeSkippedAsFinal).length,
     tvmazeVerifiedShows: results.filter(result => result.tvmazeVerified).length,
     tvmazeAmbiguousShows: results.filter(result => result.tvmazeAmbiguous).length,
     returningWithoutDate: results.filter(result => result.tba).length,

@@ -50,8 +50,8 @@ export interface TrackingSummary {
   showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
   guideAvailable: boolean; countDataAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number | null; normalizedEpisode?: number | null; needsReview?: boolean } | null;
   watchedCount: number; explicitWatchedCount: number; legacyInferredCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
-  broadcastStatus?: 'ended' | 'returning' | 'in_production' | 'planned' | 'unknown';
-  viewingState?: 'unknown' | 'fully_watched' | 'caught_up' | 'in_progress' | 'not_started';
+  broadcastStatus?: 'ended' | 'canceled' | 'returning' | 'in_production' | 'planned' | 'unknown';
+  viewingState?: 'unknown' | 'fully_watched' | 'caught_up' | 'in_progress' | 'not_started' | 'needs_review';
   completionEligible?: boolean; finalSeason?: number | null; finalityConfirmed?: boolean;
   metadataError?: string | null; statusProgressNote?: string | null;
   lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
@@ -65,7 +65,7 @@ class ShowServiceClass extends ApiService {
     return response.data;
   }
 
-  async getUpcomingReleases(): Promise<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }> {
+  async getUpcomingReleases(): Promise<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeQueriedShows?: number; tvmazeSkippedFinalShows?: number; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }> {
     const response = await this.get<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }>("/show/upcoming");
     return response.data;
   }

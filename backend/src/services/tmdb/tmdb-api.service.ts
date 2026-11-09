@@ -1,6 +1,7 @@
 import { TMDBService, SearchResult } from './tmdb.service';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { resolveTMDBRequestAuth, TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb-auth';
+import { sanitizeTMDBError, tmdbSecrets } from './tmdb-error';
 
 interface ApiResponse {
   results: Array<{
@@ -31,9 +32,12 @@ export class TMDBApiService implements TMDBService {
     return value;
   }
 
+  private secrets: string[];
+
   constructor() {
     const auth = resolveTMDBRequestAuth(process.env);
     this.hasAuthentication = !!auth;
+    this.secrets = tmdbSecrets(auth);
     this.fetcher = axios.create({
       baseURL: 'https://api.themoviedb.org/3',
       ...auth,
@@ -41,9 +45,14 @@ export class TMDBApiService implements TMDBService {
     })
   }
 
-  private get<T>(url: string, config?: { params?: Record<string, string | number> }) {
+  /** Every TMDB request goes through here, so no raw Axios error (which embeds the credential) can escape. */
+  private async get<T>(url: string, config?: { params?: Record<string, string | number> }) {
     if (!this.hasAuthentication) throw new Error(TMDB_AUTH_CONFIGURATION_ERROR);
-    return this.fetcher.get<T>(url, config);
+    try {
+      return await this.fetcher.get<T>(url, config);
+    } catch (error) {
+      throw sanitizeTMDBError(error, this.secrets);
+    }
   }
 
   async searchShows(query: string): Promise<SearchResult[]> {

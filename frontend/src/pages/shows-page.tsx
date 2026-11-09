@@ -204,17 +204,10 @@ export default function ShowsPage() {
           )
             return false;
 
-          if (
-            filters.completeFilter === "completed" &&
-            show.completed !== true
-          )
-            return false;
-
-          if (
-            filters.completeFilter === "notCompleted" &&
-            show.completed !== false
-          )
-            return false;
+          // The personal Completed status, read the same way as in Details (status first, legacy flag as fallback).
+          const personallyCompleted = (show.status || (show.completed ? "completed" : null)) === "completed";
+          if (filters.completeFilter === "completed" && !personallyCompleted) return false;
+          if (filters.completeFilter === "notCompleted" && personallyCompleted) return false;
 
           return true;
         });
