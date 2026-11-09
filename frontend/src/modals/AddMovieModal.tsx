@@ -69,6 +69,7 @@ export default function AddMovieModal({
     MovieService.createMovie({ name: movie.name, overview: movie.overview, posterURL: movie.posterURL, tmdbId: movie.id })
       .then((newMovie) => {
         setMovies([newMovie, ...movies]);
+        window.dispatchEvent(new Event("movies-updated"));
       })
       .catch((err) => {
         console.error(err);

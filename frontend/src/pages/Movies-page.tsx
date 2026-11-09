@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
 import { MovieType } from "@/types/index.ts";
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { Plus, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 
 interface ListFiltersType {
   favoriteFilter?: "favorite" | "notFavorite";
@@ -32,6 +33,8 @@ export default function MoviesPage() {
   const [addMovieModalStatus, setAddMovieModalStatus] = useState<boolean>(false);
   const [movies, setMovies] = useState<MovieType[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<string>("");
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const { data: discovery } = useMovieDiscovery();
   const [search, setSearch] = useState<string>("");
   const [filters, setFilters] = useState<ListFiltersType>(() => {
     const savedSort = localStorage.getItem('moviesSortBy');
@@ -63,10 +66,10 @@ export default function MoviesPage() {
   }, [filters.sortBy]);
 
   return (
-    <div className="library-page mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
-      <div className="library-heading mb-7 flex flex-col gap-5">
-        <div><p className="cinema-eyebrow mb-2">Your library</p><h1 className="text-4xl font-semibold tracking-tight">Movies<span className="ml-3 text-base font-normal text-muted-foreground">{movies.length}</span></h1></div>
-        <div className="flex min-w-0 items-center gap-3">
+    <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
+      <div className="library-heading mb-2 flex flex-col gap-2 sm:mb-7 sm:gap-5">
+        <div className="hidden sm:block"><p className="cinema-eyebrow mb-2">Your library</p><h1 className="text-4xl font-semibold tracking-tight">Movies<span className="ml-3 text-base font-normal text-muted-foreground">{movies.length}</span></h1></div>
+        <div className={`${controlsOpen ? "flex" : "hidden"} min-w-0 items-center gap-2 sm:flex`}>
           <InputGroup>
             <InputGroupInput
               id="search"
@@ -97,7 +100,12 @@ export default function MoviesPage() {
         </div>
       </div>
 
-      <div className="library-filters mb-6 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex items-center gap-2 sm:hidden">
+        <h1 className="min-w-0 flex-1 text-lg font-semibold">Movies <span className="text-xs font-normal text-muted-foreground">{movies.length}</span></h1>
+        <Button type="button" variant="outline" size="icon" aria-label="Search and filter movies" aria-expanded={controlsOpen} onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
+        <Button type="button" size="icon" aria-label="Add movie" onClick={() => setAddMovieModalStatus(true)}><Plus className="size-4" /></Button>
+      </div>
+      <div className={`library-filters mb-2 flex-wrap items-center gap-2 sm:mb-6 sm:flex ${controlsOpen ? "flex" : "hidden"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <Select
             key={`favorite-${key}`}
@@ -156,7 +164,7 @@ export default function MoviesPage() {
         </Select>
       </div>
 
-      <Separator className="mb-6" />
+      <Separator className="mb-2 sm:mb-6" />
 
       {(() => {
         const filteredMovies = movies?.filter((movie) => {
@@ -221,11 +229,12 @@ export default function MoviesPage() {
         }
 
         return (
-          <div className="grid w-full grid-cols-2 gap-x-4 gap-y-7 min-[480px]:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
             {sortedMovies.map((movie) => (
               <Movie
                 key={movie.id}
                 {...movie}
+                year={movie.tmdbId ? discovery?.years[movie.tmdbId] : undefined}
                 movies={movies}
                 setMovies={setMovies}
                 setSelectedMovie={setSelectedMovie}
