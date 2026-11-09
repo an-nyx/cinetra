@@ -1,3 +1,4 @@
+import { posterSrc } from "@/lib/poster";
 import { useEffect, useState } from "react";
 import { ShowService } from "@/services";
 import type { EpisodeGuide, TrackingSummary, TrackedEpisode } from "@/services/show.service";
@@ -113,7 +114,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
       </DialogHeader>
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:px-7">
         {show && <div className="flex gap-4 py-6 sm:gap-6">
-          {show.posterURL ? <img src={show.posterURL} alt="" className="cinema-poster h-36 w-24 shrink-0 rounded-xl object-cover sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
+          {show.posterURL ? <img src={posterSrc(show.posterURL, "w342")} alt="" className="cinema-poster h-36 w-24 shrink-0 rounded-xl object-cover sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Watching status</span>
               <div role="group" aria-label="Watching status" className="flex rounded-xl border bg-card p-1">

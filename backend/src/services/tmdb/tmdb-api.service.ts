@@ -27,7 +27,8 @@ export class TMDBApiService implements TMDBService {
     const existing = this.cache.get(key);
     if (existing && existing.expires > Date.now()) return existing.value as Promise<T>;
     const value = fetch().catch(error => { this.cache.delete(key); throw error; });
-    if (this.cache.size > 200) this.cache.delete(this.cache.keys().next().value!);
+    // Large enough for every show, season and search of a full library; the oldest entry is evicted first.
+    if (this.cache.size > 5000) this.cache.delete(this.cache.keys().next().value!);
     this.cache.set(key, { expires: Date.now() + 5 * 60_000, value });
     return value;
   }
@@ -45,14 +46,35 @@ export class TMDBApiService implements TMDBService {
     })
   }
 
+  // At most this many TMDB requests in flight per process, so a cold library load is a steady stream, not a burst.
+  private static readonly MAX_IN_FLIGHT = 24;
+  private static inFlight = 0;
+  private static waiting: (() => void)[] = [];
+  private static async slot() {
+    if (TMDBApiService.inFlight < TMDBApiService.MAX_IN_FLIGHT) { TMDBApiService.inFlight++; return; }
+    await new Promise<void>(resolve => TMDBApiService.waiting.push(resolve)); // the releasing request hands its slot over
+  }
+  private static release() {
+    const next = TMDBApiService.waiting.shift();
+    if (next) next(); else TMDBApiService.inFlight--;
+  }
+
   /** Every TMDB request goes through here, so no raw Axios error (which embeds the credential) can escape. */
   private async get<T>(url: string, config?: { params?: Record<string, string | number> }) {
     if (!this.hasAuthentication) throw new Error(TMDB_AUTH_CONFIGURATION_ERROR);
+    await TMDBApiService.slot();
     try {
       return await this.fetcher.get<T>(url, config);
     } catch (error) {
       throw sanitizeTMDBError(error, this.secrets);
+    } finally {
+      TMDBApiService.release();
     }
+  }
+
+  /** Cheap authenticated call used by the health check. Throws the sanitized error on failure. */
+  async ping(): Promise<void> {
+    await this.get('/configuration');
   }
 
   async searchShows(query: string): Promise<SearchResult[]> {

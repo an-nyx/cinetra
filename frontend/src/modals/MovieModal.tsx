@@ -1,3 +1,4 @@
+import { posterSrc } from "@/lib/poster";
 import { useEffect, useState } from "react";
 import { MovieService } from "@/services";
 import type { MovieWatch } from "@/services/movie.service";
@@ -139,7 +140,7 @@ export default function MovieModal({
             {/* Poster Image */}
             <div className="md:col-span-1">
               <img
-                src={movie.posterURL}
+                src={posterSrc(movie.posterURL, "w342")}
                 alt={movie.name}
                 className="mx-auto w-28 rounded-xl shadow-md sm:w-full"
                 onError={(e) => {
