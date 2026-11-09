@@ -86,14 +86,14 @@ router.get("/:id", async (req: Request<{id: string}>, res: Response) => {
 
 router.post("/", async (req: Request<{}, {}, CreateShowDto>, res: Response) => {
   const showData = req.body;
-  if (!showData?.name?.trim() || (showData.tmdbId !== undefined && (!Number.isInteger(showData.tmdbId) || showData.tmdbId <= 0)) || (showData.tvmazeId !== undefined && (!Number.isInteger(showData.tvmazeId) || showData.tvmazeId <= 0))) {
+  if (!showData?.name?.trim() || (showData.tmdbId !== undefined && (!Number.isInteger(showData.tmdbId) || showData.tmdbId <= 0))) {
     res.status(400).json({ message: 'Invalid show' });
     return;
   }
   try {
     res.status(201).json(await showModule.Commands.CreateCommand.execute({
       name: showData.name.trim(), overview: showData.overview, posterURL: showData.posterURL,
-      tmdbId: showData.tmdbId, tvmazeId: showData.tvmazeId,
+      tmdbId: showData.tmdbId,
     }, req.user.id));
   } catch (error) {
     if (error instanceof Error && (error.message === 'Show already exists' || 'code' in error && error.code === 'P2002')) {
@@ -108,7 +108,7 @@ router.put("/:id", async (req: Request<{id: string}, {}, UpdateShowDto>, res: Re
   if (!showData || ['seasonsWatched', 'episodesWatched'].some(key => {
     const value = showData[key as 'seasonsWatched' | 'episodesWatched'];
     return value !== undefined && (!Number.isInteger(value) || value < 0);
-  }) || showData.tmdbId !== undefined && (!Number.isInteger(showData.tmdbId) || showData.tmdbId <= 0) || showData.tvmazeId !== undefined && (!Number.isInteger(showData.tvmazeId) || showData.tvmazeId <= 0) ||
+  }) || showData.tmdbId !== undefined && (!Number.isInteger(showData.tmdbId) || showData.tmdbId <= 0) ||
     showData.status !== undefined && showData.status !== null && !['watching', 'completed', 'planned', 'paused', 'dropped'].includes(showData.status)) {
     res.status(400).json({ message: 'Invalid show update' }); return;
   }
@@ -121,7 +121,6 @@ router.put("/:id", async (req: Request<{id: string}, {}, UpdateShowDto>, res: Re
     ...(typeof showData.completed === 'boolean' ? { completed: showData.completed } : {}),
     ...(typeof showData.favorite === 'boolean' ? { favorite: showData.favorite } : {}),
     ...(showData.tmdbId !== undefined ? { tmdbId: showData.tmdbId } : {}),
-    ...(showData.tvmazeId !== undefined ? { tvmazeId: showData.tvmazeId } : {}),
     ...(showData.status !== undefined ? { status: showData.status } : {}),
   };
   if (allowed.name === '' || !Object.keys(allowed).length) { res.status(400).json({ message: 'Invalid show update' }); return; }

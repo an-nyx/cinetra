@@ -2,7 +2,7 @@
 
 ## Current state
 
-The Upcoming page refreshes while a browser tab is open. Its backend reads live TMDB or TVMaze data and keeps an in-memory catalog cache for 15 minutes. There is no persisted episode release snapshot, release-check worker, Coolify scheduled task, or notification delivery path. Closing the browser stops the page's refresh timer. A later page load still fetches current provider data.
+The Upcoming page refreshes while a browser tab is open. Its backend reads live TMDB data and keeps an in-memory catalog cache for 15 minutes. There is no persisted episode release snapshot, release-check worker, Coolify scheduled task, or notification delivery path. Closing the browser stops the page's refresh timer. A later page load still fetches current provider data.
 
 Production runs the frontend and Express backend in one Coolify application container (`terraform/main.tf`, `dockerfile`). The local Docker Compose setup also runs the app as a container. Neither deployment declares a recurring release-check command.
 
@@ -12,7 +12,7 @@ Coolify Scheduled Tasks can run a command inside a running application container
 
 The command must first be implemented to:
 
-1. Read tracked shows from PostgreSQL in small batches, using their stored TMDB or TVMaze IDs.
+1. Read tracked shows from PostgreSQL in small batches, using their stored TMDB IDs.
 2. Fetch current episode schedules with rate limits and retry handling.
 3. Upsert episode metadata keyed by show, season, and episode; retain prior air dates to detect new, delayed, and rescheduled releases.
 4. Record a per-show check time. Treat the first check as a baseline so older episodes do not generate false new-release alerts.

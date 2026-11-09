@@ -1,6 +1,5 @@
 export interface SearchResult {
   id: number;
-  tvmazeId?: number;
   name: string;
   overview: string;
   posterURL: string;

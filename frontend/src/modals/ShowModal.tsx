@@ -29,7 +29,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [linkQuery, setLinkQuery] = useState("");
-  const [linkResults, setLinkResults] = useState<{ id: number; tvmazeId?: number; name: string }[]>([]);
+  const [linkResults, setLinkResults] = useState<{ id: number; name: string }[]>([]);
   const search = useDebounce(linkQuery, 300);
 
   const refresh = async (id: string, selectedSeason?: number) => {
@@ -84,10 +84,10 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
       setShows(current => current.map(item => item.id === updated.id ? updated : item));
     });
   };
-  const linkShow = async (result: { id: number; tvmazeId?: number }) => {
+  const linkShow = async (result: { id: number }) => {
     if (!selectedShow) return;
     await act(async () => {
-      const updated = await ShowService.updateShow(selectedShow, result.id ? { tmdbId: result.id } : { tvmazeId: result.tvmazeId });
+      const updated = await ShowService.updateShow(selectedShow, { tmdbId: result.id });
       setShows(current => current.map(item => item.id === updated.id ? updated : item));
       setLinkQuery(''); setLinkResults([]);
     }, 1);
@@ -157,7 +157,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
           {!guide && <p className="text-sm text-muted-foreground">No verified episode guide is available for this show. You can still edit the saved position above.</p>}
           {summary.recentHistory.length > 0 && <section><h3 className="mb-2 text-lg font-semibold">Recently watched</h3><div className="flex flex-wrap gap-2">{summary.recentHistory.map(item => <span key={`${item.season}-${item.episode}`} className="rounded-lg bg-muted px-3 py-2 text-xs">S{item.season}E{item.episode} · {new Date(item.watchedAt).toLocaleDateString()}</span>)}</div></section>}
         </div>}
-        {show && !guide && !busy && <div className="space-y-3 py-3"><p className="text-sm text-muted-foreground">Find the exact show to connect its episode guide.</p><Input aria-label="Find show for episode guide" placeholder="Search for a show" value={linkQuery} onChange={e => setLinkQuery(e.target.value)} />{linkResults.map(result => <button key={result.tvmazeId || result.id} type="button" className="block w-full rounded-lg border p-3 text-left text-sm hover:border-primary" onClick={() => linkShow(result)}>{result.name}</button>)}</div>}
+        {show && !guide && !busy && <div className="space-y-3 py-3"><p className="text-sm text-muted-foreground">Find the exact show to connect its episode guide.</p><Input aria-label="Find show for episode guide" placeholder="Search for a show" value={linkQuery} onChange={e => setLinkQuery(e.target.value)} />{linkResults.map(result => <button key={result.id} type="button" className="block w-full rounded-lg border p-3 text-left text-sm hover:border-primary" onClick={() => linkShow(result)}>{result.name}</button>)}</div>}
         {show && <div className="mt-7 border-t pt-5"><Button variant="ghost" size="sm" className="gap-2 text-destructive" disabled={busy} onClick={() => { if (window.confirm(`Delete ${show.name} and its watch history?`)) deleteShow(); }}><Trash2 className="size-4" />Delete show</Button></div>}
       </div>
     </DialogContent>

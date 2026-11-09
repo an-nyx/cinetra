@@ -52,9 +52,9 @@ export default function AddShowModal({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!show.name || (!show.id && !show.tvmazeId)) return;
+    if (!show.name || !show.id) return;
 
-    ShowService.createShow({ name: show.name, overview: show.overview, posterURL: show.posterURL, ...(show.id ? { tmdbId: show.id } : { tvmazeId: show.tvmazeId }) })
+    ShowService.createShow({ name: show.name, overview: show.overview, posterURL: show.posterURL, tmdbId: show.id })
       .then((newShow) => {
         setShows([newShow, ...shows]);
       })
@@ -72,14 +72,13 @@ export default function AddShowModal({
   };
 
   const onSearchResultClick = (searchResult: SearchResult) => {
-    const { id, tvmazeId, name, overview, posterURL } = searchResult;
+    const { id, name, overview, posterURL } = searchResult;
 
     setShow({
       name,
       overview,
       posterURL,
       id,
-      tvmazeId,
     });
     setSearch("");
   };

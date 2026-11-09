@@ -38,10 +38,6 @@ export class TMDBApiService implements TMDBService {
   }
 
   async searchShows(query: string): Promise<SearchResult[]> {
-    if (!process.env.API_AUTHORIZATION || process.env.API_AUTHORIZATION.includes('<')) {
-      const response = await this.cached(`tvmaze-search:${query.toLowerCase()}`, () => axios.get<Array<{ show: { id: number; name: string; summary: string | null; image: { medium: string } | null } }>>('https://api.tvmaze.com/search/shows', { params: { q: query.trim().slice(0, 100) }, timeout: 10000 }));
-      return response.data.map(({ show }) => ({ id: 0, tvmazeId: show.id, name: show.name, overview: (show.summary || '').replace(/<[^>]*>/g, ''), posterURL: show.image?.medium || '' }));
-    }
     return this.search('tv', query);
   }
 

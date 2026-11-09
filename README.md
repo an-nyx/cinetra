@@ -48,7 +48,7 @@ npm install
 
 ### Configuration
 
-Set up the backend environment from `backend/example.env`, including a PostgreSQL `DATABASE_URL` and `JWT_SECRET`. A TMDB API read access token in `API_AUTHORIZATION` (`Bearer …`) is optional for TV tracking: without it, show search and episode guides use TVMaze. Set up the frontend environment from `frontend/example.env`:
+Set up the backend environment from `backend/example.env`, including a PostgreSQL `DATABASE_URL` and `JWT_SECRET`. A TMDB API read access token in `API_AUTHORIZATION` (`Bearer …`) is required for TV show search and episode guides. Cinetra uses TMDB as its only metadata provider. Set up the frontend environment from `frontend/example.env`:
 
 ```bash
 VITE_API_PATH=http://localhost:$PORT

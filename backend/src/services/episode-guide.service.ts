@@ -1,11 +1,10 @@
-import axios from 'axios';
 import { prisma } from '../database/prisma';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 
 const tmdb = new TMDBApiService();
 const today = () => new Date().toISOString().slice(0, 10);
 type Episode = { season: number; number: number; name: string; airDate: string | null; airTimestamp: string | null; runtime: number | null; watchedAt: Date | null };
-type Catalog = { seasons: { number: number; episodeCount: number }[]; episodes: Omit<Episode, 'watchedAt'>[]; source: 'TMDB' | 'TVMaze' };
+type Catalog = { seasons: { number: number; episodeCount: number }[]; episodes: Omit<Episode, 'watchedAt'>[]; source: 'TMDB' };
 const catalogCache = new Map<string, { until: number; value: Promise<Catalog> }>();
 
 export class EpisodeGuideError extends Error {
@@ -29,29 +28,17 @@ export function normalizeLegacyPosition(seasonsWatched: number, episodesWatched:
   return { season: done && following ? following : selected, episode: done && following ? 1 : episodesWatched + 1, complete: done, needsReview: false, known: true, progressCount: regular.filter(e => e.season < selected).length + episodesWatched };
 }
 
-async function catalogFor(show: { name: string; tmdbId: number | null; tvmazeId: number | null }): Promise<Catalog> {
-  const key = `${show.tmdbId || ''}:${show.tvmazeId || ''}:${show.name}`;
+async function catalogFor(show: { name: string; tmdbId: number | null }): Promise<Catalog> {
+  if (!show.tmdbId) throw new EpisodeGuideError(404, 'TMDB match required to load episode metadata');
+  const tmdbId = show.tmdbId;
+  const key = `tmdb:${tmdbId}`;
   const cached = catalogCache.get(key);
   if (cached && cached.until > Date.now()) return cached.value;
   const value = (async (): Promise<Catalog> => {
-    if (show.tmdbId && process.env.API_AUTHORIZATION && !process.env.API_AUTHORIZATION.includes('<')) {
-      const details = await tmdb.getShow(show.tmdbId);
-      const seasons = details.seasons.filter(s => s.season_number > 0).map(s => ({ number: s.season_number, episodeCount: s.episode_count }));
-      const pages = await Promise.all(seasons.map(s => tmdb.getSeason(show.tmdbId!, s.number)));
-      return { source: 'TMDB', seasons, episodes: pages.flatMap((page, i) => page.episodes.map(e => ({ season: seasons[i].number, number: e.episode_number, name: e.name, airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null }))) };
-    }
-    // TVMaze's public episode endpoint provides a real guide when TMDB is not configured.
-    let tvmazeId = show.tvmazeId;
-    if (!tvmazeId) {
-      const search = await axios.get<Array<{ show: { id: number; name: string } }>>('https://api.tvmaze.com/search/shows', { params: { q: show.name }, timeout: 4000 });
-      const match = search.data.find(item => item.show.name.localeCompare(show.name, undefined, { sensitivity: 'base' }) === 0);
-      if (!match) throw new EpisodeGuideError(404, 'No exact episode guide match found for this show');
-      tvmazeId = match.show.id;
-    }
-    const response = await axios.get<Array<{ season: number; number: number; name: string; airdate: string | null; airstamp: string | null; runtime: number | null }>>(`https://api.tvmaze.com/shows/${tvmazeId}/episodes`, { timeout: 4000 });
-    const episodes = response.data.filter(e => e.season > 0 && e.number > 0).map(e => ({ season: e.season, number: e.number, name: e.name, airDate: e.airdate || null, airTimestamp: e.airstamp || null, runtime: e.runtime || null }));
-    const seasons = [...new Set(episodes.map(e => e.season))].sort((a, b) => a - b).map(number => ({ number, episodeCount: episodes.filter(e => e.season === number).length }));
-    return { source: 'TVMaze', seasons, episodes };
+    const details = await tmdb.getShow(tmdbId);
+    const seasons = (details.seasons || []).filter(s => s.season_number > 0).map(s => ({ number: s.season_number, episodeCount: s.episode_count }));
+    const pages = await Promise.all(seasons.map(s => tmdb.getSeason(tmdbId, s.number)));
+    return { source: 'TMDB', seasons, episodes: pages.flatMap((page, i) => (page.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: seasons[i].number, number: e.episode_number, name: e.name, airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null }))) };
   })().catch(error => { if (!(error instanceof EpisodeGuideError && error.status === 404)) catalogCache.delete(key); throw error; });
   catalogCache.set(key, { until: Date.now() + 60 * 60_000, value });
   return value;

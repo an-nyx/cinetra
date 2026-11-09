@@ -10,7 +10,6 @@ interface CreateShowData {
   completed?: boolean;
   favorite?: boolean;
   tmdbId?: number;
-  tvmazeId?: number;
   status?: "watching" | "completed" | "planned" | "paused" | "dropped" | null;
 }
 
@@ -23,13 +22,11 @@ interface UpdateShowData {
   completed?: boolean;
   favorite?: boolean;
   tmdbId?: number;
-  tvmazeId?: number;
   status?: "watching" | "completed" | "planned" | "paused" | "dropped" | null;
 }
 
 interface ShowSearchResult {
   id: number;
-  tvmazeId?: number;
   name: string;
   overview: string;
   posterURL: string;
