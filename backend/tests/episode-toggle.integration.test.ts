@@ -26,6 +26,15 @@ async function main() {
   await mark(2, false); s = await state(); assert.equal(s.show.episodesWatched, 2); assert.ok(!s.watches.some(w => w.episode === 2));
   await assert.rejects(mark(2, false), (e: unknown) => e instanceof EpisodeGuideError && e.status === 409);
   s = await state(); assert.equal(s.show.episodesWatched, 2); assert.equal(s.show.favorite, true); assert.equal(s.show.status, 'watching'); assert.equal(s.show.tmdbId, 912345);
+  const beforeStatus = await state();
+  const repository = new ShowPrismaRepository();
+  await repository.update(show.id, { status: 'dropped', completed: false }, user.id);
+  assert.equal((await state()).show.status, 'dropped');
+  await repository.update(show.id, { status: 'watching', completed: false }, user.id);
+  const afterStatus = await state();
+  assert.equal(afterStatus.show.status, 'watching');
+  assert.deepEqual(afterStatus.watches, beforeStatus.watches);
+  assert.deepEqual([afterStatus.show.seasonsWatched, afterStatus.show.episodesWatched, afterStatus.show.favorite, afterStatus.show.tmdbId], [beforeStatus.show.seasonsWatched, beforeStatus.show.episodesWatched, beforeStatus.show.favorite, beforeStatus.show.tmdbId]);
   console.log('Episode toggle integration tests passed');
 }
 main().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => prisma.$disconnect());

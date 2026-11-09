@@ -116,11 +116,11 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
         {show && <div className="flex gap-4 py-6 sm:gap-6">
           {show.posterURL ? <img src={posterSrc(show.posterURL, "w342")} alt="" className="cinema-poster h-36 w-24 shrink-0 rounded-xl object-cover sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
           <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Watching status</span>
-              <div role="group" aria-label="Watching status" className="flex rounded-xl border bg-card p-1">
-                {(['watching', 'completed'] as const).map(value => <button key={value} type="button" aria-pressed={(show.status || (show.completed ? 'completed' : null)) === value} disabled={busy} onClick={() => updateStatus(value)} className={`min-h-10 rounded-lg px-4 text-sm font-medium capitalize ${(show.status || (show.completed ? 'completed' : null)) === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{value}</button>)}
+            <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Personal status</span>
+              <div role="group" aria-label="Personal status" className="flex flex-wrap rounded-xl border bg-card p-1">
+                {(['watching', 'completed', 'dropped'] as const).map(value => <button key={value} type="button" aria-pressed={(show.status || (show.completed ? 'completed' : null)) === value} disabled={busy} onClick={() => updateStatus(value)} className={`min-h-10 rounded-lg px-4 text-sm font-medium capitalize ${(show.status || (show.completed ? 'completed' : null)) === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{value}</button>)}
               </div>
-              {show.status && !['watching', 'completed'].includes(show.status) && <span className="text-xs text-muted-foreground">Saved legacy status: {show.status}. Choose a new status only if you want to change it.</span>}
+              {show.status && !['watching', 'completed', 'dropped'].includes(show.status) && <span className="text-xs text-muted-foreground">Saved legacy status: {show.status}. Choose a new status only if you want to change it.</span>}
               {!show.status && !show.completed && <span className="text-xs text-muted-foreground">No status selected</span>}
             </div>
             <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">{show.overview || 'No overview available.'}</p>
