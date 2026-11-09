@@ -23,12 +23,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ShowType } from "@/types/index.ts";
 import { Plus, RefreshCw, Search } from "lucide-react";
+import { filterAndSortShows, personalStatusLabels, type LibraryFilters, type PersonalStatus } from "@/lib/show-library";
 
-interface ListFiltersType {
-  favoriteFilter?: "favorite" | "notFavorite";
-  completeFilter?: "completed" | "notCompleted";
-  sortBy?: "nameAsc" | "nameDesc" | "dateNewest" | "dateOldest" | "updatedNewest" | "updatedOldest";
-}
+type ListFiltersType = LibraryFilters;
 
 export default function ShowsPage() {
   const [addShowModalStatus, setAddShowModalStatus] = useState<boolean>(false);
@@ -147,7 +144,17 @@ export default function ShowsPage() {
             </SelectContent>
           </Select>
 
-          {(filters.favoriteFilter || filters.completeFilter) && (
+          <Select key={`status-${key}`} name="statusFilter" value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
+            <SelectTrigger aria-label="Filter watching status" className="w-auto min-w-[190px] max-w-full">
+              <SelectValue placeholder="All watching statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All watching statuses</SelectItem>
+              {(['watching', 'completed', 'dropped', 'planned', 'paused', 'none'] as const).map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {(filters.favoriteFilter || filters.completeFilter || filters.statusFilter) && (
             <Button
               variant="ghost"
               size="sm"
@@ -192,45 +199,7 @@ export default function ShowsPage() {
       <Separator className="mb-6" />
 
       {(() => {
-        const filteredShows = shows?.filter((show) => {
-          if (!show.name.toLowerCase().includes(search)) return false;
-
-          if (filters.favoriteFilter === "favorite" && show.favorite !== true)
-            return false;
-
-          if (
-            filters.favoriteFilter === "notFavorite" &&
-            show.favorite !== false
-          )
-            return false;
-
-          // The personal Completed status, read the same way as in Details (status first, legacy flag as fallback).
-          const personallyCompleted = (show.status || (show.completed ? "completed" : null)) === "completed";
-          if (filters.completeFilter === "completed" && !personallyCompleted) return false;
-          if (filters.completeFilter === "notCompleted" && personallyCompleted) return false;
-
-          return true;
-        });
-
-        // Apply sorting
-        const sortedShows = [...filteredShows].sort((a, b) => {
-          switch (filters.sortBy) {
-          case "nameAsc":
-            return a.name.localeCompare(b.name);
-          case "nameDesc":
-            return b.name.localeCompare(a.name);
-          case "dateNewest":
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          case "dateOldest":
-            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          case "updatedNewest":
-            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-          case "updatedOldest":
-            return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-          default:
-            return 0;
-          }
-        });
+        const sortedShows = filterAndSortShows(shows, search, filters);
 
         if (sortedShows.length === 0) {
           return (
