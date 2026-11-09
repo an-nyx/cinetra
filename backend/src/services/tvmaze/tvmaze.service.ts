@@ -3,7 +3,7 @@
  * Nothing is persisted; TVMaze never writes TMDB associations, progress or watch records.
  */
 import axios from 'axios';
-import { SWRCache } from '../swr-cache';
+import { mapLimit, SWRCache } from '../swr-cache';
 import { chooseTitleCorroboratedMatch, decideExternalIdentity, type IdentityResult, type TitleEvidence, type TMDBExternalIds, type TVMazeEpisode, type TVMazeShow } from './tvmaze-schedule.model';
 
 // Lookups answer with a redirect to /shows/:id; read the ID from it instead of paying for a second request.
@@ -86,7 +86,7 @@ export function checkForUpdates(minIntervalMs = 30 * 60_000) {
         return !!updated && !!cached && (cached.show.updated ?? 0) < updated;
       });
       // Re-read changed shows now; if TVMaze fails, the previous copy stays in place (and is marked stale).
-      await Promise.all(changed.map(id => scheduleCache.refresh(String(id), () => loadSchedule(id)).catch(() => null)));
+      await mapLimit(changed, 4, id => scheduleCache.refresh(String(id), () => loadSchedule(id)).catch(() => null));
     } catch { /* keep cached schedules */ }
     finally { updatesPending = null; }
   })();

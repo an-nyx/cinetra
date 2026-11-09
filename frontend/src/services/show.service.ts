@@ -64,7 +64,7 @@ export interface UpcomingRelease {
 export interface ReturningTba { showId: string; showName: string; posterURL: string | null; showStatus: string | null; tvmazeStatus: string; announcedEpisodes: number }
 export interface ScheduleReview { showId: string; showName: string; posterURL: string | null; reason: string; detail: string }
 export interface UpcomingSchedule {
-  status: 'ready'; source: 'TVMaze'; generatedAt: string; stale: boolean;
+  status: 'ready'; source: 'TVMaze'; generatedAt: string; stale: boolean; refreshing?: boolean; progress?: { done: number; total: number };
   releases: UpcomingRelease[]; returningTba: ReturningTba[]; needsReview: ScheduleReview[];
   unavailable: { showId: string; showName: string; provider: 'TMDB' | 'TVMaze' }[];
   coverage: { evaluatedShows: number; verifiedShows: number; verifiedByExternalId: number; verifiedByTitle: number; viaScheduleOnlyTMDBMatch: number; scheduledShows: number; unresolvedShows: number; unavailableShows: number; staleShows: number; excludedEpisodes: { specials: number; past: number; undated: number; duplicates: number; repeats: number } };
@@ -95,7 +95,7 @@ class ShowServiceClass extends ApiService {
 
   async getUpcomingReleases(options: { refresh?: boolean; bypassCache?: boolean } = {}): Promise<UpcomingResponse> {
     const params = options.refresh ? { refresh: 1 } : options.bypassCache ? { t: Date.now() } : undefined;
-    const response = await this.get<UpcomingResponse>("/show/upcoming", { timeout: 60_000, ...(params ? { params } : {}) });
+    const response = await this.get<UpcomingResponse>("/show/upcoming", { timeout: 10_000, ...(params ? { params } : {}) });
     return response.data;
   }
 

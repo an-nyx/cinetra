@@ -24,7 +24,8 @@ async function mapLimited<T, R>(values: T[], fn: (value: T) => Promise<R>): Prom
 export async function discoverMovies(ids: Array<number | null>, today: string, region?: string, provider = { details, collection }) {
   const saved = new Set(ids.filter((id): id is number => !!id));
   let unresolved = ids.filter(id => !id).length;
-  const sources = await mapLimited([...saved], async id => { try { const movie = await provider.details(id); if (movie.id !== id) throw new Error("Mismatched movie identity"); return movie; } catch { unresolved++; return null; } });
+  let providerFailures = 0;
+  const sources = await mapLimited([...saved], async id => { try { const movie = await provider.details(id); if (movie.id !== id) throw new Error("Mismatched movie identity"); return movie; } catch { unresolved++; providerFailures++; return null; } });
   const collections = new Map<number, { id: number; name: string }>();
   let verifiedMovies = 0;
   for (const source of sources) if (source?.belongs_to_collection?.id) collections.set(source.belongs_to_collection.id, source.belongs_to_collection);
@@ -33,7 +34,7 @@ export async function discoverMovies(ids: Array<number | null>, today: string, r
       const verified = matchingSources.filter(source => result.parts!.some(part => part.id === source!.id));
       verifiedMovies += verified.length; unresolved += matchingSources.length - verified.length;
       if (!verified.length) return []; return result.parts.filter(p => !p.release_date || p.release_date >= today).map(p => ({ id: p.id, collection: c })); }
-    catch { unresolved++; return []; }
+    catch { unresolved++; providerFailures++; return []; }
   });
   const parts = new Map<number, { id: number; collection: { id: number; name: string } }>();
   for (const part of groups.flat()) if (part.id > 0 && !parts.has(part.id)) parts.set(part.id, part);
@@ -43,5 +44,5 @@ export async function discoverMovies(ids: Array<number | null>, today: string, r
   });
   const releases = candidates.filter((x): x is MovieRelease => !!x).sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.title.localeCompare(b.title));
   const years = Object.fromEntries(sources.flatMap(source => source?.release_date && /^\d{4}-\d{2}-\d{2}$/.test(source.release_date) ? [[source.id, source.release_date.slice(0, 4)]] : []));
-  return { status: 'ready' as const, releases, years, verifiedMovies, unresolved, generatedAt: new Date().toISOString() };
+  return { status: 'ready' as const, releases, years, verifiedMovies, unresolved, providerFailures, generatedAt: new Date().toISOString() };
 }

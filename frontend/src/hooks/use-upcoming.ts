@@ -1,56 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiService, ShowService } from "@/services";
+import { readUpcomingCache, writeUpcomingCache } from "@/lib/upcoming-cache";
 import type { UpcomingSchedule } from "@/services/show.service";
 
-/** How long pages keep asking while a first (cold) schedule is built on the server, and how often. */
 const BUILD_RETRY_MS = 5_000;
-const BUILD_MAX_ATTEMPTS = 30;
-
-/**
- * The TVMaze schedule for Home and Upcoming. Both read the same response (cached by ApiService), so the two pages
- * always agree. While the server is still building a cold schedule it reports progress, and this hook asks again a
- * bounded number of times. No background polling otherwise.
- */
+const BUILD_MAX_ATTEMPTS = 60;
 export function useUpcomingSchedule() {
   const [schedule, setSchedule] = useState<UpcomingSchedule | null>(null);
+  const [cached, setCached] = useState(false);
   const [building, setBuilding] = useState<{ done: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const run = useRef(0);
-
   const load = useCallback(async (refresh = false) => {
     const current = ++run.current;
-    if (refresh) { setRefreshing(true); ApiService.clearCache(); }
+    if (refresh) { setRefreshing(true); setError(""); ApiService.clearCache(); }
     try {
+      const snapshot = await readUpcomingCache<UpcomingSchedule>("tv");
+      if (current !== run.current) return;
+      if (snapshot) { setSchedule(snapshot); setCached(true); setLoading(false); }
       for (let attempt = 0; attempt < BUILD_MAX_ATTEMPTS; attempt++) {
-        const data = await ShowService.getUpcomingReleases({ refresh: refresh && attempt === 0, bypassCache: attempt > 0 });
+        const data = await ShowService.getUpcomingReleases({ refresh: refresh && attempt === 0, bypassCache: true });
         if (current !== run.current) return;
-        if (data.status === "ready") { setSchedule(data); setBuilding(null); setError(""); return; }
-        setBuilding(data.progress);
+        if (data.status === "ready") {
+          if (snapshot && (data.stale || data.unavailable.length > 0)) {
+            setSchedule(snapshot); setCached(true); setError("Some TV sources are unavailable; showing the saved schedule.");
+          } else { setSchedule(data); setCached(false); setError(""); }
+          setLoading(false);
+          // Never replace a successful snapshot with a provider failure or a transient refresh response.
+          if (!data.refreshing && !data.stale && data.unavailable.length === 0) void writeUpcomingCache("tv", data);
+          if (!data.refreshing) { setBuilding(null); return; }
+          setBuilding(data.progress || { done: 0, total: 0 });
+        } else { setBuilding(data.progress); setLoading(false); }
         await new Promise(resolve => setTimeout(resolve, BUILD_RETRY_MS));
         if (current !== run.current) return;
       }
-      setError("The schedule is taking longer than usual to prepare. Try again in a minute.");
-    } catch {
-      if (current === run.current) setError("Upcoming releases could not be loaded. Please try again.");
-    } finally {
-      if (current === run.current) { setLoading(false); setRefreshing(false); }
-    }
+      setBuilding(null); setError("The TV schedule is taking longer than expected. Try again.");
+    } catch { if (current === run.current) { setBuilding(null); setError("TV releases could not be refreshed. Try again."); } }
+    finally { if (current === run.current) { setLoading(false); setRefreshing(false); } }
   }, []);
-
   useEffect(() => {
     load();
     const onChange = () => load();
-    window.addEventListener("tracking-updated", onChange);
-    window.addEventListener("online", onChange);
+    window.addEventListener("tracking-updated", onChange); window.addEventListener("online", onChange);
     return () => { run.current++; window.removeEventListener("tracking-updated", onChange); window.removeEventListener("online", onChange); };
   }, [load]);
-
-  return { schedule, building, loading, refreshing, error, refresh: () => load(true) };
+  return { schedule, cached, building, loading, refreshing, error, refresh: () => load(true) };
 }
-
-/** The current time, refreshed every minute and when the page becomes visible again (day boundaries stay right). */
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {

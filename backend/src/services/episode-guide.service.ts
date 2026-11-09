@@ -148,7 +148,8 @@ async function buildUpcomingReleases(userId: string, progress: { done: number; t
   const linkedTmdbIds = new Set(shows.flatMap(show => (show.tmdbId ? [show.tmdbId] : [])));
   // The earliest calendar day that is still "today" somewhere; pages drop what is before the viewer's own today.
   const cutoff = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  await checkForUpdates(force ? 2 * 60_000 : 30 * 60_000);
+  // Refresh changed provider records independently; never block the schedule on the entire updates feed.
+  void checkForUpdates(force ? 2 * 60_000 : 30 * 60_000);
   const outcomes = await mapLimit(shows, 8, async show => { try { return await upcomingOutcome(show, linkedTmdbIds, cutoff); } finally { progress.done++; } });
   return assembleUpcoming(outcomes, new Date().toISOString());
 }
@@ -159,28 +160,32 @@ function upcomingFor(userId: string, force = false) {
   const load = () => {
     const progress = { done: 0, total: 0 };
     buildProgress.set(userId, progress);
-    return buildUpcomingReleases(userId, progress, force);
+    return buildUpcomingReleases(userId, progress, force).then(result => {
+      const previous = upcomingCache.peek(userId);
+      // Provider outages must not replace a usable last-good schedule with a partial one.
+      return previous && result.coverage.unavailableShows > 0 ? { ...previous, stale: true } : result;
+    });
   };
   return force ? upcomingCache.refresh(userId, load) : upcomingCache.get(userId, load);
 }
 
 /** How long a request waits for a first (cold) build before answering "building" with progress. */
-const BUILD_WAIT_MS = 12_000;
+const BUILD_WAIT_MS = 250;
 /**
  * The user's TVMaze schedule. Cached per user (stale-while-revalidate). `refresh` rebuilds now (at most every 30
  * seconds) and re-checks TVMaze's updates feed; a cold build that takes longer than a few seconds answers
  * `{ status: 'building' }` so pages never hang, and finishes in the background.
  */
-export async function getUpcomingReleases(userId: string, options: { refresh?: boolean } = {}): Promise<UpcomingResponse | { status: 'building'; progress: { done: number; total: number } }> {
+export async function getUpcomingReleases(userId: string, options: { refresh?: boolean } = {}): Promise<(UpcomingResponse & { refreshing?: boolean; progress?: { done: number; total: number } }) | { status: 'building'; progress: { done: number; total: number } }> {
   const force = !!options.refresh && Date.now() - (lastForcedRefresh.get(userId) || 0) > 30_000;
   if (force) lastForcedRefresh.set(userId, Date.now());
   const pending = upcomingFor(userId, force);
   pending.catch(() => { /* reported to the waiting request, or retried on the next one */ });
   let timer: NodeJS.Timeout | undefined;
   const waited = await Promise.race([pending, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), BUILD_WAIT_MS); })]).finally(() => clearTimeout(timer));
-  if (waited) return waited;
+  if (waited) return upcomingCache.isRefreshing(userId) ? { ...waited, refreshing: true, progress: { ...(buildProgress.get(userId) || { done: 0, total: 0 }) } } : waited;
   const previous = upcomingCache.peek(userId);
-  if (previous) return previous; // a slow forced refresh: keep showing the last schedule
+  if (previous) return { ...previous, refreshing: true, progress: { ...(buildProgress.get(userId) || { done: 0, total: 0 }) } };
   return { status: 'building', progress: { ...(buildProgress.get(userId) || { done: 0, total: 0 }) } };
 }
 

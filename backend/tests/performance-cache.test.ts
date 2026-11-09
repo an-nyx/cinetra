@@ -16,9 +16,11 @@ async function main() {
 
   // Stale: old value returned at once, one background refresh, new value afterwards.
   clock = 150; assert.equal(await cache.get('k', load(2)), 1);
+  assert.equal(cache.isRefreshing('k'), true);
   assert.equal(await cache.get('k', load(3)), 1); // refresh already in flight: not started twice
   await new Promise(r => setTimeout(r, 20));
   assert.equal(loads, 2);
+  assert.equal(cache.isRefreshing('k'), false);
   assert.equal(await cache.get('k', load(4)), 2);
 
   // Failed background refresh keeps the stale value and waits retryMs before trying again.

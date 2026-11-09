@@ -1,3 +1,4 @@
+import { clearUpcomingCache } from "@/lib/upcoming-cache";
 import { ApiService } from "./api.service";
 
 interface LoginCredentials {
@@ -39,6 +40,7 @@ class AuthServiceClass extends ApiService {
   }
 
   logout(): void {
+    clearUpcomingCache();
     localStorage.removeItem("Authorization");
   }
 
