@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ShowType } from "@/types/index.ts";
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { Plus, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { filterAndSortShows, personalStatusLabels, type LibraryFilters, type PersonalStatus } from "@/lib/show-library";
 
 type ListFiltersType = LibraryFilters;
@@ -33,6 +33,7 @@ export default function ShowsPage() {
   const [tracking, setTracking] = useState<TrackingSummary[]>([]);
   const [selectedShow, setSelectedShow] = useState<string>("");
   const [search, setSearch] = useState<string>("");
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [filters, setFilters] = useState<ListFiltersType>(() => {
     const savedSort = localStorage.getItem('showsSortBy');
     return savedSort ? { sortBy: savedSort as ListFiltersType['sortBy'] } : {};
@@ -76,10 +77,11 @@ export default function ShowsPage() {
   }, [filters.sortBy]);
 
   return (
-    <div className="library-page mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
-      <div className="library-heading mb-7 flex flex-col gap-5">
-        <div><p className="cinema-eyebrow mb-2">Your collection</p><h1 className="text-4xl font-semibold tracking-tight">TV shows<span className="ml-3 text-base font-normal text-muted-foreground">{shows.length}</span></h1><p className="mt-2 text-sm text-muted-foreground">Your stories, right where you left them.</p></div>
-        <div className="flex min-w-0 items-center gap-3">
+    <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
+      <div className="library-heading mb-2 flex flex-col gap-2 sm:mb-7 sm:gap-5">
+        <div><p className="cinema-eyebrow mb-2 hidden sm:block">Your collection</p><h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">TV shows<span className="ml-3 text-sm font-normal text-muted-foreground sm:text-base">{shows.length}</span></h1><p className="mt-2 hidden text-sm text-muted-foreground sm:block">Your stories, right where you left them.</p></div>
+        <div className="flex gap-2 sm:hidden"><Button type="button" variant="outline" size="sm" className="min-h-10 gap-2" aria-expanded={controlsOpen} aria-controls="show-filters" onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" />Search & filters{(search || filters.favoriteFilter || filters.completeFilter || filters.statusFilter) && <span aria-label="Filters active"> · active</span>}</Button><Button type="button" size="sm" className="min-h-10 gap-1" onClick={() => setAddShowModalStatus(true)}><Plus className="size-4" />Add show</Button></div>
+        <div className={`${controlsOpen ? 'flex' : 'hidden'} min-w-0 items-center gap-3 sm:flex`}>
           <InputGroup>
             <InputGroupInput
               id="search"
@@ -97,7 +99,7 @@ export default function ShowsPage() {
           </InputGroup>
           <Button
             onClick={() => setAddShowModalStatus(true)}
-            className="shrink-0 gap-2 rounded-xl font-medium"
+            className="hidden shrink-0 gap-2 rounded-xl font-medium sm:inline-flex"
           >
             <Plus className="size-4" /><span>Add show</span>
           </Button>
@@ -110,7 +112,7 @@ export default function ShowsPage() {
         </div>
       </div>
 
-      <div className="library-filters mb-6 flex flex-wrap items-center gap-2">
+      <div id="show-filters" className={`library-filters mb-3 flex-wrap items-center gap-2 sm:mb-6 sm:flex ${controlsOpen ? 'flex' : 'hidden'}`}>
         <div className="flex flex-wrap items-center gap-2">
           <Select
             key={`favorite-${key}`}
@@ -196,7 +198,7 @@ export default function ShowsPage() {
         </Select>
       </div>
 
-      <Separator className="mb-6" />
+      <Separator className="mb-2 sm:mb-6" />
 
       {(() => {
         const sortedShows = filterAndSortShows(shows, search, filters);
@@ -228,7 +230,7 @@ export default function ShowsPage() {
         }
 
         return (
-          <div className="grid w-full grid-cols-2 gap-x-3 gap-y-5 min-[480px]:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid w-full grid-cols-2 gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-5 min-[480px]:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {sortedShows.map((show) => (
               <Show
                 type="show"
