@@ -28,6 +28,12 @@ async function main() {
   s = await state(); assert.equal(s.show.episodesWatched, 2); assert.equal(s.show.favorite, true); assert.equal(s.show.status, 'watching'); assert.equal(s.show.tmdbId, 912345);
   const beforeStatus = await state();
   const repository = new ShowPrismaRepository();
+  await repository.update(show.id, { status: 'completed', completed: true }, user.id);
+  const monitored = await state();
+  assert.ok(monitored.show.completedMonitorFrom instanceof Date);
+  await repository.update(show.id, { favorite: false }, user.id);
+  assert.deepEqual((await state()).show.completedMonitorFrom, monitored.show.completedMonitorFrom);
+  await repository.update(show.id, { favorite: true }, user.id);
   await repository.update(show.id, { status: 'dropped', completed: false }, user.id);
   assert.equal((await state()).show.status, 'dropped');
   await repository.update(show.id, { status: 'watching', completed: false }, user.id);
