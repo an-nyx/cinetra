@@ -235,10 +235,16 @@ h1, h2, h3 { letter-spacing: -0.035em; }
   [data-slot="skeleton"]::after { animation: none !important; }
 }
 
-/* Keep a portrait poster and two complete card rows visible on compact phones. */
+/* Phones: two complete card rows above the bottom bar. The poster height is what the screen leaves after the
+   header, controls, bar, safe areas and the two text blocks; it fills the card width at a portrait ~1:1.07 ratio and
+   only narrows (staying portrait) on short screens. --show-chrome is the measured non-poster height for two rows. */
 @media (max-width: 639px) {
   .compact-show-poster {
-    width: min(100%, clamp(44px, calc((100vh - 450px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 3), 160px));
-    width: min(100%, clamp(44px, calc((100dvh - 450px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 3), 160px));
+    --show-chrome: 394px;
+    --poster-h: clamp(84px, calc((100vh - var(--show-chrome) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2), 320px);
+    --poster-h: clamp(84px, calc((100dvh - var(--show-chrome) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2), 320px);
+    aspect-ratio: auto;
+    height: var(--poster-h);
+    width: min(100%, calc(var(--poster-h) / 1.07));
   }
 }
