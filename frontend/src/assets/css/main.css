@@ -238,7 +238,7 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 /* Keep a portrait poster and two complete card rows visible on compact phones. */
 @media (max-width: 639px) {
   .compact-show-poster {
-    width: min(100%, clamp(44px, calc((100vh - 530px) / 3), 112px));
-    width: min(100%, clamp(44px, calc((100dvh - 530px) / 3), 112px));
+    width: min(100%, clamp(44px, calc((100vh - 530px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 3), 112px));
+    width: min(100%, clamp(44px, calc((100dvh - 530px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 3), 112px));
   }
 }
