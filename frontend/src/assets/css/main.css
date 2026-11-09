@@ -234,3 +234,11 @@ h1, h2, h3 { letter-spacing: -0.035em; }
   .cinema-surface-hover, .upcoming-entry, .upcoming-filter, .cinema-progress > span { transition: none !important; }
   [data-slot="skeleton"]::after { animation: none !important; }
 }
+
+/* Keep a portrait poster and two complete card rows visible on compact phones. */
+@media (max-width: 639px) {
+  .compact-show-poster {
+    width: min(100%, clamp(44px, calc((100vh - 530px) / 3), 112px));
+    width: min(100%, clamp(44px, calc((100dvh - 530px) / 3), 112px));
+  }
+}
