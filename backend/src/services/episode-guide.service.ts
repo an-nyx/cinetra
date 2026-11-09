@@ -58,7 +58,8 @@ export async function getTrackingSummary(showId: string, userId: string) {
   if (!show) throw new EpisodeGuideError(404, 'Show not found');
   const watches = await prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } });
   let catalog: Catalog | null = null;
-  try { catalog = await catalogFor(show); } catch { /* Saved positions remain available without a provider. */ }
+  let metadataError: string | null = null;
+  try { catalog = await catalogFor(show); } catch (error) { metadataError = error instanceof Error ? error.message : 'TMDB metadata unavailable'; /* Saved positions remain available without a provider. */ }
   const watchMap = new Map(watches.map(w => [`${w.season}:${w.episode}`, w.watchedAt]));
   const episodes: Episode[] = (catalog?.episodes || []).map(e => ({ ...e, watchedAt: watchMap.get(`${e.season}:${e.number}`) || null }));
   episodes.sort((a, b) => a.season - b.season || a.number - b.number);
@@ -89,7 +90,7 @@ export async function getTrackingSummary(showId: string, userId: string) {
     showId, name: show.name, posterURL: show.posterURL, status: show.status || (show.completed ? 'completed' : null), source: catalog?.source || null,
     guideAvailable: !!catalog && episodes.length > 0, legacyPosition: hasSavedPosition ? { fullSeasons: show.seasonsWatched, episodesInNextSeason: show.episodesWatched, normalizedSeason: legacy?.season, normalizedEpisode: legacy?.episode, needsReview: legacy?.needsReview || false } : null,
     watchedCount: watched, releasedCount: released.length, remainingCount: remaining.length,
-    progressPercent: percent, broadcastStatus, viewingState, completionEligible: fullyWatched, finalSeason, finalityConfirmed,
+    progressPercent: percent, broadcastStatus, viewingState, completionEligible: fullyWatched, finalSeason, finalityConfirmed, metadataError,
     lastEpisode: last, nextEpisode: next, upcomingEpisode: upcoming[0] || null,
     newEpisodes: remaining.filter(e => !!last && e.airDate! > last.watchedAt!.toISOString().slice(0, 10)).length,
     recentHistory: [...watches].sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime()).slice(0, 5),
