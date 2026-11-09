@@ -2,10 +2,8 @@ import { Router, Request, Response } from "express";
 import { showModule } from '../../modules/show';
 import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.entity';
 import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError } from '../../services/episode-guide.service';
-import { TMDBApiService } from '../../services/tmdb/tmdb-api.service';
 
 const router = Router();
-const tmdbCandidates = new TMDBApiService();
 
 function guideError(res: Response, error: unknown) {
   if (error instanceof EpisodeGuideError) res.status(error.status).json({ message: error.message });
@@ -28,14 +26,6 @@ router.get("/tracking", async (req: Request, res: Response) => {
   catch (error) { guideError(res, error); }
 });
 
-router.get('/:id/match-candidates', async (req: Request<{id:string}>, res: Response) => {
-  try {
-    const show = await showModule.Queries.GetByIdQuery.execute(req.params.id, req.user.id);
-    if (!show) { res.status(404).json({message:'Show not found'}); return; }
-    const query = typeof req.query.q === 'string' ? req.query.q : show.name;
-    res.json(await tmdbCandidates.searchShowCandidates(query));
-  } catch { res.status(502).json({message:'TMDB search unavailable'}); }
-});
 
 router.get("/upcoming", async (req: Request, res: Response) => {
   try { res.json(await getUpcomingReleases(req.user.id)); }

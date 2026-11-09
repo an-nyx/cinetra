@@ -16,7 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { CalendarDays, Film, House, Tv, ScanSearch } from "lucide-react";
+import { CalendarDays, Film, House, Tv } from "lucide-react";
 
 const navData = {
   navMain: [
@@ -27,7 +27,6 @@ const navData = {
       icon: Tv,
     },
     { title: "Upcoming", url: "/upcoming", icon: CalendarDays },
-    { title: "Match Review", url: "/review-matches", icon: ScanSearch },
     {
       title: "Movies",
       url: "/movies",

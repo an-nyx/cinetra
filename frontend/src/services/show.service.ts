@@ -52,7 +52,6 @@ export interface TrackingSummary {
   newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
   error?: string | null;
 }
-export interface MatchCandidate { id: number; name: string; year: string | null; overview: string; posterURL: string | null; source: 'TMDB' }
 
 class ShowServiceClass extends ApiService {
   async getLibraryTracking(): Promise<TrackingSummary[]> {
@@ -103,10 +102,6 @@ class ShowServiceClass extends ApiService {
     return response.data;
   }
 
-  async getMatchCandidates(id: string, query: string): Promise<MatchCandidate[]> {
-    const response = await this.get<MatchCandidate[]>(`/show/${id}/match-candidates?q=${encodeURIComponent(query)}`);
-    return response.data;
-  }
 
   async getEpisodeGuide(id: string, season = 1): Promise<EpisodeGuide> {
     const response = await this.get<EpisodeGuide>(`/show/${id}/episodes?season=${season}`);
