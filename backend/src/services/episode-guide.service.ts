@@ -8,6 +8,7 @@ import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
 import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type ScheduleIdentity, type UpcomingItem } from './upcoming-schedule.model';
 import { chooseScheduleOnlyTMDBMatch, type ScheduleMatch } from './schedule-identity';
 import { mapLimit, SWRCache } from './swr-cache';
+import { analyzeRematchProgress } from './rematch.model';
 
 const tmdb = new TMDBApiService();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -356,6 +357,76 @@ export async function setSeasonWatched(showId: string, userId: string, season: n
     if (forward) await moveCheckpoint(tx, show, forward);
   });
   return getTrackingSummary(showId, userId);
+}
+
+/** A rematch that needs the user's explicit acknowledgement or a fresh review; carries the preview to show again. */
+export class RematchConflictError extends EpisodeGuideError {
+  constructor(message: string, public preview: Awaited<ReturnType<typeof previewRematch>>) { super(409, message); }
+}
+
+function seriesSummary(tmdbId: number, catalog: Catalog | null, fallback: { name: string; posterURL: string | null; overview: string | null }) {
+  const meta = catalog?.meta;
+  return {
+    tmdbId, name: meta?.name || fallback.name, originalName: meta?.originalName ?? null, year: (meta?.firstAirDate || '').slice(0, 4) || null,
+    overview: meta?.overview ?? fallback.overview ?? null,
+    posterURL: meta?.posterPath ? `https://image.tmdb.org/t/p/w500${meta.posterPath}` : fallback.posterURL,
+    seasons: catalog ? catalog.seasons.filter(s => s.number > 0).length : null,
+    releasedEpisodes: catalog ? catalog.episodes.filter(e => e.season > 0 && e.number > 0 && !!e.airDate && e.airDate <= today()).length : null,
+  };
+}
+
+/**
+ * Read-only: compare a show's current TMDB match with a chosen replacement, and explain how its existing progress
+ * would read against the replacement. Never changes anything.
+ */
+export async function previewRematch(showId: string, userId: string, tmdbId: number) {
+  if (!validNumber(tmdbId, 1)) throw new EpisodeGuideError(400, 'Choose a TMDB series');
+  const show = await prisma.show.findFirst({ where: { id: showId, userId } });
+  if (!show) throw new EpisodeGuideError(404, 'Show not found');
+  let replacement: Catalog;
+  try { replacement = await catalogFor({ name: show.name, tmdbId }); }
+  catch (error) {
+    if (classifyMetadataFailure(error) === 'tmdb_not_found') throw new EpisodeGuideError(404, 'That TMDB series could not be found');
+    throw new EpisodeGuideError(502, 'TMDB is unavailable right now; nothing was changed');
+  }
+  const current = show.tmdbId && show.tmdbId !== tmdbId ? await catalogFor(show).catch(() => null) : show.tmdbId === tmdbId ? replacement : null;
+  const [watches, duplicate] = await Promise.all([
+    prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true } }),
+    prisma.show.findFirst({ where: { userId, tmdbId, NOT: { id: showId } }, select: { id: true, name: true } }),
+  ]);
+  const unchanged = show.tmdbId === tmdbId;
+  return {
+    showId, unchanged, currentTmdbId: show.tmdbId,
+    current: show.tmdbId ? seriesSummary(show.tmdbId, current, show) : null,
+    replacement: seriesSummary(tmdbId, replacement, show),
+    duplicate, progress: analyzeRematchProgress(show, watches, replacement, today()),
+    canApply: !unchanged && !duplicate,
+  };
+}
+
+/**
+ * Re-link one show to a different TMDB series. Only the TMDB link and TMDB-derived title, poster and overview change
+ * (plus the TVMaze link, which belonged to the old series). Saved position, individual records, personal status and
+ * favorite are untouched; progress that does not map is kept and needs review, never converted.
+ */
+export async function applyRematch(showId: string, userId: string, tmdbId: number, expectedCurrentTmdbId: number | null, acknowledgeProgress: boolean) {
+  const preview = await previewRematch(showId, userId, tmdbId);
+  if (preview.unchanged) return { preview, summary: await getTrackingSummary(showId, userId) };
+  if (preview.duplicate) throw new RematchConflictError(`"${preview.duplicate.name}" in your library is already linked to this TMDB series.`, preview);
+  if (preview.currentTmdbId !== expectedCurrentTmdbId) throw new RematchConflictError('This show changed since you reviewed it. Review the change again.', preview);
+  if (preview.progress.needsAcknowledgement && !acknowledgeProgress) throw new RematchConflictError('Some saved progress does not map onto the selected series. Confirm that you want to keep it for review.', preview);
+  const r = preview.replacement;
+  try {
+    const result = await prisma.show.updateMany({
+      where: { id: showId, userId, tmdbId: expectedCurrentTmdbId },
+      data: { tmdbId, tvmazeId: null, name: r.name, posterURL: r.posterURL, overview: r.overview },
+    });
+    if (result.count !== 1) throw new RematchConflictError('This show changed since you reviewed it. Review the change again.', preview);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'P2002') throw new RematchConflictError('Another show in your library is already linked to this TMDB series.', preview);
+    throw error;
+  }
+  return { preview, summary: await getTrackingSummary(showId, userId) };
 }
 
 export async function importLegacyProgress(showId: string, userId: string) {

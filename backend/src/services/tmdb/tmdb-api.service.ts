@@ -10,12 +10,14 @@ interface ApiResponse {
     name?: string;
     overview: string;
     poster_path: string;
+    first_air_date?: string;
+    release_date?: string;
     original_name?: string;
     original_title?: string;
   }>;
 }
 
-export type TMDBShowDetails = { name?: string; original_name?: string; overview?: string; first_air_date?: string | null; seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; name?: string; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null };
+export type TMDBShowDetails = { name?: string; original_name?: string; overview?: string; first_air_date?: string | null; poster_path?: string | null; seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; name?: string; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null };
 type SeasonDetails = { episodes: Array<{ episode_number: number; name: string; air_date: string | null; runtime: number | null; episode_type?: string }> };
 
 export class TMDBApiService implements TMDBService {
@@ -95,12 +97,15 @@ export class TMDBApiService implements TMDBService {
       const response = await this.cached(`search:${type}:${query.toLowerCase()}`, () => this.get<ApiResponse>(`/search/${type}`, { params: { query } }));
 
       const searchResults: SearchResult[] = response.data.results.map(
-        ({ id, title, name, overview, poster_path }) => {
+        ({ id, title, name, overview, poster_path, original_name, original_title, first_air_date, release_date }) => {
           return ({
             id,
             name: name || title || '',
             overview,
             posterURL: poster_path ? `https://image.tmdb.org/t/p/w500${poster_path}` : '',
+            // Year and original title tell adaptations and remakes with the same name apart.
+            originalName: original_name || original_title || undefined,
+            year: (first_air_date || release_date || '').slice(0, 4) || null,
           })
         }
       );
