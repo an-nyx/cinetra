@@ -270,11 +270,6 @@ h1, h2, h3 { letter-spacing: -0.035em; }
   [data-slot="skeleton"]::after { animation: none !important; }
 }
 
-/* Keep phone posters compact and sized only by their grid column, independent of browser chrome. */
-@media (max-width: 639px) {
-  .compact-show-poster { aspect-ratio: 1 / 1.07; }
-}
-
 /* Compact Home dashboard and Upcoming calendar (phone-first). */
 .dash-card { border: 1px solid var(--border); border-radius: 1rem; background: var(--card); }
 .dark .dash-card { background: linear-gradient(145deg, oklch(0.235 0.024 205 / 82%), oklch(0.18 0.018 215 / 94%)); }

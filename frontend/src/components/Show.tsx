@@ -57,7 +57,7 @@ export default function Show({
       <div className="relative flex w-full justify-center">
         <button type="button" onClick={() => setSelectedShow(id)} aria-label={`Open ${name}`} className="compact-show-poster relative block aspect-[2/3] w-full overflow-hidden bg-muted text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary">
           <span className="absolute inset-0 flex items-center justify-center"><Tv className="size-8" /></span>
-          {posterURL && <img loading="lazy" className="relative h-full w-full object-cover" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+          {posterURL && <img loading="lazy" className="relative h-full w-full object-contain" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
         </button>
         {tracking?.newSeasonToWatch && <button type="button" onClick={() => setSelectedShow(id)} className="absolute inset-x-0 bottom-0 min-h-10 bg-black/80 px-1 text-center text-[11px] leading-4 text-white"><span className="block truncate font-semibold">New season to watch</span><span className="block truncate">S{tracking.newSeasonToWatch.season} · {tracking.newSeasonToWatch.count} unwatched</span></button>}
       </div>
