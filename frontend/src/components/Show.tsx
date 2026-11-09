@@ -2,7 +2,7 @@ import { Heart, Tv } from "lucide-react";
 import { ShowType } from "@/types";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
-import { positionDetails, viewingStateLabel } from "@/lib/tracking";
+import { nextEpisodeCode, savedPositionCode, viewingStateLabel } from "@/lib/tracking";
 import { posterSrc } from "@/lib/poster";
 import { personalStatus, personalStatusColors, personalStatusLabels } from "@/lib/show-library";
 
@@ -61,14 +61,19 @@ export default function Show({
         </button>
         {tracking?.newSeasonToWatch && <button type="button" onClick={() => setSelectedShow(id)} className="absolute inset-x-0 bottom-0 min-h-10 bg-black/80 px-1 text-center text-[11px] leading-4 text-white"><span className="block truncate font-semibold">New season to watch</span><span className="block truncate">S{tracking.newSeasonToWatch.season} · {tracking.newSeasonToWatch.count} unwatched</span></button>}
       </div>
-      <div className="grid min-w-0 grid-rows-[2rem_1rem_2rem_2.5rem] gap-px px-1.5 py-1 sm:grid-rows-[2.5rem_1rem_2rem_2.5rem] sm:gap-0.5 sm:px-2 sm:py-2">
-        <button type="button" onClick={() => setSelectedShow(id)} title={name} className="line-clamp-2 self-start overflow-hidden text-left text-xs font-semibold leading-4 text-foreground hover:text-primary sm:text-base sm:leading-5">{name}</button>
-        <p className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-muted-foreground" title={`Personal status: ${personalStatusLabels[savedStatus]}`}><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: borderColor || 'currentColor' }} /><span className="truncate">{personalStatusLabels[savedStatus]}</span>{tracking?.progressPercent != null && <span className="ml-auto shrink-0 font-medium text-foreground">{tracking.progressPercent}%</span>}</p>
-        <div className="min-w-0 overflow-hidden text-xs leading-4 text-muted-foreground">{tracking && !tracking.error && <><p className="truncate" title={tracking.progressUnavailable?.detail}>{viewingStateLabel(tracking)}{tracking.progressPercent === null && ` · ${tracking.progressUnavailable?.label || 'Unavailable'}`}</p>{positionDetails(tracking) ? <p className="truncate" title={positionDetails(tracking)}>{positionDetails(tracking)}</p> : tracking.newEpisodes > 0 && <p className="truncate text-primary">{tracking.newEpisodes} new episode{tracking.newEpisodes === 1 ? '' : 's'}</p>}</>}</div>
-
-        <div className="min-w-0">{tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="min-h-10 max-w-full text-left text-xs font-semibold leading-4 text-primary hover:underline" onClick={() => onMarkNext(tracking)}>Mark next watched <span aria-hidden="true">→</span></button>}</div>
+      {/* Fixed rows keep every card the same height: title, personal status, progress, and the optional action. */}
+      <div className="grid min-w-0 grid-rows-[1.25rem_1rem_1rem_1.25rem] gap-px px-2.5 py-1 sm:grid-rows-[2.5rem_1.25rem_1.25rem_2.5rem] sm:gap-0.5 sm:px-3 sm:py-2">
+        <button type="button" onClick={() => setSelectedShow(id)} title={name} className="block min-w-0 truncate text-left text-sm font-semibold leading-5 text-foreground hover:text-primary sm:line-clamp-2 sm:whitespace-normal sm:text-base">{name}</button>
+        <p className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs leading-4 text-muted-foreground" title={`Personal status: ${personalStatusLabels[savedStatus]}`}><span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ backgroundColor: borderColor || 'currentColor' }} /><span className="truncate">{personalStatusLabels[savedStatus]}</span></p>
+        <p className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs leading-4 text-muted-foreground" title={tracking?.progressPercent == null ? tracking?.progressUnavailable?.detail : undefined}>{tracking && !tracking.error && <>
+          {tracking.progressPercent !== null
+            ? <span className="shrink-0 font-semibold text-foreground">{tracking.progressPercent}%</span>
+            : <span className="truncate">{tracking.progressUnavailable?.label || viewingStateLabel(tracking)}</span>}
+          {(nextEpisodeCode(tracking) || savedPositionCode(tracking)) && <><span aria-hidden="true">•</span><span className="truncate">{nextEpisodeCode(tracking) ? `Next ${nextEpisodeCode(tracking)}` : `Saved ${savedPositionCode(tracking)}`}</span></>}
+        </>}</p>
+        <div className="flex min-w-0 items-center">{tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="min-h-5 max-w-full truncate text-left text-xs font-semibold leading-4 text-primary hover:underline" onClick={() => onMarkNext(tracking)}>Mark next watched <span aria-hidden="true">→</span></button>}</div>
       </div>
-      <button type="button" className="absolute right-1.5 top-1.5 flex size-11 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary" aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}><Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} /></button>
+      <button type="button" className="absolute right-1.5 top-1.5 flex size-10 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary" aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}><Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} /></button>
     </article>
   );
 }

@@ -78,9 +78,9 @@ export default function ShowsPage() {
 
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
-      <div className="library-heading mb-2 flex flex-col gap-2 sm:mb-7 sm:gap-5">
-        <div><p className="cinema-eyebrow mb-2 hidden sm:block">Your collection</p><h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">TV shows<span className="ml-3 text-sm font-normal text-muted-foreground sm:text-base">{shows.length}</span></h1><p className="mt-2 hidden text-sm text-muted-foreground sm:block">Your stories, right where you left them.</p></div>
-        <div className="flex gap-2 sm:hidden"><Button type="button" variant="outline" size="sm" className="min-h-10 gap-2" aria-expanded={controlsOpen} aria-controls="show-filters" onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" />Search & filters{(search || filters.favoriteFilter || filters.completeFilter || filters.statusFilter) && <span aria-label="Filters active"> · active</span>}</Button><Button type="button" size="sm" className="min-h-10 gap-1" onClick={() => setAddShowModalStatus(true)}><Plus className="size-4" />Add show</Button></div>
+      <div className={`library-heading flex flex-col gap-2 sm:mb-7 sm:gap-5 ${controlsOpen ? 'mb-2' : 'mb-0'}`}>
+        <div className="hidden sm:block"><p className="cinema-eyebrow mb-2 hidden sm:block">Your collection</p><h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">TV shows<span className="ml-3 text-sm font-normal text-muted-foreground sm:text-base">{shows.length}</span></h1><p className="mt-2 hidden text-sm text-muted-foreground sm:block">Your stories, right where you left them.</p></div>
+
         <div className={`${controlsOpen ? 'flex' : 'hidden'} min-w-0 items-center gap-3 sm:flex`}>
           <InputGroup>
             <InputGroupInput
@@ -99,7 +99,7 @@ export default function ShowsPage() {
           </InputGroup>
           <Button
             onClick={() => setAddShowModalStatus(true)}
-            className="hidden shrink-0 gap-2 rounded-xl font-medium sm:inline-flex"
+            className="shrink-0 gap-2 rounded-xl font-medium"
           >
             <Plus className="size-4" /><span>Add show</span>
           </Button>
@@ -110,6 +110,18 @@ export default function ShowsPage() {
             setShows={setShows}
           />
         </div>
+      </div>
+
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-1.5 sm:hidden">
+        <Select value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
+          <SelectTrigger aria-label="Filter watching status" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All watching statuses</SelectItem>{(['watching', 'completed', 'dropped', 'planned', 'paused', 'none'] as const).map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={filters.sortBy ?? 'default'} onValueChange={(value: NonNullable<ListFiltersType['sortBy']> | 'default') => setFilters({ ...filters, sortBy: value === 'default' ? undefined : value })}>
+          <SelectTrigger aria-label="Sort library" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="default">Sort by</SelectItem><SelectItem value="nameAsc">Name (A-Z)</SelectItem><SelectItem value="nameDesc">Name (Z-A)</SelectItem><SelectItem value="dateNewest">Date Added (Newest)</SelectItem><SelectItem value="dateOldest">Date Added (Oldest)</SelectItem><SelectItem value="updatedNewest">Updated (Newest)</SelectItem><SelectItem value="updatedOldest">Updated (Oldest)</SelectItem></SelectContent>
+        </Select>
+        <Button type="button" variant="outline" size="icon" className="size-10" aria-label="Search and more filters" aria-expanded={controlsOpen} aria-controls="show-filters" onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
       </div>
 
       <div id="show-filters" className={`library-filters mb-3 flex-wrap items-center gap-2 sm:mb-6 sm:flex ${controlsOpen ? 'flex' : 'hidden'}`}>
@@ -147,7 +159,7 @@ export default function ShowsPage() {
           </Select>
 
           <Select key={`status-${key}`} name="statusFilter" value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
-            <SelectTrigger aria-label="Filter watching status" className="w-auto min-w-[190px] max-w-full">
+            <SelectTrigger aria-label="Filter watching status" className="hidden w-auto min-w-[190px] max-w-full sm:flex">
               <SelectValue placeholder="All watching statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -184,7 +196,7 @@ export default function ShowsPage() {
             setFilters({ ...filters, sortBy: value })
           }
         >
-          <SelectTrigger aria-label="Sort library" className="w-auto min-w-[130px]">
+          <SelectTrigger aria-label="Sort library" className="hidden w-auto min-w-[130px] sm:flex">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
