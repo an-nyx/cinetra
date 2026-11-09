@@ -177,10 +177,18 @@ button, a, input, select, textarea { touch-action: manipulation; }
 .mobile-dock-tab[data-highlighted="true"] { color: #8de5c5; transform: scale(1.06); }
 .mobile-dock-tab:focus-visible { outline: 2px solid #8de5c5; outline-offset: -5px; }
 
+.desktop-nav { display: none; }
+
 [data-slot="dialog-header"] { padding-right: 3rem; } /* clears the 44px close control */
 
 @media (min-width: 768px) {
   .app-content { padding-bottom: 1rem; }
+  .mobile-dock { display: none; }
+  .desktop-nav { display: flex; align-items: center; gap: 0.25rem; margin-left: 1.5rem; }
+  .desktop-nav-link { padding: 0.6rem 0.85rem; border-radius: 0.65rem; color: var(--muted-foreground); font-size: 0.875rem; font-weight: 600; transition: color 180ms ease, background-color 180ms ease; }
+  .desktop-nav-link:hover { color: var(--foreground); background: oklch(0.78 0.14 165 / 8%); }
+  .desktop-nav-link.is-active { color: var(--primary); background: oklch(0.78 0.14 165 / 12%); }
+  .desktop-nav-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   .library-heading { flex-direction: row; align-items: center; justify-content: space-between; }
 }
 
