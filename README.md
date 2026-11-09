@@ -48,7 +48,7 @@ npm install
 
 ### Configuration
 
-Set up the backend environment from `backend/example.env`, including a PostgreSQL `DATABASE_URL` and `JWT_SECRET`. For TMDB, set either `TMDB_READ_ACCESS_TOKEN` (the API Read Access Token from TMDB; the backend adds `Bearer` when needed) or `TMDB_API_KEY` (a TMDB v3 API key). The old `API_AUTHORIZATION` Bearer-token variable remains supported for existing deployments. Keep these credentials only in the backend/Coolify runtime environment; never use a frontend `VITE_*` variable. Cinetra uses TMDB as its only metadata provider. Set up the frontend environment from `frontend/example.env`:
+Set up the backend environment from `backend/example.env`, including a PostgreSQL `DATABASE_URL` and `JWT_SECRET`. For TMDB, set either `TMDB_READ_ACCESS_TOKEN` (the API Read Access Token from TMDB; the backend adds `Bearer` when needed) or `TMDB_API_KEY` (a TMDB v3 API key). The old `API_AUTHORIZATION` Bearer-token variable remains supported for existing deployments. Keep these credentials only in the backend/Coolify runtime environment; never use a frontend `VITE_*` variable. TMDB remains Cinetra's canonical provider for show identity, search, episode tracking, progress, and statuses. TVMaze is an optional, non-persistent schedule supplement used only by Upcoming when TMDB schedule data is absent or incomplete and identity can be corroborated. Set up the frontend environment from `frontend/example.env`:
 
 ```bash
 VITE_API_PATH=http://localhost:$PORT

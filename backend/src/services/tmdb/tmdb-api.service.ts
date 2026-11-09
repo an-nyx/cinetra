@@ -14,7 +14,7 @@ interface ApiResponse {
   }>;
 }
 
-type ShowDetails = { seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null };
+export type TMDBShowDetails = { name?: string; original_name?: string; overview?: string; first_air_date?: string | null; seasons: Array<{ season_number: number; episode_count: number; air_date?: string | null; name?: string }>; status?: string; in_production?: boolean; next_episode_to_air?: { season_number: number; episode_number: number; name?: string; air_date: string } | null; last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null };
 type SeasonDetails = { episodes: Array<{ episode_number: number; name: string; air_date: string | null; runtime: number | null; episode_type?: string }> };
 
 export class TMDBApiService implements TMDBService {
@@ -81,8 +81,8 @@ export class TMDBApiService implements TMDBService {
     }
   }
 
-  async getShow(id: number): Promise<ShowDetails> {
-    const response = await this.cached<AxiosResponse<ShowDetails>>(`tv:${id}`, () => this.get<ShowDetails>(`/tv/${id}`));
+  async getShow(id: number): Promise<TMDBShowDetails> {
+    const response = await this.cached<AxiosResponse<TMDBShowDetails>>(`tv:${id}`, () => this.get<TMDBShowDetails>(`/tv/${id}`));
     return response.data;
   }
 

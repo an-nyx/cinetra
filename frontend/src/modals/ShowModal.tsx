@@ -118,7 +118,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
               {!show.status && !show.completed && <span className="text-xs text-muted-foreground">No status selected</span>}
             </div>
             <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">{show.overview || 'No overview available.'}</p>
-            {summary && <p className="text-xs text-muted-foreground">{summary.watchedCount} episodes watched (including saved progress) · {summary.releasedCount} released with dates</p>}
+            {summary && <p className="text-xs text-muted-foreground">{summary.countDataAvailable ? `${summary.watchedCount} effectively watched · ${summary.releasedCount} released episodes` : 'Episode counts unavailable; your saved viewing position is preserved below.'}</p>}
           </div>
         </div>}
         {error && <div role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</div>}
@@ -130,7 +130,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
         {summary && <div className="space-y-5">
           <section className="cinema-surface p-5 sm:p-6">
             {summary.statusProgressNote && <p role="status" className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">{summary.statusProgressNote}</p>}
-            <div className="mb-2 flex items-end justify-between"><div><p className="cinema-eyebrow">Your progress</p><p className="mt-1 text-3xl font-semibold">{summary.progressPercent === null ? "Unavailable" : `${summary.progressPercent}%`} {summary.progressPercent !== null && <span className="text-sm font-normal text-muted-foreground">of released episodes</span>}</p></div><span className="text-sm text-muted-foreground">{summary.watchedCount}/{summary.releasedCount} watched</span></div>
+            <div className="mb-2 flex items-end justify-between"><div><p className="cinema-eyebrow">Your progress</p><p className="mt-1 text-3xl font-semibold">{summary.progressPercent === null ? "Unavailable" : `${summary.progressPercent}%`} {summary.progressPercent !== null && <span className="text-sm font-normal text-muted-foreground">of released episodes</span>}</p></div><span className="text-sm text-muted-foreground">{summary.countDataAvailable ? `${summary.watchedCount}/${summary.releasedCount} watched` : 'Episode count unavailable'}</span></div>
             <p className="mb-4 text-xs text-muted-foreground">{summary.explicitWatchedCount} individually logged · {summary.legacyInferredCount} covered by saved position</p>
             {summary.progressPercent !== null && <div role="progressbar" aria-valuenow={summary.progressPercent} aria-valuemin={0} aria-valuemax={100} aria-label="Released episode progress" className="cinema-progress h-2"><span style={{ width: `${summary.progressPercent}%` }} /></div>}
             {summary.legacyPosition && <p className="mt-2 text-xs text-muted-foreground">The saved position is reflected in watched episodes without creating episode records.</p>}
