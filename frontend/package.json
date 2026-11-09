@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test:library": "node --test tests/show-library.test.mjs",
+    "test:library": "node --test tests/show-library.test.mjs tests/upcoming-calendar.test.mjs tests/home-dashboard.test.mjs",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview"
   },

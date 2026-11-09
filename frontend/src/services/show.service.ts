@@ -50,12 +50,27 @@ export interface EpisodeGuide {
 }
 
 export interface TrackedEpisode { season: number; number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null; watched?: boolean; watchSource?: 'explicit' | 'legacy' | 'both' | null }
+/** One new episode from the TVMaze-only schedule. `id` (TVMaze show + episode ID) is stable across refreshes. */
 export interface UpcomingRelease {
+  id: string; tvmazeShowId: number; episodeId: number;
   showId: string; showName: string; posterURL: string | null; showStatus: string | null;
-  season: number | null; number: number | null; name: string; airDate: string; airTimestamp: string | null; seasonPremiere: boolean;
-  scheduleSource: 'TMDB' | 'TVMaze'; scheduleConflict?: boolean; scheduleIdentity?: 'linked' | 'schedule_match' | 'library_title';
+  season: number; number: number; name: string;
+  /** TVMaze's (network-local) premiere date. */
+  airDate: string;
+  /** Present only when TVMaze confirms an air time; date-only releases never get one. */
+  airTime: string | null; airTimestamp: string | null;
+  runtime: number | null; seasonPremiere: boolean; channel: string | null; streaming: boolean; scheduleSource: 'TVMaze';
 }
-export interface ReturningTba { showId: string; showName: string; posterURL: string | null; broadcastStatus: string }
+export interface ReturningTba { showId: string; showName: string; posterURL: string | null; showStatus: string | null; tvmazeStatus: string; announcedEpisodes: number }
+export interface ScheduleReview { showId: string; showName: string; posterURL: string | null; reason: string; detail: string }
+export interface UpcomingSchedule {
+  status: 'ready'; source: 'TVMaze'; generatedAt: string; stale: boolean;
+  releases: UpcomingRelease[]; returningTba: ReturningTba[]; needsReview: ScheduleReview[];
+  unavailable: { showId: string; showName: string; provider: 'TMDB' | 'TVMaze' }[];
+  coverage: { evaluatedShows: number; verifiedShows: number; verifiedByExternalId: number; verifiedByTitle: number; viaScheduleOnlyTMDBMatch: number; scheduledShows: number; unresolvedShows: number; unavailableShows: number; staleShows: number; excludedEpisodes: { specials: number; past: number; undated: number; duplicates: number; repeats: number } };
+}
+/** A first (cold) build can take a while; the server then answers with progress instead of waiting. */
+export type UpcomingResponse = UpcomingSchedule | { status: 'building'; progress: { done: number; total: number } };
 export interface TrackingSummary {
   showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
   guideAvailable: boolean; countDataAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number | null; normalizedEpisode?: number | null; needsReview?: boolean } | null;
@@ -78,8 +93,9 @@ class ShowServiceClass extends ApiService {
     return response.data;
   }
 
-  async getUpcomingReleases(): Promise<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeQueriedShows?: number; tvmazeSkippedFinalShows?: number; unlinkedScheduleMatches?: { tmdb: number; tvmaze: number; unmatched: number }; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }> {
-    const response = await this.get<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }>("/show/upcoming", { timeout: 60_000 });
+  async getUpcomingReleases(options: { refresh?: boolean; bypassCache?: boolean } = {}): Promise<UpcomingResponse> {
+    const params = options.refresh ? { refresh: 1 } : options.bypassCache ? { t: Date.now() } : undefined;
+    const response = await this.get<UpcomingResponse>("/show/upcoming", { timeout: 60_000, ...(params ? { params } : {}) });
     return response.data;
   }
 

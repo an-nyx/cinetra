@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
 import { releasedProgressPercent } from '../src/services/legacy-progress.model';
 import { buildTrackingSummary, mergeShowEpisodes, type Catalog as ServiceCatalog } from '../src/services/tracking-summary.model';
-import { needsTVMazeSupplement } from '../src/services/upcoming-schedule.model';
 import type { TMDBApiService } from '../src/services/tmdb/tmdb-api.service';
 import {
   attentionReason, auditShow, auditUpcoming, auditLibrarySurfaces, comparePreservation, expectedTracking, inContinueWatching, preservationRecord, showCardLabel,
@@ -19,7 +18,7 @@ import path from 'node:path';
   const sources = ['../scripts/audit/tracking-audit.model.ts', '../scripts/audit-tracking.ts'].map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
   const emitted = new Set([...sources.matchAll(/(?:add\(\s*(?:[\w.!]+,\s*)?|code:\s*(?:\w+\s*\?\s*)?)'([a-z0-9_]+)'/g)].map(m => m[1]));
   for (const [code] of sources.matchAll(/(?<=\? ')[a-z0-9]+_[a-z0-9_]+(?=' :)|(?<=: ')[a-z0-9]+_[a-z0-9_]+(?=', (?:'(?:error|warning|info)'|severity))/g)) emitted.add(code);
-  for (const code of ['canceled_series_not_final', 'not_started_reported_in_progress', 'future_season_count_mismatch', 'tvmaze_queried_for_final_series']) assert.ok(emitted.has(code), `scan missed ${code}`);
+  for (const code of ['canceled_series_not_final', 'not_started_reported_in_progress', 'future_season_count_mismatch', 'upcoming_non_tvmaze_source', 'upcoming_duplicate_episode']) assert.ok(emitted.has(code), `scan missed ${code}`);
   const missing = [...emitted].filter(code => !ISSUE_CATEGORY[code]);
   assert.deepEqual(missing, [], `issue codes without a category: ${missing.join(', ')}`);
   assert.ok(emitted.size >= 40);
@@ -214,56 +213,26 @@ function audit(s: RawShow, c: Catalog, explicit: ExplicitRecord[], tmdbStatus: s
   assert.ok(codes(manual.result.issues).includes('completed_flags_disagree'));
 }
 
-// Fixes 5 and 6: when TVMaze is consulted.
+// Upcoming is TVMaze-only: TMDB-sourced, duplicate, unnumbered, past or unverified entries are defects.
 {
-  const base = { tmdbResponded: true, tmdbFailed: false, tmdbSeasonFailures: 0, scheduleMetadataIncomplete: false, tmdbReleaseCount: 0, inProduction: false, nextEpisodeAnnounced: false };
-  assert.equal(needsTVMazeSupplement({ ...base, broadcastStatus: 'Ended' }), false);
-  assert.equal(needsTVMazeSupplement({ ...base, broadcastStatus: 'Canceled', scheduleMetadataIncomplete: true }), false);
-  assert.equal(needsTVMazeSupplement({ ...base, broadcastStatus: 'Ended', nextEpisodeAnnounced: true }), true); // evidence of more
-  assert.equal(needsTVMazeSupplement({ ...base, broadcastStatus: 'Ended', inProduction: null }), true); // finality not established
-  assert.equal(needsTVMazeSupplement({ ...base, tmdbResponded: false, tmdbFailed: true, broadcastStatus: null, inProduction: null }), true); // TMDB down
-  assert.equal(needsTVMazeSupplement({ ...base, broadcastStatus: 'Returning Series', inProduction: true }), true); // TMDB has no dates
-  assert.equal(needsTVMazeSupplement({ ...base, broadcastStatus: 'Returning Series', inProduction: true, tmdbReleaseCount: 3 }), false);
-}
-
-// TVMaze-only schedule gap: TMDB knows the show returns but dates nothing; TVMaze supplies the schedule.
-{
-  const shows = [show('t1', 1, 1)];
-  const undatedSeason = catalog([6, 6], Object.fromEntries([1, 2, 3, 4, 5, 6].map(n => [`2:${n}`, null])));
-  const result = auditUpcoming(shows, {
-    releases: [{ showId: 't1', season: 2, number: 1, name: 'a', airDate: '2026-12-05', scheduleSource: 'TVMaze' }, { showId: 't1', season: null, number: null, name: 'b', airDate: '2026-12-12', scheduleSource: 'TVMaze' }],
-    returningTba: [], tmdbFailureTypes: {}, tvmazeQueriedShows: 1,
-  }, new Map([['t1', facts(undatedSeason, 'Returning Series')]]), today);
-  assert.deepEqual(result.coverage, { tmdbOnly: 0, tvmazeOnly: 1, both: 0, none: 0, noTmdbId: 0 });
-  assert.deepEqual(codes(result.perShow.t1), ['tvmaze_supplement']);
-  assert.deepEqual(codes(result.library), []);
-}
-
-// Upcoming diagnostics: unlinked shows are not TMDB failures; finished series do not need TVMaze.
-{
-  const shows = [show('v1', 1, 1, { tmdbId: null }), show('v2', 1, 1)];
-  const map = new Map<string, TMDBFacts | null>([['v1', null], ['v2', facts(catalog([4]), 'Ended')]]);
-  const before = auditUpcoming(shows, { releases: [], returningTba: [], tmdbFailureTypes: { catalog_404: 1 }, tvmazeVerifiedShows: 2 }, map, today);
-  assert.deepEqual(codes(before.library), ['unlinked_shows_counted_as_tmdb_failures', 'tvmaze_queried_for_final_series']);
-  const after = auditUpcoming(shows, { releases: [], returningTba: [], tmdbFailureTypes: {}, tvmazeQueriedShows: 0, tvmazeVerifiedShows: 0 }, map, today);
-  assert.deepEqual(codes(after.library), []);
-}
-
-// Upcoming: TMDB primary, TVMaze schedule-only.
-{
-  const shows = [show('u1', 1, 1), show('u2', 1, 1), show('u3', 1, 1, { tmdbId: null })];
-  const c1 = catalog([4], { '1:3': '2026-11-20', '1:4': '2026-11-27' });
+  const shows = [show('u1', 1, 1), show('u2', 1, 1), show('u3', 1, 1, { tmdbId: null }), show('u4', 1, 1)];
   const result = auditUpcoming(shows, {
     releases: [
-      { showId: 'u1', season: 1, number: 3, name: 'x', airDate: '2026-11-20', scheduleSource: 'TMDB' },
-      { showId: 'u1', season: 1, number: 4, name: 'y', airDate: '2026-11-27', scheduleSource: 'TVMaze' },
-      { showId: 'u3', season: null, number: null, name: 'z', airDate: '2026-12-01', scheduleSource: 'TVMaze' },
-    ], returningTba: [],
-  }, new Map([['u1', facts(c1, 'Returning Series')], ['u2', facts(catalog([4]), 'Returning Series')], ['u3', null]]), today);
-  assert.ok(codes(result.perShow.u1).includes('tvmaze_replaced_tmdb'));
-  assert.ok(codes(result.perShow.u2).includes('returning_show_missing'));
-  assert.ok(codes(result.perShow.u3).includes('upcoming_without_tmdb_identity'));
-  assert.deepEqual(result.coverage, { tmdbOnly: 0, tvmazeOnly: 0, both: 1, none: 1, noTmdbId: 1 });
+      { id: '1:10', showId: 'u1', season: 2, number: 1, name: 'a', airDate: '2026-12-05', scheduleSource: 'TVMaze' },
+      { id: '1:10', showId: 'u1', season: 2, number: 1, name: 'a', airDate: '2026-12-05', scheduleSource: 'TVMaze' },
+      { id: '2:20', showId: 'u2', season: null, number: null, name: 'special', airDate: '2026-12-12', scheduleSource: 'TVMaze' },
+      { id: '2:21', showId: 'u2', season: 1, number: 2, name: 'old', airDate: '2026-10-01', scheduleSource: 'TMDB' },
+      { id: '3:30', showId: 'u3', season: 1, number: 1, name: 'x', airDate: '2026-12-01', scheduleSource: 'TVMaze' },
+    ], returningTba: [], needsReview: [{ showId: 'u3', reason: 'no_tmdb_identity' }],
+  }, new Map([['u4', facts(catalog([4]), 'Returning Series')]]), today);
+  assert.deepEqual(codes(result.perShow.u1), ['upcoming_duplicate_episode']);
+  assert.deepEqual(codes(result.perShow.u2).sort(), ['upcoming_non_tvmaze_source', 'upcoming_past_episode', 'upcoming_unnumbered_episode']);
+  assert.deepEqual(codes(result.perShow.u3), ['upcoming_unverified_identity', 'tvmaze_identity_review']);
+  assert.deepEqual(codes(result.perShow.u4), ['tmdb_returning_without_tvmaze_schedule']);
+  assert.deepEqual(result.coverage, { scheduled: 3, returningTba: 0, needsReview: 0, unavailable: 0, none: 1 });
+  // A cold "building" answer is reported, not crashed on.
+  const building = auditUpcoming(shows, { status: 'building' } as never, new Map(), today);
+  assert.deepEqual(codes(building.library), ['upcoming_building']);
 }
 
 // Preservation comparison.
@@ -274,7 +243,7 @@ function audit(s: RawShow, c: Catalog, explicit: ExplicitRecord[], tmdbStatus: s
   assert.equal(comparePreservation(before, after).length, 3);
 }
 
-// Unavailable percentages must explain themselves; unlinked schedules must declare how they were matched.
+// Unavailable percentages must explain themselves.
 {
   const s = show('w1', 1, 2, { tmdbId: null });
   const base: Summary = { showId: 'w1', status: 'watching', guideAvailable: false, countDataAvailable: false, legacyPosition: { fullSeasons: 1, episodesInNextSeason: 2 }, watchedCount: 0, explicitWatchedCount: 0, legacyInferredCount: 0, releasedCount: 0, remainingCount: 0, progressPercent: null, viewingState: 'unknown', metadataError: 'TMDB match required', nextEpisode: null, upcomingEpisode: null, newEpisodes: 0, error: null };
@@ -283,13 +252,6 @@ function audit(s: RawShow, c: Catalog, explicit: ExplicitRecord[], tmdbStatus: s
   assert.ok(run({ ...base, progressUnavailable: { code: 'tmdb_unavailable', label: '', detail: '' } }).includes('percent_reason_mismatch'));
   assert.ok(!run({ ...base, progressUnavailable: { code: 'no_tmdb_association', label: 'No TMDB match', detail: '' } }).some(c => c.startsWith('percent_')));
 
-  const shows = [show('x1', 1, 1, { tmdbId: null }), show('x2', 1, 1, { tmdbId: null })];
-  const result = auditUpcoming(shows, { releases: [
-    { showId: 'x1', season: 2, number: 1, name: 'a', airDate: '2026-12-05', scheduleSource: 'TMDB', scheduleIdentity: 'schedule_match' },
-    { showId: 'x2', season: null, number: null, name: 'b', airDate: '2026-12-06', scheduleSource: 'TVMaze' },
-  ], returningTba: [] }, new Map([['x1', null], ['x2', null]]), today);
-  assert.deepEqual(codes(result.perShow.x1), ['unlinked_schedule_match']);
-  assert.deepEqual(codes(result.perShow.x2), ['upcoming_without_tmdb_identity']);
 }
 
 // Runner: GET only, token never in output, failures recorded per show.

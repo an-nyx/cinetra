@@ -2,10 +2,11 @@ import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 import { type EpisodeMetadata } from './legacy-progress.model';
-import { buildTrackingSummary, catalogFromTMDB, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type CatalogMeta, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
+import { buildTrackingSummary, catalogFromTMDB, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
 import { TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb/tmdb-auth';
-import { getVerifiedTVMazeSchedule } from './tvmaze/upcoming-schedule.service';
-import { isReturningWithoutDate, mergeUpcomingItems, needsTVMazeSupplement, type ScheduleIdentity, type UpcomingItem } from './upcoming-schedule.model';
+import { checkForUpdates, getSchedule, resolveIdentity, tvmazeCacheStats } from './tvmaze/tvmaze.service';
+import { selectScheduledEpisodes } from './tvmaze/tvmaze-schedule.model';
+import { assembleUpcoming, type ShowOutcome, type UpcomingResponse } from './upcoming-schedule.model';
 import { chooseScheduleOnlyTMDBMatch, type ScheduleMatch } from './schedule-identity';
 import { mapLimit, SWRCache } from './swr-cache';
 import { analyzeRematchProgress, summarizeSeries } from './rematch.model';
@@ -16,7 +17,7 @@ type Episode = EpisodeMetadata & { name: string; airTimestamp: string | null; ru
 // Catalogs: fresh for 1 hour, then served stale (up to 24 hours) while one background refresh runs.
 const catalogCache = new SWRCache<Catalog>({ freshMs: 60 * 60_000, staleMs: 24 * 60 * 60_000, retryMs: 5 * 60_000 });
 // Upcoming per user: fresh for 5 minutes, then served stale (up to 6 hours) while it rebuilds in the background.
-const upcomingCache = new SWRCache<Awaited<ReturnType<typeof buildUpcomingReleases>>>({ freshMs: 5 * 60_000, staleMs: 6 * 60 * 60_000, retryMs: 60_000, maxEntries: 200 });
+const upcomingCache = new SWRCache<UpcomingResponse>({ freshMs: 5 * 60_000, staleMs: 6 * 60 * 60_000, retryMs: 60_000, maxEntries: 200 });
 
 export class EpisodeGuideError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -102,155 +103,85 @@ function scheduleOnlyTMDBMatch(show: { id: string; name: string; overview: strin
   return value;
 }
 
-async function buildUpcomingReleases(userId: string) {
-  const shows = await prisma.show.findMany({ where: { userId }, select: { id: true, name: true, overview: true, posterURL: true, status: true, tmdbId: true, tvmazeId: true } });
-  const todayDate = today();
-  const linkedTmdbIds = new Set(shows.flatMap(show => (show.tmdbId ? [show.tmdbId] : [])));
-  const fetchOne = async (show: typeof shows[number]) => {
-    // Effective schedule identity: the stored association, else a strictly corroborated schedule-only TMDB match
-    // (never stored), else TVMaze from the library title and overview. A missing association is not a provider failure.
-    let tmdbId = show.tmdbId;
-    let identity: ScheduleIdentity = 'linked';
-    let unlinkedRejection: string | null = null;
-    if (!tmdbId) {
-      const match = await scheduleOnlyTMDBMatch(show, linkedTmdbIds);
-      if (match.tmdbId !== null) { tmdbId = match.tmdbId; identity = 'schedule_match'; } else { unlinkedRejection = match.reason; identity = 'library_title'; }
-    }
-    // Show-level details as Upcoming needs them, taken from the cached catalog (no extra TMDB requests).
-    let details: { name: string | null; original_name: string | null; overview: string | null; first_air_date: string | null; status: string | null; in_production: boolean | null; next_episode_to_air: CatalogMeta['nextEpisode'] } | null = null;
-    let tmdbFailed = false;
-    let tmdbErrorType: string | null = null;
-    let tvmazeEntries = 0;
-    const tmdbSeasonFailures = 0; // the catalog loads all seasons or fails as a whole
-    let scheduleMetadataIncomplete = false;
-    const canonical = new Map<string, { name: string; airDate: string | null }>();
-    const releases = new Map<string, UpcomingItem>();
-    try {
-      if (!tmdbId) throw new EpisodeGuideError(404, 'No TMDB identity for schedule');
-      const catalog = await catalogFor({ name: show.name, tmdbId });
-      const meta = catalog.meta;
-      details = { name: meta?.name ?? null, original_name: meta?.originalName ?? null, overview: meta?.overview ?? null, first_air_date: meta?.firstAirDate ?? null, status: catalog.broadcastStatus, in_production: catalog.inProduction, next_episode_to_air: meta?.nextEpisode ?? null };
-      const next = meta?.nextEpisode ?? null;
-      const seasons = catalog.seasons.filter(season => season.number > 0 && season.episodeCount > 0);
-      const currentSeason = next?.season || meta?.lastAiredSeason || seasons[seasons.length - 1]?.number;
-      const candidateSeasons = new Set<number>();
-      if (currentSeason) candidateSeasons.add(currentSeason);
-      for (const season of seasons) {
-        const airDate = meta?.seasonAirDates[season.number];
-        if (season.number >= (currentSeason || 1) && airDate && airDate >= todayDate) candidateSeasons.add(season.number);
-      }
-      const seasonNumbers = [...candidateSeasons].sort((a, b) => a - b).slice(0, 4);
-      const episodesOf = (season: number) => catalog.episodes.filter(episode => episode.season === season && episode.number > 0);
-      scheduleMetadataIncomplete = seasonNumbers.some(season => {
-        const expected = seasons.find(item => item.number === season)?.episodeCount || 0;
-        const regular = episodesOf(season);
-        return regular.length < expected || regular.some(episode => !episode.airDate);
-      });
-      for (const season of seasonNumbers) for (const episode of episodesOf(season)) {
-        const key = `${season}:${episode.number}`;
-        canonical.set(key, { name: episode.name || '', airDate: episode.airDate });
-        if (episode.airDate && episode.airDate >= todayDate) {
-          releases.set(key, {
-            showId: show.id, showName: show.name, posterURL: show.posterURL, showStatus: show.status,
-            season, number: episode.number, name: episode.name || '', airDate: episode.airDate,
-            airTimestamp: null, seasonPremiere: episode.number === 1, scheduleSource: 'TMDB', scheduleConflict: false, scheduleIdentity: identity,
-          });
-        }
-      }
-      if (next && next.season > 0 && next.number > 0 && next.airDate && next.airDate >= todayDate) {
-        const key = `${next.season}:${next.number}`;
-        if (!releases.has(key)) releases.set(key, {
-          showId: show.id, showName: show.name, posterURL: show.posterURL, showStatus: show.status,
-          season: next.season, number: next.number, name: next.name || '', airDate: next.airDate,
-          airTimestamp: null, seasonPremiere: next.number === 1, scheduleSource: 'TMDB', scheduleConflict: false, scheduleIdentity: identity,
-        });
-      }
-    } catch (error) {
-      if (tmdbId) tmdbFailed = true; // no identity at all is counted separately, not as a TMDB failure
-      if (tmdbId) tmdbErrorType = axios.isAxiosError(error) ? (error.response?.status ? `http_${error.response.status}` : 'network_or_timeout') : error instanceof EpisodeGuideError ? `catalog_${error.status}` : 'configuration_or_unknown';
-    }
+/** Where an error came from, so Upcoming can say which provider was unreachable. */
+const providerOf = (error: unknown): 'TMDB' | 'TVMaze' => axios.isAxiosError(error) && String(error.config?.baseURL || '').includes('tvmaze') ? 'TVMaze' : 'TMDB';
 
-    let tvmazeVerified = false;
-    let tvmazeAmbiguous = false;
-    // TVMaze is schedule-only. Identity must be corroborated by the canonical
-    // TMDB title/year/overview, or by the stored library title and overview when
-    // TMDB is unavailable. No TVMaze IDs or tracking metadata are persisted.
-    const tvmazeQueried = !tmdbId || needsTVMazeSupplement({
-      tmdbResponded: !!details, tmdbFailed, tmdbSeasonFailures, scheduleMetadataIncomplete, tmdbReleaseCount: releases.size,
-      broadcastStatus: details?.status, inProduction: details?.in_production, nextEpisodeAnnounced: !!details?.next_episode_to_air,
-    });
-    const tvmazeSkippedAsFinal = !tvmazeQueried && (tmdbFailed || tmdbSeasonFailures > 0 || scheduleMetadataIncomplete || releases.size < 2);
-    if (tvmazeQueried) {
-      const schedule = await getVerifiedTVMazeSchedule({
-        tmdbName: details?.name, tmdbOriginalName: details?.original_name, tmdbOverview: details?.overview,
-        firstAirDate: details?.first_air_date, libraryName: show.name, libraryOverview: show.overview,
-      }, show.tvmazeId, todayDate);
-      tvmazeVerified = schedule.identityStatus === 'verified';
-      tvmazeAmbiguous = schedule.identityStatus === 'ambiguous';
-      for (const episode of schedule.episodes || []) {
-        const candidate = episode.season && episode.number ? canonical.get(`${episode.season}:${episode.number}`) : undefined;
-        const mapped = !!candidate && !!episode.name && candidate.name.trim().toLocaleLowerCase() === episode.name.trim().toLocaleLowerCase();
-        const key = mapped ? `${episode.season}:${episode.number}` : `tvmaze:${episode.airDate}:${episode.name.trim().toLocaleLowerCase()}`;
-        const existing = releases.get(key);
-        if (existing) {
-          if (existing.scheduleSource === 'TMDB' && existing.airDate !== episode.airDate) existing.scheduleConflict = true;
-          continue;
-        }
-        tvmazeEntries++;
-        releases.set(key, {
-          showId: show.id, showName: show.name, posterURL: show.posterURL, showStatus: show.status,
-          season: mapped ? episode.season : null, number: mapped ? episode.number : null,
-          name: mapped ? candidate!.name : episode.name, airDate: episode.airDate, airTimestamp: episode.airTimestamp,
-          seasonPremiere: mapped ? episode.number === 1 : false, scheduleSource: 'TVMaze', scheduleConflict: false, scheduleIdentity: identity,
-        });
-      }
-    }
-    const broadcastStatus = details?.status || '';
-    return {
-      releases: [...releases.values()], failed: tmdbFailed && releases.size === 0, noTmdbAssociation: !show.tmdbId,
-      unlinkedResolution: show.tmdbId ? null : identity === 'schedule_match' ? 'tmdb' as const : tvmazeVerified ? 'tvmaze' as const : 'unmatched' as const, unlinkedRejection,
-      tmdbResponded: !!details, tmdbFailed, tmdbErrorType, tmdbSeasonFailures, scheduleMetadataIncomplete, tvmazeQueried, tvmazeSkippedAsFinal, tvmazeVerified, tvmazeAmbiguous, tvmazeEntries,
-      tmdbEntries: [...releases.values()].filter(release => release.scheduleSource === 'TMDB').length,
-      tba: isReturningWithoutDate(broadcastStatus, releases.size > 0) ? { showId: show.id, showName: show.name, posterURL: show.posterURL, broadcastStatus } : null,
-    };
-  };
-  // Linked shows read their cached catalog; TVMaze lookups are rate-limited separately.
-  const results = await mapLimit(shows, 8, fetchOne);
-  const unique = new Map<string, (typeof results)[number]['releases'][number]>();
-  for (const release of results.flatMap(result => result.releases)) {
-    const key = release.season && release.number ? `${release.showId}:${release.season}:${release.number}` : `${release.showId}:${release.airDate}:${release.name.toLocaleLowerCase()}`;
-    const existing = unique.get(key);
-    if (!existing || (existing.scheduleSource !== 'TMDB' && release.scheduleSource === 'TMDB')) unique.set(key, release);
+type UpcomingShowRow = { id: string; name: string; overview: string | null; posterURL: string | null; status: string | null; completed: boolean; tmdbId: number | null; tvmazeId: number | null };
+/**
+ * One show's TVMaze-only schedule. Identity: the stored TMDB association (or a strictly corroborated schedule-only
+ * TMDB match, never stored) gives TheTVDB/IMDb IDs, which select the TVMaze series. Anything unverifiable is
+ * returned for review and contributes no dates. TMDB dates are never used here.
+ */
+async function upcomingOutcome(show: UpcomingShowRow, linkedTmdbIds: ReadonlySet<number>, cutoff: string): Promise<ShowOutcome> {
+  const library = { id: show.id, name: show.name, posterURL: show.posterURL, status: show.status || (show.completed ? 'completed' : null) };
+  let tmdbId = show.tmdbId;
+  let tmdbBasis: 'linked' | 'schedule_match' = 'linked';
+  if (!tmdbId) {
+    const match = await scheduleOnlyTMDBMatch(show, linkedTmdbIds);
+    if (match.tmdbId === null) return match.reason === 'search_failed' ? { kind: 'unavailable', show: library, provider: 'TMDB' } : { kind: 'review', show: library, reason: 'no_tmdb_identity' };
+    tmdbId = match.tmdbId; tmdbBasis = 'schedule_match';
   }
-  const releaseTime = (e: { airTimestamp: string | null; airDate: string }) => Date.parse(e.airTimestamp || `${e.airDate}T00:00:00Z`);
-  return {
-    releases: mergeUpcomingItems([...unique.values()]).sort((a, b) => releaseTime(a) - releaseTime(b) || a.showName.localeCompare(b.showName)),
-    returningTba: results.flatMap(result => result.tba ? [result.tba] : []),
-    failedShows: results.filter(result => result.failed).length, evaluatedShows: shows.length,
-    showsWithTMDBId: shows.filter(show => !!show.tmdbId).length, showsWithoutTMDBId: shows.filter(show => !show.tmdbId).length,
-    unlinkedScheduleMatches: {
-      tmdb: results.filter(result => result.unlinkedResolution === 'tmdb').length,
-      tvmaze: results.filter(result => result.unlinkedResolution === 'tvmaze').length,
-      unmatched: results.filter(result => result.unlinkedResolution === 'unmatched').length,
-    },
-    unlinkedTMDBRejections: results.reduce((counts, result) => { if (result.unlinkedRejection) counts[result.unlinkedRejection] = (counts[result.unlinkedRejection] || 0) + 1; return counts; }, {} as Record<string, number>),
-    tmdbResponses: results.filter(result => result.tmdbResponded).length, tmdbFailures: results.filter(result => result.tmdbFailed).length,
-    tmdbSeasonFailures: results.reduce((count, result) => count + result.tmdbSeasonFailures, 0),
-    incompleteTMDBSchedules: results.filter(result => result.scheduleMetadataIncomplete).length,
-    tmdbFailureTypes: results.reduce((counts, result) => { if (result.tmdbErrorType) counts[result.tmdbErrorType] = (counts[result.tmdbErrorType] || 0) + 1; return counts; }, {} as Record<string, number>),
-    scheduledTMDBEpisodes: results.reduce((count, result) => count + result.tmdbEntries, 0),
-    scheduledTVMazeEpisodes: results.reduce((count, result) => count + result.tvmazeEntries, 0),
-    tvmazeQueriedShows: results.filter(result => result.tvmazeQueried).length,
-    tvmazeSkippedFinalShows: results.filter(result => result.tvmazeSkippedAsFinal).length,
-    tvmazeVerifiedShows: results.filter(result => result.tvmazeVerified).length,
-    tvmazeAmbiguousShows: results.filter(result => result.tvmazeAmbiguous).length,
-    returningWithoutDate: results.filter(result => result.tba).length,
-    scheduleConflicts: mergeUpcomingItems([...unique.values()]).filter(release => release.scheduleConflict).length,
-  };
+  const seriesId = tmdbId;
+  let identity: Awaited<ReturnType<typeof resolveIdentity>>;
+  try {
+    identity = await resolveIdentity({
+      tmdbId: seriesId,
+      externalIds: () => tmdb.getExternalIds(seriesId),
+      evidence: async () => {
+        const details = await tmdb.getShow(seriesId);
+        return { names: [details.name, details.original_name, show.name], firstAirDate: details.first_air_date || null, overview: details.overview || show.overview || null };
+      },
+    });
+  } catch (error) { return { kind: 'unavailable', show: library, provider: providerOf(error) }; }
+  if (identity.status !== 'verified') return { kind: 'review', show: library, reason: identity.reason };
+  if (show.tvmazeId && show.tvmazeId !== identity.tvmazeId) return { kind: 'review', show: library, reason: 'stored_tvmaze_conflict' };
+  try {
+    const schedule = await getSchedule(identity.tvmazeId);
+    const { episodes, excluded } = selectScheduledEpisodes(schedule.episodes, cutoff);
+    return { kind: 'scheduled', show: library, tvmaze: schedule.show, method: identity.method, tmdbBasis, episodes, excluded, stale: schedule.stale };
+  } catch { return { kind: 'unavailable', show: library, provider: 'TVMaze' }; }
 }
 
-export function getUpcomingReleases(userId: string) {
-  return upcomingCache.get(userId, () => buildUpcomingReleases(userId));
+async function buildUpcomingReleases(userId: string, progress: { done: number; total: number }, force: boolean) {
+  const shows = await prisma.show.findMany({ where: { userId }, select: { id: true, name: true, overview: true, posterURL: true, status: true, completed: true, tmdbId: true, tvmazeId: true } });
+  progress.total = shows.length;
+  const linkedTmdbIds = new Set(shows.flatMap(show => (show.tmdbId ? [show.tmdbId] : [])));
+  // The earliest calendar day that is still "today" somewhere; pages drop what is before the viewer's own today.
+  const cutoff = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  await checkForUpdates(force ? 2 * 60_000 : 30 * 60_000);
+  const outcomes = await mapLimit(shows, 8, async show => { try { return await upcomingOutcome(show, linkedTmdbIds, cutoff); } finally { progress.done++; } });
+  return assembleUpcoming(outcomes, new Date().toISOString());
+}
+
+const buildProgress = new Map<string, { done: number; total: number }>();
+const lastForcedRefresh = new Map<string, number>();
+function upcomingFor(userId: string, force = false) {
+  const load = () => {
+    const progress = { done: 0, total: 0 };
+    buildProgress.set(userId, progress);
+    return buildUpcomingReleases(userId, progress, force);
+  };
+  return force ? upcomingCache.refresh(userId, load) : upcomingCache.get(userId, load);
+}
+
+/** How long a request waits for a first (cold) build before answering "building" with progress. */
+const BUILD_WAIT_MS = 12_000;
+/**
+ * The user's TVMaze schedule. Cached per user (stale-while-revalidate). `refresh` rebuilds now (at most every 30
+ * seconds) and re-checks TVMaze's updates feed; a cold build that takes longer than a few seconds answers
+ * `{ status: 'building' }` so pages never hang, and finishes in the background.
+ */
+export async function getUpcomingReleases(userId: string, options: { refresh?: boolean } = {}): Promise<UpcomingResponse | { status: 'building'; progress: { done: number; total: number } }> {
+  const force = !!options.refresh && Date.now() - (lastForcedRefresh.get(userId) || 0) > 30_000;
+  if (force) lastForcedRefresh.set(userId, Date.now());
+  const pending = upcomingFor(userId, force);
+  pending.catch(() => { /* reported to the waiting request, or retried on the next one */ });
+  let timer: NodeJS.Timeout | undefined;
+  const waited = await Promise.race([pending, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), BUILD_WAIT_MS); })]).finally(() => clearTimeout(timer));
+  if (waited) return waited;
+  const previous = upcomingCache.peek(userId);
+  if (previous) return previous; // a slow forced refresh: keep showing the last schedule
+  return { status: 'building', progress: { ...(buildProgress.get(userId) || { done: 0, total: 0 }) } };
 }
 
 /** The library changed (show added, removed or re-linked): the next request gets the current list and rebuilds it. */
@@ -268,9 +199,11 @@ export async function warmCaches() {
   warmup = { state: 'running', startedAt: new Date().toISOString() };
   try {
     const linked = await prisma.show.findMany({ where: { tmdbId: { not: null } }, select: { name: true, tmdbId: true }, distinct: ['tmdbId'] });
-    await mapLimit(linked, 6, show => catalogFor(show).catch(() => null));
+    // Upcoming no longer reads TMDB catalogs, so both warm in parallel (TVMaze is rate-limited on its own).
+    const catalogs = mapLimit(linked, 6, show => catalogFor(show).catch(() => null));
     const users = await prisma.show.findMany({ select: { userId: true }, distinct: ['userId'] });
-    for (const { userId } of users) await getUpcomingReleases(userId).catch(() => null);
+    for (const { userId } of users) await upcomingFor(userId).catch(() => null);
+    await catalogs;
     warmup = { ...warmup, state: 'done', finishedAt: new Date().toISOString(), catalogs: catalogCache.size, users: users.length };
   } catch {
     warmup = { ...warmup, state: 'failed', finishedAt: new Date().toISOString() };
@@ -290,7 +223,11 @@ export async function getHealth() {
       return { status: notConfigured ? 'not_configured' as const : failure === 'tmdb_auth_failed' ? 'auth_failed' as const : 'unavailable' as const, httpStatus, checkedAt: new Date().toISOString() };
     }
   });
-  return { tmdb: tmdbHealth, caches: { catalogs: catalogCache.size, upcomingUsers: upcomingCache.size, warmup } };
+  // Schedule match totals across libraries (counts only; no titles or user data).
+  const built = upcomingCache.keys().flatMap(key => { const value = upcomingCache.peek(key); return value ? [value] : []; });
+  const sum = (pick: (c: UpcomingResponse['coverage']) => number) => built.reduce((n, v) => n + pick(v.coverage), 0);
+  const schedule = { source: 'TVMaze', evaluatedShows: sum(c => c.evaluatedShows), verifiedShows: sum(c => c.verifiedShows), verifiedByExternalId: sum(c => c.verifiedByExternalId), verifiedByTitle: sum(c => c.verifiedByTitle), needsReview: sum(c => c.unresolvedShows), unavailable: sum(c => c.unavailableShows), stale: built.some(v => v.stale) };
+  return { tmdb: tmdbHealth, schedule, caches: { catalogs: catalogCache.size, upcomingUsers: upcomingCache.size, tvmaze: tvmazeCacheStats(), warmup } };
 }
 
 export async function getEpisodeGuide(showId: string, userId: string, season: number) {

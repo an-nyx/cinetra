@@ -1,64 +1,181 @@
-import { posterSrc } from "@/lib/poster";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, ArrowUpRight, CalendarDays, Check, Play, RefreshCw, Tv } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, RefreshCw, Tv } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import ShowModal from "@/modals/ShowModal";
 import { ShowService } from "@/services";
-import type { TrackingSummary, TrackedEpisode, UpcomingRelease } from "@/services/show.service";
+import type { TrackingSummary } from "@/services/show.service";
 import type { ShowType } from "@/types";
-import { attentionReason, canContinueWatching, savedPositionCode } from "@/lib/tracking";
+import { posterSrc } from "@/lib/poster";
+import { episodeCode, homeDashboard, savedPositionCode } from "@/lib/tracking";
+import { eventEpisodeLine, groupReleaseEvents, shortDay, timeLabel } from "@/lib/upcoming-calendar";
+import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
 
-const code = (e: TrackedEpisode | null | undefined) => e && Number.isInteger(e.season) && Number.isInteger(e.number) ? `S${String(e.season).padStart(2, '0')}E${String(e.number).padStart(2, '0')}` : null;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const nextCode = (item: TrackingSummary) => item.nextEpisode ? episodeCode(item.nextEpisode.season, item.nextEpisode.number) : null;
+function relativeTime(iso: string, now: Date) {
+  const days = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(new Date(iso).setHours(0, 0, 0, 0)).getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function Poster({ url, size = "w154", className }: { url: string | null; size?: "w92" | "w154" | "w185" | "w342"; className: string }) {
+  return url
+    ? <img src={posterSrc(url, size)} alt="" loading="lazy" decoding="async" className={`dash-poster ${className}`} />
+    : <span className={`dash-poster flex items-center justify-center text-muted-foreground ${className}`}><Tv className="size-5" /></span>;
+}
+
 export default function WelcomePage() {
   const [shows, setShows] = useState<ShowType[]>([]);
   const [tracking, setTracking] = useState<TrackingSummary[]>([]);
-  const [selectedShow, setSelectedShow] = useState('');
+  const [selectedShow, setSelectedShow] = useState("");
   const [editMatch, setEditMatch] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  // Home's upcoming list reads the same feed as the Upcoming page, so both always agree (including title-matched schedules).
-  const [releases, setReleases] = useState<UpcomingRelease[]>([]);
-  useEffect(() => { ShowService.getUpcomingReleases().then(data => setReleases(data.releases)).catch(() => setReleases([])); }, []);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [allNew, setAllNew] = useState(false);
+  const now = useNow();
+  // Coming soon reads the same TVMaze schedule and grouping as the Upcoming page, and loads on its own (never blocks Home).
+  const upcoming = useUpcomingSchedule();
+
   const load = useCallback(async () => {
-    try { const [library, progress] = await Promise.all([ShowService.getAllShows(), ShowService.getLibraryTracking()]); setShows(library); setTracking(progress); setError(''); }
-    catch { setError('Could not load your tracking dashboard.'); }
+    try { const [library, progress] = await Promise.all([ShowService.getAllShows(), ShowService.getLibraryTracking()]); setShows(library); setTracking(progress); setError(""); }
+    catch { setError("Could not load your tracking dashboard."); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { load(); window.addEventListener('tracking-updated', load); return () => window.removeEventListener('tracking-updated', load); }, [load]);
-  const items = tracking.filter(item => item && typeof item === 'object' && !item.error);
-  // Totals add up only shows whose counts are verified (reliable released-episode metadata, no unresolved conflict).
-  // Other shows are left out and the tiles say so, rather than hiding every total or guessing missing counts.
-  const verified = items.filter(item => item.countDataAvailable && item.progressPercent !== null);
-  const totalsNote = verified.length && verified.length < shows.length ? `from ${verified.length} of ${shows.length} shows` : null;
-  // Only shows with a released next episode are playable; saved positions that need review are listed separately.
-  const continuing = items.filter(canContinueWatching);
-  const attention = items.flatMap(item => { const reason = attentionReason(item); return reason ? [{ item, reason }] : []; });
-  const newEpisodes = items.filter(item => item.newEpisodes > 0);
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const upcoming = [...new Map([...releases].filter(release => release.airDate >= todayKey).sort((a, b) => a.airDate.localeCompare(b.airDate)).reverse().map(release => [release.showId, release])).values()].sort((a, b) => a.airDate.localeCompare(b.airDate));
-  const recent = items.flatMap(item => (Array.isArray(item.recentHistory) ? item.recentHistory : []).filter(event => event && event.watchedAt).map(event => ({ item, event }))).sort((a, b) => b.event.watchedAt.localeCompare(a.event.watchedAt)).slice(0, 5);
-  const featured = continuing[0];
+  useEffect(() => { load(); window.addEventListener("tracking-updated", load); return () => window.removeEventListener("tracking-updated", load); }, [load]);
+
+  const dash = useMemo(() => homeDashboard(tracking), [tracking]);
+  const comingSoon = useMemo(() => groupReleaseEvents(upcoming.schedule?.releases || [], now).slice(0, 3), [upcoming.schedule, now]);
+  const open = (showId: string, fixMatch = false) => { setEditMatch(fixMatch); setSelectedShow(showId); };
   const markNext = async (item: TrackingSummary) => {
     if (!item.nextEpisode || busy) return;
-    setBusy(true);
+    setBusy(item.showId);
     try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); await load(); }
     catch { setError(`Could not update ${item.name}.`); }
-    finally { setBusy(false); }
+    finally { setBusy(null); }
   };
-  return <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-7 pb-24 md:px-8 md:py-10">
-    <header className="relative isolate overflow-hidden rounded-[1.6rem] border border-primary/15 bg-card px-6 py-8 sm:px-9 sm:py-10">{featured?.posterURL && <img src={posterSrc(featured.posterURL, "w342")} alt="" aria-hidden="true" className="absolute -right-6 -top-20 -z-10 h-[160%] w-1/2 rotate-6 object-cover opacity-[.16] blur-[2px]" />}<div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/90 via-background/70 to-transparent" /><div className="flex items-start justify-between gap-3"><div><p className="cinema-eyebrow">Your personal watch space</p><h1 className="mt-3 max-w-xl text-3xl font-semibold leading-tight sm:text-5xl">Pick up where you left off<span className="text-primary">.</span></h1><p className="mt-3 max-w-lg text-sm text-muted-foreground sm:text-base">Your next episodes, release dates, and progress in one place.</p></div><Button variant="outline" size="icon" onClick={load} aria-label="Refresh dashboard"><RefreshCw className="size-4" /></Button></div>{featured && <button type="button" onClick={() => setSelectedShow(featured.showId)} className="mt-7 flex max-w-lg items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-left text-xs text-primary transition-colors hover:bg-primary/20 sm:text-sm"><Play className="size-4 fill-current" /><span className="truncate">Up next: <strong>{featured.name}</strong> · {code(featured.nextEpisode)}{savedPositionCode(featured) && <> · saved {savedPositionCode(featured)}</>}</span><ArrowUpRight className="size-4 shrink-0" /></button>}</header>
+  const featured = dash.featured;
+  const newShown = allNew ? dash.newEpisodes : dash.newEpisodes.slice(0, 3);
+
+  return <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 px-4 pb-4 pt-3 md:px-8 md:pt-6">
+    <h1 className="sr-only">Home</h1>
     {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">{error}</p>}
-    {loading ? <div className="space-y-5" aria-label="Loading dashboard"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[1,2,3,4].map(n => <Skeleton key={n} className="h-25 rounded-2xl" />)}</div><Skeleton className="h-60 rounded-2xl" /></div> : <>
-      <section aria-label="Quick watching statistics" className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[[shows.length, 'Shows in library'], [items.filter(item => item.status === 'watching').length, 'Currently watching'], [verified.length ? verified.reduce((n, item) => n + item.watchedCount, 0) : '—', 'Episodes watched', totalsNote], [verified.length ? verified.reduce((n, item) => n + item.remainingCount, 0) : '—', 'Ready to watch', totalsNote]].map(([value, label, note]) => <div key={label as string} className="cinema-surface p-4"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{label}</p>{note && <p className="mt-0.5 text-[11px] text-muted-foreground/80">{note} · others lack verified episode data</p>}</div>)}</section>
-      <section className="space-y-4"><div className="flex justify-between"><h2 className="flex items-center gap-2 text-xl font-semibold"><Play className="size-5 text-primary" />Continue watching</h2><Link to="/shows" className="text-sm text-primary">All shows →</Link></div>{continuing.length ? <div className="grid gap-3 lg:grid-cols-2">{continuing.map(item => <article key={item.showId} className="flex gap-4 cinema-surface p-4"><button onClick={() => setSelectedShow(item.showId)} aria-label={`Open ${item.name}`} className="shrink-0">{item.posterURL ? <img src={posterSrc(item.posterURL, "w185")} alt="" className="cinema-poster h-32 w-20 rounded-xl object-cover" /> : <Tv className="size-16 text-muted-foreground" />}</button><div className="min-w-0 flex-1"><button className="truncate text-left font-semibold hover:text-primary" onClick={() => setSelectedShow(item.showId)}>{item.name}</button><p className="mt-1 truncate text-sm text-muted-foreground">Next {code(item.nextEpisode)} · {item.nextEpisode?.name}</p>{savedPositionCode(item) && <p className="truncate text-xs text-muted-foreground">Saved position {savedPositionCode(item)}</p>}<p className="mt-1 text-xs text-muted-foreground">{item.countDataAvailable ? `${item.remainingCount} released episodes remaining` : 'Released episode count unavailable'} {item.newEpisodes > 0 && <span className="rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary">{item.newEpisodes} NEW</span>}</p>{item.progressPercent !== null ? <><div className="cinema-progress mt-3"><div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${item.progressPercent}%` }} /></div><p className="mt-1 text-right text-xs text-muted-foreground">{item.progressPercent}% released progress</p></> : <p className="mt-2 text-right text-xs text-muted-foreground">Progress percentage unavailable</p>}{item.nextEpisode && <Button size="sm" className="mt-2 w-full gap-1" disabled={busy} onClick={() => markNext(item)}><Check className="size-4" />Mark next watched</Button>}</div></article>)}</div> : <p className="cinema-empty p-5 text-sm text-muted-foreground">{shows.length ? 'No show has a released next episode waiting.' : 'Add a show to start tracking.'}</p>}</section>
-      {attention.length > 0 && <section className="space-y-3" aria-labelledby="needs-review-heading"><h2 id="needs-review-heading" className="flex items-center gap-2 text-xl font-semibold"><AlertTriangle className="size-5 text-amber-400" />Needs review</h2><p className="text-sm text-muted-foreground">Saved progress for these shows cannot be placed on episodes. Nothing has been changed; open a show to review it.</p><div className="grid gap-2 lg:grid-cols-2">{attention.map(({ item, reason }) => <div key={item.showId} className="flex min-w-0 items-center gap-2 cinema-surface p-2"><button type="button" onClick={() => { setEditMatch(false); setSelectedShow(item.showId); }} className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg p-1 text-left text-sm hover:text-primary"><span className="min-w-0"><span className="block truncate font-medium">{item.name}</span><span className="block truncate text-xs text-muted-foreground">{reason}</span></span>{savedPositionCode(item) && <span className="shrink-0 text-xs text-muted-foreground">Saved {savedPositionCode(item)}</span>}</button><Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => { setEditMatch(true); setSelectedShow(item.showId); }}>{item.progressUnavailable?.code === 'no_tmdb_association' ? 'Link to TMDB' : 'Fix match'}</Button></div>)}</div></section>}
-      <div className="grid gap-8 lg:grid-cols-2"><section className="space-y-4"><h2 className="text-xl font-semibold">New episodes available</h2>{newEpisodes.length ? newEpisodes.map(item => <button key={item.showId} onClick={() => setSelectedShow(item.showId)} className="flex w-full items-center justify-between cinema-surface cinema-surface-hover p-4 text-left"><span>{item.name}<span className="block text-xs text-muted-foreground">{item.nextEpisode && `${code(item.nextEpisode)} · ${item.nextEpisode.name}`}</span></span><span className="rounded-full bg-primary/15 px-2 py-1 text-xs font-semibold text-primary">{item.newEpisodes} NEW</span></button>) : <p className="cinema-empty p-5 text-sm text-muted-foreground">No new unwatched episodes since your last watch.</p>}</section><section className="space-y-4"><h2 className="flex items-center gap-2 text-xl font-semibold"><CalendarDays className="size-5 text-primary" />Upcoming episodes</h2>{upcoming.length ? upcoming.slice(0, 6).map(release => <button key={release.showId} onClick={() => setSelectedShow(release.showId)} className="flex w-full items-center justify-between gap-3 cinema-surface cinema-surface-hover p-4 text-left"><span className="min-w-0">{release.showName}<span className="block truncate text-xs text-muted-foreground">{release.season && release.number ? code({ season: release.season, number: release.number } as TrackedEpisode) : 'Scheduled'}{release.name ? ` · ${release.name}` : ''}</span></span><span className="shrink-0 text-xs text-primary">{release.airDate}</span></button>) : <p className="cinema-empty p-5 text-sm text-muted-foreground">No upcoming air dates announced.</p>}</section></div>
-      <div className="grid gap-8 lg:grid-cols-2"><section className="space-y-3"><h2 className="text-xl font-semibold">Watchlist</h2>{items.filter(item => item.status === 'planned').slice(0, 5).map(item => <button key={item.showId} className="block w-full cinema-surface cinema-surface-hover p-3 text-left text-sm" onClick={() => setSelectedShow(item.showId)}>{item.name}</button>)}{!items.some(item => item.status === 'planned') && <p className="text-sm text-muted-foreground">No planned shows yet.</p>}</section><section className="space-y-3"><h2 className="text-xl font-semibold">Recently watched</h2>{recent.map(({ item, event }) => <button key={`${item.showId}-${event.season}-${event.episode}`} className="block w-full cinema-surface cinema-surface-hover p-3 text-left text-sm" onClick={() => setSelectedShow(item.showId)}>{item.name} · S{event.season}E{event.episode} <span className="float-right text-xs text-muted-foreground">{new Date(event.watchedAt).toLocaleDateString()}</span></button>)}{!recent.length && <p className="text-sm text-muted-foreground">Your watch history will appear here.</p>}</section></div>
-      {tracking.some(item => item.error) && <p className="text-xs text-muted-foreground">Episode data unavailable for {tracking.filter(item => item.error).length} show(s).</p>}
+
+    {loading ? <div className="space-y-5" aria-label="Loading dashboard" aria-busy="true">
+      <Skeleton className="h-[148px] rounded-2xl" />
+      <div className="grid grid-cols-3 gap-2">{[1, 2, 3].map(n => <Skeleton key={n} className="h-[62px] rounded-xl" />)}</div>
+      <div className="flex gap-2.5 overflow-hidden">{[1, 2, 3].map(n => <Skeleton key={n} className="h-56 w-[30%] shrink-0 rounded-xl" />)}</div>
+    </div> : <>
+      {/* A. Featured up next */}
+      <section aria-labelledby="up-next-heading" className="dash-card p-3">
+        <div className="flex items-center justify-between">
+          <h2 id="up-next-heading" className="cinema-eyebrow">Up next</h2>
+          <Button variant="ghost" size="icon" onClick={load} aria-label="Refresh dashboard" className="-my-2 -mr-2 rounded-full"><RefreshCw className="size-4" /></Button>
+        </div>
+        {featured ? <div className="mt-1 flex gap-3">
+          <button type="button" onClick={() => open(featured.showId)} aria-label={`Open ${featured.name}`} className="shrink-0"><Poster url={featured.posterURL} size="w185" className="h-[108px] w-[72px] cinema-poster" /></button>
+          <div className="min-w-0 flex-1">
+            <button type="button" onClick={() => open(featured.showId)} className="block max-w-full text-left"><span className="line-clamp-2 break-words text-base font-semibold leading-snug hover:text-primary">{featured.name}</span></button>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground"><span className="font-medium text-foreground/90">Next {nextCode(featured)}</span>{featured.nextEpisode?.name ? ` · ${featured.nextEpisode.name}` : ""}</p>
+            {savedPositionCode(featured) && <p className="truncate text-[11px] text-muted-foreground">Saved {savedPositionCode(featured)}</p>}
+            <div className="mt-1.5 flex items-center gap-2">
+              {featured.progressPercent !== null && <div className="mini-progress min-w-8 flex-1" role="progressbar" aria-label="Released episodes watched" aria-valuenow={featured.progressPercent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${featured.progressPercent}%` }} /></div>}
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{featured.progressPercent !== null ? `${featured.progressPercent}% · ` : ""}{featured.countDataAvailable ? `${featured.remainingCount} unwatched` : "Count unavailable"}</span>
+            </div>
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" className="h-9 max-w-full gap-1 rounded-full px-3 text-xs" disabled={!!busy} onClick={() => markNext(featured)} aria-label={`Mark ${nextCode(featured)} of ${featured.name} watched`}><Check className="size-3.5" />Mark next watched</Button>
+            </div>
+          </div>
+        </div> : <p className="mt-1 text-sm text-muted-foreground">{shows.length ? "You're caught up — no released episode is waiting." : "Add a show to start tracking."} <Link to="/shows" className="text-primary">Go to Shows</Link></p>}
+      </section>
+
+      {/* B. Statistics */}
+      <section aria-label="Watching statistics" className="grid grid-cols-3 gap-2">
+        {([[shows.length, "Total shows"], [dash.watching, "Watching"], [dash.episodesWatched ?? "—", "Episodes watched"]] as const).map(([value, label]) => <div key={label} className="dash-card px-2.5 py-2">
+          <p className="text-lg font-semibold tabular-nums leading-tight">{typeof value === "number" ? value.toLocaleString() : value}</p>
+          <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
+        </div>)}
+      </section>
+      {dash.verifiedShows > 0 && dash.verifiedShows < shows.length && <p className="-mt-3.5 text-[11px] text-muted-foreground/80">Episodes watched counts {dash.verifiedShows} of {shows.length} shows with verified episode data.</p>}
+
+      {/* C. Continue watching */}
+      {dash.continueWatching.length > 0 && <section aria-labelledby="continue-heading">
+        <div className="dash-heading"><h2 id="continue-heading">Continue watching</h2><Link to="/shows?status=watching" className="dash-link">See all<ChevronRight className="size-3.5" /></Link></div>
+        <ul className="h-rail pb-1">{dash.continueWatching.map(item => <li key={item.showId} className="w-[30%] min-w-[104px] max-w-[150px] shrink-0 md:w-[150px]">
+          <div className="relative">
+            <button type="button" onClick={() => open(item.showId)} aria-label={`Open ${item.name}, next ${nextCode(item)}`} className="block w-full text-left">
+              <Poster url={item.posterURL} size="w185" className="aspect-[2/3] w-full" />
+              <span className="mt-1.5 block truncate text-xs font-semibold">{item.name}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">Next {nextCode(item)}</span>
+            </button>
+            {/* Poster-sized overlay so the action sits on the poster's corner without covering the title. */}
+            <span className="pointer-events-none absolute inset-x-0 top-0 aspect-[2/3]">
+              <button type="button" disabled={!!busy} onClick={() => markNext(item)} aria-label={`Mark ${nextCode(item)} of ${item.name} watched`} className="touch-target pointer-events-auto absolute bottom-1.5 right-1.5 flex size-8 items-center justify-center rounded-full border border-primary/40 bg-background/85 text-primary shadow-lg backdrop-blur disabled:opacity-50">
+                <Check className={`size-4 ${busy === item.showId ? "animate-pulse" : ""}`} />
+              </button>
+            </span>
+          </div>
+          {item.progressPercent !== null && <div className="mt-1 flex items-center gap-1.5"><div className="mini-progress flex-1"><span style={{ width: `${item.progressPercent}%` }} /></div><span className="text-[10px] tabular-nums text-muted-foreground">{item.progressPercent}%</span></div>}
+        </li>)}</ul>
+      </section>}
+
+      {/* D. New episodes available (TMDB released episodes) */}
+      {dash.newEpisodes.length > 0 && <section aria-labelledby="new-heading">
+        <div className="dash-heading"><h2 id="new-heading">New episodes available</h2>{dash.newEpisodes.length > 3 && <button type="button" className="dash-link" aria-expanded={allNew} onClick={() => setAllNew(value => !value)}>{allNew ? "Show less" : `See all ${dash.newEpisodes.length}`}</button>}</div>
+        <ul className="space-y-1.5">{newShown.map(item => <li key={item.showId}><button type="button" onClick={() => open(item.showId)} className="dash-card dash-row flex min-h-14 w-full items-center gap-3 p-2 text-left">
+          <Poster url={item.posterURL} size="w92" className="h-[54px] w-9" />
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.name}</span>
+            <span className="block truncate text-xs text-muted-foreground">{item.newSeasonToWatch ? `Season ${item.newSeasonToWatch.season} is out · ` : ""}{plural(item.remainingCount, "released episode")} unwatched</span></span>
+          <span className="release-tag shrink-0">{item.newSeasonToWatch ? "New season" : `${item.newEpisodes} new`}</span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </button></li>)}</ul>
+      </section>}
+
+      {/* E. Coming soon (TVMaze, same as Upcoming) */}
+      {(upcoming.loading || comingSoon.length > 0) && !upcoming.error && <section aria-labelledby="soon-heading">
+        <div className="dash-heading"><h2 id="soon-heading">Coming soon</h2><Link to="/upcoming" className="dash-link">Upcoming<ChevronRight className="size-3.5" /></Link></div>
+        {upcoming.loading && !upcoming.schedule ? <div className="space-y-1.5" aria-busy="true">{[1, 2, 3].map(n => <Skeleton key={n} className="h-14 rounded-xl" />)}{upcoming.building && <p className="text-[11px] text-muted-foreground">Preparing schedule… {upcoming.building.done}/{upcoming.building.total}</p>}</div>
+          : <ul className="space-y-1.5">{comingSoon.map(event => <li key={event.key}><button type="button" onClick={() => open(event.showId)} className="dash-card dash-row flex min-h-14 w-full items-center gap-3 p-2 text-left">
+            <Poster url={event.posterURL} size="w92" className="h-[54px] w-9" />
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{event.showName}</span><span className="block truncate text-xs text-muted-foreground">{eventEpisodeLine(event)}</span></span>
+            <span className="shrink-0 text-right text-xs"><span className="block font-semibold text-primary">{shortDay(event.day, now)}</span>{timeLabel(event.timestamp) && <span className="block text-[11px] text-muted-foreground">{timeLabel(event.timestamp)}</span>}</span>
+          </button></li>)}</ul>}
+      </section>}
+
+      {/* F. Recently watched (recorded watch times only) */}
+      {dash.recent.length > 0 && <section aria-labelledby="recent-heading">
+        <div className="dash-heading"><h2 id="recent-heading">Recently watched</h2></div>
+        <ul className="dash-card divide-y divide-border/60 px-1">{dash.recent.slice(0, 3).map(({ item, event }) => <li key={`${item.showId}-${event.season}-${event.episode}`}><button type="button" onClick={() => open(item.showId)} className="flex min-h-12 w-full items-center gap-3 px-2 py-1.5 text-left">
+          <Poster url={item.posterURL} size="w92" className="h-10 w-7" />
+          <span className="flex min-w-0 flex-1 gap-1 text-sm"><span className="truncate">{item.name}</span><span className="shrink-0 text-muted-foreground">· {episodeCode(event.season, event.episode)}</span></span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">{relativeTime(event.watchedAt, now)}</span>
+        </button></li>)}</ul>
+      </section>}
+
+      {/* Watchlist (hidden when empty) */}
+      {dash.watchlist.length > 0 && <section aria-labelledby="watchlist-heading">
+        <div className="dash-heading"><h2 id="watchlist-heading">Watchlist</h2><Link to="/shows?status=planned" className="dash-link">See all<ChevronRight className="size-3.5" /></Link></div>
+        <ul className="h-rail">{dash.watchlist.slice(0, 8).map(item => <li key={item.showId} className="w-[22%] min-w-[72px] max-w-[96px] shrink-0"><button type="button" onClick={() => open(item.showId)} aria-label={`Open ${item.name}`} className="block w-full text-left">
+          <Poster url={item.posterURL} size="w154" className="aspect-[2/3] w-full" /><span className="mt-1 block truncate text-[11px] text-muted-foreground">{item.name}</span>
+        </button></li>)}</ul>
+      </section>}
+
+      {/* Saved progress that cannot be placed on episodes (kept, never hidden) */}
+      {dash.attention.length > 0 && <details className="dash-card group px-3 py-1">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden"><AlertTriangle className="size-4 text-amber-400" />Needs review<span className="text-xs font-normal text-muted-foreground">{dash.attention.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" /></summary>
+        <p className="pb-2 text-xs text-muted-foreground">Saved progress for these shows cannot be placed on episodes. Nothing has been changed.</p>
+        <ul className="space-y-1 pb-2">{dash.attention.map(({ item, reason }) => <li key={item.showId} className="flex min-w-0 items-center gap-2">
+          <button type="button" onClick={() => open(item.showId)} className="min-w-0 flex-1 py-1 text-left"><span className="block truncate text-sm font-medium">{item.name}</span><span className="block truncate text-xs text-muted-foreground">{reason}</span></button>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => open(item.showId, true)}>{item.progressUnavailable?.code === "no_tmdb_association" ? "Link to TMDB" : "Fix match"}</Button>
+        </li>)}</ul>
+      </details>}
+
+      {dash.unavailable > 0 && <p className="text-[11px] text-muted-foreground">Episode data unavailable for {plural(dash.unavailable, "show")}.</p>}
     </>}
-    <ShowModal type="show" selectedShow={selectedShow} closeModal={() => { setSelectedShow(''); setEditMatch(false); }} shows={shows} setShows={setShows} initialEditMatch={editMatch} />
+    <ShowModal type="show" selectedShow={selectedShow} closeModal={() => { setSelectedShow(""); setEditMatch(false); }} shows={shows} setShows={setShows} initialEditMatch={editMatch} />
   </div>;
 }

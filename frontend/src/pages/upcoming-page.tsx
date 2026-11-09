@@ -1,144 +1,171 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
+import { AlertTriangle, CalendarDays, ChevronDown, Info, RefreshCw, Tv } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import ShowModal from "@/modals/ShowModal";
+import { ShowService } from "@/services";
+import type { ShowType } from "@/types";
 import { posterSrc } from "@/lib/poster";
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
-import { CalendarDays, Info, RefreshCw, Tv } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import ShowModal from '@/modals/ShowModal';
-import { ApiService, ShowService } from '@/services';
-import type { ReturningTba, UpcomingRelease, TrackingSummary } from '@/services/show.service';
-import type { ShowType } from '@/types';
+import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
+import {
+  calendarFilters, calendarStats, dayHeading, episodeCode, eventEpisodeLine, filterEvents, groupByDay, groupReleaseEvents, relativeDay, timeLabel,
+  type CalendarFilter, type ReleaseEvent,
+} from "@/lib/upcoming-calendar";
 
-type Filter = 'all' | 'today' | 'week' | 'month' | 'premieres';
-const filters: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All Upcoming' }, { id: 'today', label: 'Today' },
-  { id: 'week', label: 'This Week' }, { id: 'month', label: 'This Month' },
-  { id: 'premieres', label: 'Season Premieres' },
-];
-const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-const localDateKey = (release: UpcomingRelease) => release.airTimestamp ? dateKey(new Date(release.airTimestamp)) : release.airDate;
-const isUpcoming = (release: UpcomingRelease, now: Date) => release.airTimestamp ? new Date(release.airTimestamp).getTime() > now.getTime() : release.airDate >= dateKey(now);
-const dateText = (release: UpcomingRelease) => release.airTimestamp
-  ? new Date(release.airTimestamp).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
-  : new Date(`${release.airDate}T12:00:00`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-const timeText = (release: UpcomingRelease) => release.airTimestamp
-  ? new Date(release.airTimestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  : null;
-const countText = (value: number, unit: string) => `${value} ${unit}${value === 1 ? '' : 's'}`;
-function countdown(release: UpcomingRelease, now: Date) {
-  if (!release.airTimestamp) {
-    const day = new Date(`${release.airDate}T12:00:00`);
-    const current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
-    const days = Math.round((day.getTime() - current.getTime()) / 86_400_000);
-    if (days <= 0) return 'Today';
-    if (days === 1) return 'Tomorrow';
-    if (days < 14) return countText(days, 'Day');
-    if (days < 60) return countText(Math.floor(days / 7), 'Week');
-    return countText(Math.floor(days / 30), 'Month');
-  }
-  const minutes = Math.max(1, Math.ceil((new Date(release.airTimestamp).getTime() - now.getTime()) / 60_000));
-  if (minutes < 60) return countText(minutes, 'Minute');
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return countText(hours, 'Hour');
-  const days = Math.floor(hours / 24);
-  if (days < 14) return countText(days, 'Day');
-  if (days < 60) return countText(Math.floor(days / 7), 'Week');
-  return countText(Math.floor(days / 30), 'Month');
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const emptyText: Record<CalendarFilter, string> = {
+  all: "No confirmed new episodes yet.", today: "Nothing new airs today.", week: "Nothing new this week.",
+  month: "Nothing new this month.", premieres: "No season premieres scheduled.",
+};
+
+function Poster({ url, className }: { url: string | null; className: string }) {
+  return url
+    ? <img src={posterSrc(url, "w154")} alt="" loading="lazy" decoding="async" className={`dash-poster ${className}`} />
+    : <span className={`dash-poster flex items-center justify-center text-muted-foreground ${className}`}><Tv className="size-4" /></span>;
 }
-function passesFilter(release: UpcomingRelease, filter: Filter, now: Date) {
-  if (filter === 'all') return true;
-  if (filter === 'premieres') return release.seasonPremiere;
-  const day = localDateKey(release);
-  if (filter === 'today') return day === dateKey(now);
-  if (filter === 'month') return day.slice(0, 7) === dateKey(now).slice(0, 7);
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
-  return day >= dateKey(start) && day < dateKey(end);
+
+function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const grouped = event.episodes.length > 1;
+  const single = event.episodes[0];
+  const time = timeLabel(event.timestamp);
+  const line = eventEpisodeLine(event);
+  return <article className="dash-card dash-row overflow-hidden">
+    <div className="flex min-w-0 items-stretch">
+      <button type="button" onClick={() => onOpen(event.showId)} aria-label={`Open ${event.showName}: ${line}${time ? `, ${time}` : ""}`} className="flex min-w-0 flex-1 items-center gap-3 p-2.5 text-left">
+        <Poster url={event.posterURL} className="h-[66px] w-11" />
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="line-clamp-2 break-words text-[0.9rem] font-semibold leading-snug">{event.showName}</span>
+          </span>
+          <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+            {event.premiere && <span className="release-tag whitespace-nowrap">Premiere</span>}
+            <span className="min-w-0 break-words">{line}</span>
+          </span>
+          {!grouped && single.name && !/^Episode \d+$/i.test(single.name) && <span className="mt-0.5 block truncate text-xs text-foreground/75">{single.name}</span>}
+          {grouped && <span className="mt-0.5 block text-xs text-foreground/75">{plural(event.episodes.length, "episode")}</span>}
+        </span>
+        <span className="shrink-0 self-start pt-0.5 text-right">
+          {time ? <span className="block text-xs font-semibold text-primary">{time}</span> : null}
+          {event.channel && <span className="mt-0.5 hidden max-w-[5.5rem] truncate text-[11px] text-muted-foreground min-[360px]:block">{event.channel}</span>}
+        </span>
+      </button>
+      {grouped && <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} the ${event.episodes.length} episodes of ${event.showName}`} className="flex w-11 shrink-0 items-center justify-center border-l border-border/60 text-muted-foreground hover:text-primary">
+        <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>}
+    </div>
+    {grouped && open && <ol className="border-t border-border/60 px-3 py-1.5 text-xs">
+      {event.episodes.map(episode => <li key={episode.id} className="flex min-h-8 items-center gap-2 py-1">
+        <span className="w-14 shrink-0 font-mono text-[11px] text-muted-foreground">{episodeCode(episode.season, episode.number)}</span>
+        <span className="min-w-0 flex-1 break-words">{episode.name || "Title not announced"}</span>
+        {episode.airTimestamp && episode.airTimestamp !== event.timestamp && <span className="shrink-0 text-muted-foreground">{timeLabel(episode.airTimestamp)}</span>}
+      </li>)}
+    </ol>}
+  </article>;
 }
 
 export default function UpcomingPage() {
-  const [releases, setReleases] = useState<UpcomingRelease[]>([]);
-  const [returningTba, setReturningTba] = useState<ReturningTba[]>([]);
+  const { schedule, building, loading, refreshing, error, refresh } = useUpcomingSchedule();
+  const now = useNow();
+  const [filter, setFilter] = useState<CalendarFilter>("all");
   const [shows, setShows] = useState<ShowType[]>([]);
-  const [tracking, setTracking] = useState<TrackingSummary[]>([]);
-  const [failedShows, setFailedShows] = useState(0);
-  const [tmdbFailureTypes, setTMDBFailureTypes] = useState<Record<string, number>>({});
-  const [showsWithoutTMDBId, setShowsWithoutTMDBId] = useState(0);
-  const [scheduleConflicts, setScheduleConflicts] = useState(0);
-  const [ambiguousSchedules, setAmbiguousSchedules] = useState(0);
-  const [coverage, setCoverage] = useState<{ evaluated: number; tmdbEntries: number; tvmazeEntries: number; unlinked: { tmdb: number; tvmaze: number; unmatched: number } | null }>({ evaluated: 0, tmdbEntries: 0, tvmazeEntries: 0, unlinked: null });
-  const [filter, setFilter] = useState<Filter>('all');
-  const [selectedShow, setSelectedShow] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [now, setNow] = useState(() => new Date());
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const data = await ShowService.getUpcomingReleases();
-      setReleases(data.releases);
-      setReturningTba(data.returningTba || []);
-      setFailedShows(data.failedShows);
-      setTMDBFailureTypes(data.tmdbFailureTypes || {});
-      setShowsWithoutTMDBId(data.showsWithoutTMDBId || 0);
-      setScheduleConflicts(data.scheduleConflicts || 0);
-      setAmbiguousSchedules(data.tvmazeAmbiguousShows || 0);
-      setCoverage({ evaluated: data.evaluatedShows || 0, tmdbEntries: data.scheduledTMDBEpisodes || 0, tvmazeEntries: data.scheduledTVMazeEpisodes || 0, unlinked: data.unlinkedScheduleMatches || null });
-      ShowService.getAllShows().then(setShows).catch(() => {});
-      ShowService.getLibraryTracking().then(setTracking).catch(() => setTracking([]));
-      setNow(new Date());
-      setError('');
-    } catch { setError('Upcoming releases could not be loaded. Please try again.'); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, []);
-  useEffect(() => { refresh(); }, [refresh]);
-  useEffect(() => {
-    const tick = window.setInterval(() => setNow(new Date()), 60_000);
-    const sync = window.setInterval(refresh, 16 * 60_000);
-    const onVisible = () => { if (document.visibilityState === 'visible') setNow(new Date()); };
-    const onTrackingUpdated = () => { ApiService.clearCache(); refresh(); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', refresh);
-    window.addEventListener('tracking-updated', onTrackingUpdated);
-    return () => { window.clearInterval(tick); window.clearInterval(sync); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', refresh); window.removeEventListener('tracking-updated', onTrackingUpdated); };
-  }, [refresh]);
-  const visible = useMemo(() => releases.filter(release => isUpcoming(release, now) && passesFilter(release, filter, now))
-    .sort((a, b) => (a.airTimestamp ? Date.parse(a.airTimestamp) : Date.parse(`${a.airDate}T00:00:00`)) - (b.airTimestamp ? Date.parse(b.airTimestamp) : Date.parse(`${b.airDate}T00:00:00`)) || a.showName.localeCompare(b.showName)), [releases, filter, now]);
-  const nextRelease = useMemo(() => releases.filter(release => isUpcoming(release, now))
-    .sort((a, b) => (a.airTimestamp ? Date.parse(a.airTimestamp) : Date.parse(`${a.airDate}T00:00:00`)) - (b.airTimestamp ? Date.parse(b.airTimestamp) : Date.parse(`${b.airDate}T00:00:00`)))[0], [releases, now]);
+  const [selectedShow, setSelectedShow] = useState("");
+  useEffect(() => { ShowService.getAllShows().then(setShows).catch(() => {}); }, []);
 
-  return <div className="mx-auto w-full max-w-6xl space-y-7 px-4 py-7 pb-24 md:px-8 md:py-10">
-    <header className="flex flex-col justify-between gap-5 rounded-2xl border border-primary/15 bg-card px-5 py-6 sm:flex-row sm:items-end sm:px-7">
-      <div className="max-w-2xl"><p className="cinema-eyebrow">Your tracked shows</p><h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Upcoming<span className="text-primary">.</span></h1><p className="mt-2 text-sm text-muted-foreground sm:text-base">Confirmed episode dates and returning shows from your library</p>
-        {nextRelease && <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/70 sm:text-sm"><span className="cinema-tag">Next to air</span><strong className="font-semibold text-white">{nextRelease.showName}</strong><span>· {countdown(nextRelease, now)}</span></p>}
+  const events = useMemo(() => groupReleaseEvents(schedule?.releases || [], now), [schedule, now]);
+  const visible = useMemo(() => filterEvents(events, filter, now), [events, filter, now]);
+  const days = useMemo(() => groupByDay(visible), [visible]);
+  const stats = calendarStats(events);
+  const counts = useMemo(() => Object.fromEntries(calendarFilters.map(f => [f.id, filterEvents(events, f.id, now).length])) as Record<CalendarFilter, number>, [events, now]);
+  const coverage = schedule?.coverage;
+  const updated = schedule ? new Date(schedule.generatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
+
+  return <div className="mx-auto w-full min-w-0 max-w-3xl px-4 pb-4 pt-3 md:px-8 md:pt-6">
+    <header className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight">Upcoming</h1>
+        <p className="text-xs text-muted-foreground">New episodes from your shows, by release date</p>
       </div>
-      <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => { ApiService.clearCache(); refresh(); }} disabled={refreshing}><RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh</Button>
+      <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={refresh} disabled={refreshing || loading} aria-label="Refresh schedule">
+        <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+      </Button>
     </header>
-    {tracking.some(item => item.newSeasonToWatch) && <section className="space-y-2 rounded-xl border border-primary/25 bg-card p-4" aria-label="New seasons to watch"><h2 className="font-semibold">New seasons to watch</h2><p className="text-xs text-muted-foreground">Released episodes from your Completed shows. Your personal statuses remain unchanged.</p>{tracking.filter(item => item.newSeasonToWatch).map(item => <button key={item.showId} type="button" onClick={() => setSelectedShow(item.showId)} className="block w-full rounded-lg border p-3 text-left text-sm"><span className="font-semibold">{item.name} · Season {item.newSeasonToWatch!.season}</span><span className="mt-1 block text-xs text-muted-foreground">{item.newSeasonToWatch!.episodes.map(e => `E${String(e.number).padStart(2, '0')} ${e.name}`).join(' · ')}</span><span className="mt-1 block text-xs text-primary">Review and resume Watching</span></button>)}</section>}
-    <nav aria-label="Upcoming filters" className="flex flex-wrap items-center gap-2">{filters.map(option => <button key={option.id} type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)} className="upcoming-filter px-3.5 py-2 text-xs font-semibold sm:text-sm">{option.label}</button>)}<span className="ml-auto text-xs text-muted-foreground">{loading ? 'Loading releases…' : error && !releases.length ? '' : `${visible.length} release${visible.length === 1 ? '' : 's'}`}</span></nav>
-    {error && <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">{error}</p>}
-    {!loading && (tmdbFailureTypes.http_401 || 0) > 0 && <p role="status" className="text-xs text-destructive">TMDB rejected authentication, so some schedules are missing. See Schedule coverage below.</p>}
-    {loading ? <div aria-label="Loading upcoming releases" className="space-y-3">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div> : visible.length ? <section aria-label="Scheduled upcoming episodes" className="space-y-3">
-      {visible.map((release, index) => <button key={`${release.showId}:${release.season ?? ''}:${release.number ?? ''}:${release.airDate}:${release.name}`} type="button" data-next={index === 0 ? 'true' : undefined} aria-label={`Open ${release.showName}${release.season && release.number ? `, season ${release.season} episode ${release.number}` : ''}, ${dateText(release)}, in ${countdown(release, now)}`} onClick={() => setSelectedShow(release.showId)} className="group flex min-h-28 w-full min-w-0 items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-3 text-left transition-colors hover:border-primary/35 hover:bg-card/80 sm:gap-5 sm:px-4">
-        {release.posterURL ? <img src={posterSrc(release.posterURL, "w185")} alt="" loading="lazy" className="cinema-poster h-20 w-14 shrink-0 rounded-lg object-cover sm:h-24 sm:w-16" /> : <span className="flex h-20 w-14 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground sm:h-24 sm:w-16"><Tv className="size-6" /></span>}
-        <span className="min-w-0 flex-1"><span className="line-clamp-2 break-words text-base font-semibold leading-snug group-hover:text-primary sm:text-lg">{release.showName}</span><span className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{release.season && release.number ? `${release.seasonPremiere ? `Season ${release.season} Premiere` : `S${String(release.season).padStart(2, '0')}E${String(release.number).padStart(2, '0')}`}${release.name ? ` · ${release.name}` : ''}` : release.name || 'Scheduled episode'}</span><span className="mt-1 block text-xs text-muted-foreground">{release.scheduleSource}{release.scheduleIdentity && release.scheduleIdentity !== 'linked' ? ' · matched by title' : ''}{release.scheduleConflict ? ' · Conflicting dates; TMDB date shown' : ''}</span></span>
-        <span className="shrink-0 text-right"><span className="block text-sm font-semibold text-primary">{countdown(release, now)}</span><span className="mt-1 block text-xs text-muted-foreground">{dateText(release)}{timeText(release) ? ` · ${timeText(release)}` : ''}</span></span>
+
+    {schedule && <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="Release statistics">
+      <span><strong className="font-semibold text-foreground">{stats.episodes}</strong> {stats.episodes === 1 ? "episode" : "episodes"}</span>
+      <span><strong className="font-semibold text-foreground">{stats.shows}</strong> {stats.shows === 1 ? "show" : "shows"}</span>
+      <span><strong className="font-semibold text-primary">{stats.premieres}</strong> {stats.premieres === 1 ? "premiere" : "premieres"}</span>
+      {updated && <span className="ml-auto">Updated {updated}</span>}
+    </p>}
+    {schedule?.stale && <p role="status" className="mt-2 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+      <AlertTriangle className="mt-px size-3.5 shrink-0" />TVMaze could not be reached for some shows; their last saved schedule is shown and may be out of date.
+    </p>}
+
+    <nav aria-label="Upcoming filters" className="filter-rail mt-3">
+      {calendarFilters.map(option => <button key={option.id} type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)} className="upcoming-filter min-h-10 shrink-0 whitespace-nowrap px-3.5 text-xs font-semibold">
+        {option.label}{schedule && <span className="ml-1.5 opacity-70">{counts[option.id]}</span>}
       </button>)}
-    </section> : error ? null : <div className="rounded-2xl border bg-card px-5 py-10 text-center"><CalendarDays className="mx-auto size-9 text-primary" /><h2 className="mt-3 text-lg font-semibold">No dated upcoming episodes yet.</h2><p className="mt-2 text-sm text-muted-foreground">A release appears here when a provider confirms a date for a show in your library.</p>{!returningTba.length && <Button asChild className="mt-5"><Link to="/shows">Go to TV show library</Link></Button>}</div>}
-    {!loading && returningTba.length > 0 && <section aria-label="Returning shows with no date" className="space-y-3"><div><h2 className="text-lg font-semibold">Returning — Date TBA</h2><p className="text-sm text-muted-foreground">These shows are returning or in production, but no episode date is confirmed.</p></div>{returningTba.map(show => <button type="button" key={show.showId} onClick={() => setSelectedShow(show.showId)} className="flex min-h-20 w-full items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-3 text-left sm:gap-4 sm:px-4">{show.posterURL ? <img src={posterSrc(show.posterURL, "w154")} alt="" loading="lazy" className="cinema-poster h-14 w-10 shrink-0 rounded-md object-cover" /> : <Tv className="size-8 shrink-0 text-muted-foreground" />}<span className="min-w-0 flex-1"><span className="line-clamp-2 break-words font-semibold">{show.showName}</span><span className="text-xs text-muted-foreground">{show.broadcastStatus}</span></span><span className="shrink-0 text-xs text-muted-foreground">Date TBA</span></button>)}</section>}
-    {!loading && !error && <details className="group rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-sm text-muted-foreground">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-medium text-foreground/80 [&::-webkit-details-marker]:hidden"><Info className="size-4 shrink-0 text-primary" />Schedule coverage<span className="ml-auto text-xs font-normal text-muted-foreground group-open:hidden">Show</span><span className="ml-auto hidden text-xs font-normal text-muted-foreground group-open:inline">Hide</span></summary>
-      <ul className="mt-2 space-y-1.5 text-xs leading-relaxed">
-        <li>{coverage.evaluated} show{coverage.evaluated === 1 ? '' : 's'} checked · {coverage.tmdbEntries} date{coverage.tmdbEntries === 1 ? '' : 's'} from TMDB · {coverage.tvmazeEntries} added from TVMaze.</li>
-        {showsWithoutTMDBId > 0 && <li>{showsWithoutTMDBId} show{showsWithoutTMDBId === 1 ? ' is' : 's are'} not linked to TMDB{coverage.unlinked ? `: ${coverage.unlinked.tmdb} matched on TMDB by title and description, ${coverage.unlinked.tvmaze} on TVMaze, ${coverage.unlinked.unmatched} not matched` : ''}. Title matches are used for schedules only and are never saved.</li>}
-        {failedShows > 0 && <li>Schedules could not be loaded for {failedShows} linked show{failedShows === 1 ? '' : 's'}{Object.keys(tmdbFailureTypes).length ? ` (${Object.entries(tmdbFailureTypes).map(([type, count]) => `${type.replace('http_', 'HTTP ')}: ${count}`).join(', ')})` : ''}.</li>}
-        {scheduleConflicts > 0 && <li>TMDB and TVMaze disagree on {scheduleConflicts} date{scheduleConflicts === 1 ? '' : 's'}; TMDB’s date is shown.</li>}
-        {ambiguousSchedules > 0 && <li>{ambiguousSchedules} TVMaze match{ambiguousSchedules === 1 ? ' was' : 'es were'} ambiguous and left out.</li>}
-      </ul>
-    </details>}
-    <ShowModal type="show" selectedShow={selectedShow} closeModal={() => setSelectedShow('')} shows={shows} setShows={setShows} />
+    </nav>
+
+    {error && <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm"><span>{error}</span><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></div>}
+
+    {loading && !schedule ? <div className="mt-4 space-y-2" aria-label="Loading upcoming releases" aria-busy="true">
+      {building && building.total > 0 && <div className="dash-card p-3 text-xs text-muted-foreground" role="status">
+        <p>Preparing your TVMaze schedule… {building.done} of {building.total} shows checked</p>
+        <div className="mini-progress mt-2"><span style={{ width: `${Math.round((building.done / building.total) * 100)}%` }} /></div>
+      </div>}
+      <Skeleton className="h-5 w-40 rounded-md" />
+      {[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-[86px] rounded-2xl" />)}
+    </div> : schedule && <>
+      {days.length ? <section aria-label="Scheduled new episodes" className="mt-2">
+        {days.map(({ day, events: dayEvents }) => <section key={day} aria-labelledby={`day-${day}`} className="release-day-group">
+          <h2 id={`day-${day}`} className="release-day flex items-baseline justify-between text-[11px] font-bold tracking-[0.12em] text-muted-foreground">
+            <span>{dayHeading(day)}</span>{relativeDay(day, now) && <span className="text-primary">{relativeDay(day, now)}</span>}
+          </h2>
+          <div className="space-y-2 pb-2">{dayEvents.map(event => <ReleaseCard key={event.key} event={event} onOpen={setSelectedShow} />)}</div>
+        </section>)}
+      </section> : !error && <div className="dash-card mt-4 px-4 py-6 text-center">
+        <CalendarDays className="mx-auto size-7 text-primary" />
+        <h2 className="mt-2 text-sm font-semibold">{emptyText[filter]}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{filter === "all" ? "Episodes appear here once TVMaze confirms a date for a show in your library." : "Try another filter."}</p>
+        {filter === "all" && !schedule.coverage.evaluatedShows && <Button asChild size="sm" className="mt-3"><Link to="/shows">Add shows</Link></Button>}
+      </div>}
+
+      {schedule.returningTba.length > 0 && <details className="dash-card group mt-4 px-3 py-1">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          Returning — Date TBA<span className="text-xs font-normal text-muted-foreground">{schedule.returningTba.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <p className="pb-2 text-xs text-muted-foreground">TVMaze lists these shows as continuing, but no new episode has a confirmed date.</p>
+        <ul className="space-y-1 pb-2">{schedule.returningTba.map(show => <li key={show.showId}><button type="button" onClick={() => setSelectedShow(show.showId)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-1 py-1 text-left hover:bg-muted/40">
+          <Poster url={show.posterURL} className="h-12 w-8" />
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{show.showName}</span><span className="block text-xs text-muted-foreground">{show.announcedEpisodes ? `${plural(show.announcedEpisodes, "episode")} announced, no date` : show.tvmazeStatus === "Running" ? "Between seasons" : show.tvmazeStatus}</span></span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">Date TBA</span>
+        </button></li>)}</ul>
+      </details>}
+
+      {schedule.needsReview.length > 0 && <details className="dash-card group mt-3 px-3 py-1">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <AlertTriangle className="size-4 text-amber-400" />Schedule match needs review<span className="text-xs font-normal text-muted-foreground">{schedule.needsReview.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <p className="pb-2 text-xs text-muted-foreground">These shows could not be matched to TVMaze with certainty, so no dates are shown for them. Nothing was changed.</p>
+        <ul className="space-y-1 pb-2">{schedule.needsReview.map(item => <li key={item.showId}><button type="button" onClick={() => setSelectedShow(item.showId)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-1 py-1 text-left hover:bg-muted/40">
+          <Poster url={item.posterURL} className="h-12 w-8" />
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.showName}</span><span className="block text-xs leading-snug text-muted-foreground">{item.detail}</span></span>
+        </button></li>)}</ul>
+      </details>}
+
+      {coverage && <details className="group mt-3 rounded-xl px-3 text-xs text-muted-foreground">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden"><Info className="size-3.5 text-primary" />Schedule source: TVMaze<ChevronDown className="ml-auto size-4 transition-transform group-open:rotate-180" /></summary>
+        <ul className="space-y-1 pb-3 leading-relaxed">
+          <li>{plural(coverage.evaluatedShows, "show")} checked · {coverage.verifiedShows} matched on TVMaze ({coverage.verifiedByExternalId} by TheTVDB/IMDb ID{coverage.verifiedByTitle ? `, ${coverage.verifiedByTitle} by title, premiere and synopsis` : ""}).</li>
+          {coverage.unresolvedShows > 0 && <li>{coverage.unresolvedShows} not matched with certainty (listed above).</li>}
+          {coverage.unavailableShows > 0 && <li>{coverage.unavailableShows} could not be checked right now.</li>}
+          <li>Only first-run episodes are listed: {coverage.excludedEpisodes.repeats} repeat{coverage.excludedEpisodes.repeats === 1 ? "" : "s"}, {coverage.excludedEpisodes.duplicates} duplicate{coverage.excludedEpisodes.duplicates === 1 ? "" : "s"} and {coverage.excludedEpisodes.specials} special{coverage.excludedEpisodes.specials === 1 ? "" : "s"} left out.</li>
+          <li>Times are shown in your time zone when TVMaze confirms them; otherwise only the date is shown.</li>
+        </ul>
+      </details>}
+    </>}
+    <ShowModal type="show" selectedShow={selectedShow} closeModal={() => setSelectedShow("")} shows={shows} setShows={setShows} />
   </div>;
 }

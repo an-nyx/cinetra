@@ -1,61 +1,70 @@
-export type ScheduleSource = 'TMDB' | 'TVMaze';
-/** How the show's schedule identity was established: stored TMDB link, a corroborated schedule-only TMDB match, or the library title (TVMaze). */
-export type ScheduleIdentity = 'linked' | 'schedule_match' | 'library_title';
-export type UpcomingItem = {
-  showId: string; showName: string; posterURL: string | null; showStatus: string | null;
-  season: number | null; number: number | null; name: string; airDate: string; airTimestamp: string | null;
-  seasonPremiere: boolean; scheduleSource: ScheduleSource; scheduleConflict: boolean; scheduleIdentity?: ScheduleIdentity;
-};
-
-export function upcomingItemKey(item: UpcomingItem) {
-  return item.season && item.number
-    ? `${item.showId}:${item.season}:${item.number}`
-    : `${item.showId}:${item.airDate}:${item.name.trim().toLocaleLowerCase()}`;
-}
-
-export function mergeUpcomingItems(items: UpcomingItem[]) {
-  const merged = new Map<string, UpcomingItem>();
-  for (const item of items) {
-    const key = upcomingItemKey(item);
-    const title = item.name.trim().toLocaleLowerCase();
-    let currentKey = key;
-    let current = merged.get(key);
-    if (!current && title) {
-      const sameTitleAndDate = [...merged.entries()].find(([, existing]) =>
-        existing.showId === item.showId && existing.airDate === item.airDate && existing.name.trim().toLocaleLowerCase() === title,
-      );
-      if (sameTitleAndDate) [currentKey, current] = sameTitleAndDate;
-    }
-    if (!current) { merged.set(key, item); continue; }
-    if (currentKey === key && current.airDate !== item.airDate) {
-      const preferred = current.scheduleSource === 'TMDB' ? current : item.scheduleSource === 'TMDB' ? item : current;
-      merged.set(key, { ...preferred, scheduleConflict: true });
-      continue;
-    }
-    if (current.scheduleSource !== 'TMDB' && item.scheduleSource === 'TMDB') {
-      merged.delete(currentKey);
-      merged.set(key, item);
-    }
-  }
-  return [...merged.values()];
-}
-
-export function isReturningWithoutDate(broadcastStatus: string | null | undefined, hasDatedRelease: boolean) {
-  return !hasDatedRelease && ['Returning Series', 'In Production', 'Planned'].includes(broadcastStatus || '');
-}
-
-export type TVMazeNeedInput = {
-  tmdbResponded: boolean; tmdbFailed: boolean; tmdbSeasonFailures: number; scheduleMetadataIncomplete: boolean;
-  tmdbReleaseCount: number; broadcastStatus: string | null | undefined; inProduction: boolean | null | undefined; nextEpisodeAnnounced: boolean;
-};
-
 /**
- * TVMaze is a schedule-only supplement. Query it only when TMDB could not provide a usable schedule, and never for a
- * series TMDB definitively reports as over (Ended/Canceled, not in production, nothing announced, nothing dated ahead).
+ * Upcoming assembly (pure). Every dated release comes from TVMaze; TMDB dates are never merged in or used as a
+ * fallback. A show whose TVMaze identity cannot be verified is listed for review and contributes nothing.
  */
-export function needsTVMazeSupplement(input: TVMazeNeedInput) {
-  const definitivelyOver = input.tmdbResponded && ['Ended', 'Canceled'].includes(input.broadcastStatus || '')
-    && input.inProduction === false && !input.nextEpisodeAnnounced && input.tmdbReleaseCount === 0;
-  if (definitivelyOver) return false;
-  return input.tmdbFailed || input.tmdbSeasonFailures > 0 || input.scheduleMetadataIncomplete || input.tmdbReleaseCount < 2;
+import { channelOf, IDENTITY_FAILURE_TEXT, isReturningWithoutDate, type EpisodeExclusions, type IdentityFailure, type IdentityMethod, type ScheduledEpisode, type TVMazeShow } from './tvmaze/tvmaze-schedule.model';
+
+export type LibraryShow = { id: string; name: string; posterURL: string | null; status: string | null };
+export type UpcomingRelease = ScheduledEpisode & {
+  /** Stable key: TVMaze show ID + TVMaze episode ID. */
+  id: string; tvmazeShowId: number;
+  showId: string; showName: string; posterURL: string | null; showStatus: string | null;
+  channel: string | null; streaming: boolean; scheduleSource: 'TVMaze';
+};
+export type ShowOutcome =
+  | { kind: 'scheduled'; show: LibraryShow; tvmaze: Pick<TVMazeShow, 'id' | 'name' | 'status' | 'network' | 'webChannel'>; method: IdentityMethod; tmdbBasis: 'linked' | 'schedule_match'; episodes: ScheduledEpisode[]; excluded: EpisodeExclusions; stale: boolean }
+  | { kind: 'review'; show: LibraryShow; reason: IdentityFailure }
+  | { kind: 'unavailable'; show: LibraryShow; provider: 'TMDB' | 'TVMaze' };
+
+// TVMaze's own (network-local) date first, then the confirmed instant; date-only entries lead their day. Pages re-sort in local time.
+const byRelease = (a: UpcomingRelease, b: UpcomingRelease) => a.airDate.localeCompare(b.airDate) || (a.airTimestamp ? Date.parse(a.airTimestamp) : 0) - (b.airTimestamp ? Date.parse(b.airTimestamp) : 0);
+
+export function assembleUpcoming(input: ShowOutcome[], generatedAt: string) {
+  // Two library entries that resolve to one TVMaze series cannot both be right: neither is trusted.
+  const byTVMaze = new Map<number, number>();
+  for (const outcome of input) if (outcome.kind === 'scheduled') byTVMaze.set(outcome.tvmaze.id, (byTVMaze.get(outcome.tvmaze.id) || 0) + 1);
+  const outcomes: ShowOutcome[] = input.map(outcome => outcome.kind === 'scheduled' && byTVMaze.get(outcome.tvmaze.id)! > 1
+    ? { kind: 'review', show: outcome.show, reason: 'shared_tvmaze_identity' } : outcome);
+
+  const releases = new Map<string, UpcomingRelease>();
+  const returningTba: { showId: string; showName: string; posterURL: string | null; showStatus: string | null; tvmazeStatus: string; announcedEpisodes: number }[] = [];
+  const excluded: EpisodeExclusions = { specials: 0, past: 0, undated: 0, duplicates: 0, repeats: 0 };
+  for (const outcome of outcomes) {
+    if (outcome.kind !== 'scheduled') continue;
+    for (const key of Object.keys(excluded) as (keyof EpisodeExclusions)[]) excluded[key] += outcome.excluded[key];
+    const { channel, streaming } = channelOf(outcome.tvmaze);
+    for (const episode of outcome.episodes) {
+      const id = `${outcome.tvmaze.id}:${episode.episodeId}`;
+      if (releases.has(id)) { excluded.duplicates++; continue; }
+      releases.set(id, {
+        ...episode, id, tvmazeShowId: outcome.tvmaze.id, showId: outcome.show.id, showName: outcome.show.name,
+        posterURL: outcome.show.posterURL, showStatus: outcome.show.status, channel, streaming, scheduleSource: 'TVMaze',
+      });
+    }
+    if (isReturningWithoutDate(outcome.tvmaze.status, outcome.episodes.length)) returningTba.push({
+      showId: outcome.show.id, showName: outcome.show.name, posterURL: outcome.show.posterURL, showStatus: outcome.show.status,
+      tvmazeStatus: outcome.tvmaze.status!, announcedEpisodes: outcome.excluded.undated,
+    });
+  }
+  const scheduled = outcomes.filter((o): o is Extract<ShowOutcome, { kind: 'scheduled' }> => o.kind === 'scheduled');
+  const review = outcomes.filter((o): o is Extract<ShowOutcome, { kind: 'review' }> => o.kind === 'review');
+  const unavailable = outcomes.filter((o): o is Extract<ShowOutcome, { kind: 'unavailable' }> => o.kind === 'unavailable');
+  const staleShows = scheduled.filter(o => o.stale).length;
+  return {
+    status: 'ready' as const, source: 'TVMaze' as const, generatedAt, stale: staleShows > 0 || unavailable.some(o => o.provider === 'TVMaze'),
+    releases: [...releases.values()].sort((a, b) => byRelease(a, b) || a.showName.localeCompare(b.showName) || a.season - b.season || a.number - b.number),
+    returningTba: returningTba.sort((a, b) => a.showName.localeCompare(b.showName)),
+    needsReview: review.map(o => ({ showId: o.show.id, showName: o.show.name, posterURL: o.show.posterURL, reason: o.reason, detail: IDENTITY_FAILURE_TEXT[o.reason] }))
+      .sort((a, b) => a.showName.localeCompare(b.showName)),
+    unavailable: unavailable.map(o => ({ showId: o.show.id, showName: o.show.name, provider: o.provider })),
+    coverage: {
+      evaluatedShows: outcomes.length, verifiedShows: scheduled.length,
+      verifiedByExternalId: scheduled.filter(o => o.method === 'external_id').length,
+      verifiedByTitle: scheduled.filter(o => o.method === 'title_corroborated').length,
+      viaScheduleOnlyTMDBMatch: scheduled.filter(o => o.tmdbBasis === 'schedule_match').length,
+      scheduledShows: new Set([...releases.values()].map(r => r.showId)).size,
+      unresolvedShows: review.length, unavailableShows: unavailable.length, staleShows, excludedEpisodes: excluded,
+    },
+  };
 }
+export type UpcomingResponse = ReturnType<typeof assembleUpcoming>;

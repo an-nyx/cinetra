@@ -184,7 +184,7 @@ export async function runAudit(options: { get: Get; tmdb: TMDBApiService | null;
       show, summary: summaries.find(s => s.showId === show.id) || null,
       detail: detail.ok ? detail.data : null, detailError: detail.ok ? null : detail.error,
       guides: guide.guides, guideError: guide.error, facts: oracle.facts, factsError: tmdb && show.tmdbId ? oracle.error : null,
-      upcoming: upcomingResponse.ok ? upcomingResponse.data.releases.filter(r => r.showId === show.id) : [], today,
+      upcoming: upcomingResponse.ok ? (upcomingResponse.data.releases || []).filter(r => r.showId === show.id) : [], today,
     });
     audit.issues.push(...(upcoming?.perShow[show.id] || []));
     return audit;

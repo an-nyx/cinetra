@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { AxiosError } from 'axios';
 import { chooseScheduleOnlyTMDBMatch, descriptionSimilarity } from '../src/services/schedule-identity';
 import { buildTrackingSummary, type Catalog } from '../src/services/tracking-summary.model';
-import { tvmazeMayHaveUpcoming, verifyTVMazeIdentity } from '../src/services/tvmaze/upcoming-schedule.service';
 
 const today = '2026-11-09';
 const overview = 'Two detectives investigate a series of disappearances in a remote coastal town where everyone hides a secret.';
@@ -20,23 +19,6 @@ const overview = 'Two detectives investigate a series of disappearances in a rem
   assert.deepEqual(chooseScheduleOnlyTMDBMatch(library, [candidate, { ...candidate, id: 12, first_air_date: '1998-01-01' }], new Set()), { tmdbId: null, reason: 'ambiguous' }); // remake with same synopsis
   assert.deepEqual(chooseScheduleOnlyTMDBMatch(library, [candidate], new Set([11])), { tmdbId: null, reason: 'already_linked' });
   assert.ok(descriptionSimilarity(overview, overview) === 1 && descriptionSimilarity(overview, '') === 0);
-}
-
-// TVMaze identity without TMDB corroboration needs the same strong description agreement as a TMDB schedule match.
-{
-  const candidate = { id: 5, name: 'Harbor Lights', premiered: '2024-03-01', summary: overview };
-  assert.equal(verifyTVMazeIdentity({ libraryName: 'Harbor Lights', libraryOverview: overview }, candidate).verified, true);
-  const loose = 'Two detectives investigate disappearances in a quiet town during one long winter season.';
-  assert.equal(verifyTVMazeIdentity({ libraryName: 'Harbor Lights', libraryOverview: loose }, candidate).verified, false); // ~0.4 overlap: rejected
-  assert.equal(verifyTVMazeIdentity({ libraryName: 'Harbor Lights', libraryOverview: loose, tmdbName: 'Harbor Lights', firstAirDate: '2024-03-01', tmdbOverview: overview }, candidate).verified, true); // TMDB-corroborated
-}
-
-// TVMaze: a matched show that has ended with nothing announced needs no episode download.
-{
-  assert.equal(tvmazeMayHaveUpcoming({ status: 'Ended' }), false);
-  assert.equal(tvmazeMayHaveUpcoming({ status: 'Ended', _links: { nextepisode: { href: 'x' } } }), true);
-  assert.equal(tvmazeMayHaveUpcoming({ status: 'Running' }), true);
-  assert.equal(tvmazeMayHaveUpcoming({ status: 'To Be Determined' }), true);
 }
 
 // Every unavailable percentage carries a specific, non-invented reason; available ones carry none.

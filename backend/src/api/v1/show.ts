@@ -36,7 +36,7 @@ router.get("/tracking", async (req: Request, res: Response) => {
 
 
 router.get("/upcoming", async (req: Request, res: Response) => {
-  try { res.json(await getUpcomingReleases(req.user.id)); }
+  try { res.json(await getUpcomingReleases(req.user.id, { refresh: req.query.refresh === '1' })); }
   catch (error) { guideError(res, error); }
 });
 

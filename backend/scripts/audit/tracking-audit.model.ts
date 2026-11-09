@@ -24,18 +24,17 @@ export const ISSUE_CATEGORY: Record<string, IssueCategory> = {
   next_episode_mismatch: 'defect', checkmark_mismatch: 'defect', watch_source_mismatch: 'defect', checkmarks_disagree_with_count: 'defect',
   details_differ_from_list: 'defect', details_unavailable: 'defect', summary_missing: 'defect', summary_error: 'defect',
   card_hides_next_episode: 'defect', card_hides_saved_position: 'defect', review_case_not_surfaced: 'defect', continue_watching_without_next: 'defect', home_upcoming_differs: 'defect',
-  unlinked_shows_counted_as_tmdb_failures: 'defect', tvmaze_queried_for_final_series: 'defect',
-  percent_unavailable_without_reason: 'defect', percent_reason_mismatch: 'defect', unlinked_schedule_match: 'informational',
-  upcoming_missing_tmdb_episode: 'defect', tvmaze_replaced_tmdb: 'defect', upcoming_without_tmdb_identity: 'defect', returning_show_missing: 'defect', upcoming_unknown_show: 'defect',
+  percent_unavailable_without_reason: 'defect', percent_reason_mismatch: 'defect', 
+  upcoming_non_tvmaze_source: 'defect', upcoming_duplicate_episode: 'defect', upcoming_unnumbered_episode: 'defect', upcoming_past_episode: 'defect', upcoming_unverified_identity: 'defect', upcoming_unknown_show: 'defect', upcoming_building: 'informational',
+  tvmaze_identity_review: 'informational', tmdb_returning_without_tvmaze_schedule: 'informational',
   library_summary_count: 'defect', home_totals_hidden: 'defect', caught_up_continue_watching_split: 'defect', library_tracking_failed: 'defect', upcoming_failed: 'defect', home_totals_partial: 'informational',
   no_tmdb_id: 'insufficient_metadata', tmdb_unavailable: 'insufficient_metadata', production_metadata_error: 'insufficient_metadata', episode_guide_unavailable: 'insufficient_metadata',
   no_regular_episodes: 'insufficient_metadata', season_count_mismatch: 'insufficient_metadata', undated_before_released: 'insufficient_metadata',
-  upcoming_date_differs_from_tmdb: 'insufficient_metadata', upcoming_for_final_series: 'insufficient_metadata', schedule_conflict: 'insufficient_metadata',
   position_invalid: 'saved_data_conflict', position_season_zero: 'saved_data_conflict', position_earlier_season_missing: 'saved_data_conflict',
   position_season_missing: 'saved_data_conflict', position_exceeds_season: 'saved_data_conflict', position_covers_unaired: 'saved_data_conflict',
   explicit_records_not_in_catalog: 'saved_data_conflict', completed_flags_disagree: 'saved_data_conflict',
   undated_future_episodes: 'informational', future_season_count_mismatch: 'informational', episode_numbering_gap: 'informational',
-  position_covers_undated: 'saved_data_conflict', explicit_records_unaired: 'informational', manual_completed_not_verified: 'informational', tvmaze_supplement: 'informational',
+  position_covers_undated: 'saved_data_conflict', explicit_records_unaired: 'informational', manual_completed_not_verified: 'informational',
 };
 export const categoryOf = (code: string): IssueCategory | 'uncategorized' => ISSUE_CATEGORY[code] || 'uncategorized';
 
@@ -62,8 +61,8 @@ export type Summary = {
   metadataError?: string | null; statusProgressNote?: string | null;
   nextEpisode?: EpisodeRef | null; upcomingEpisode?: EpisodeRef | null; newEpisodes?: number; error?: string | null;
 };
-export type UpcomingRelease = { showId: string; season: number | null; number: number | null; name: string; airDate: string; scheduleSource: 'TMDB' | 'TVMaze'; scheduleConflict?: boolean; scheduleIdentity?: 'linked' | 'schedule_match' | 'library_title' };
-export type UpcomingResponse = { releases: UpcomingRelease[]; returningTba: { showId: string; broadcastStatus: string }[]; [diagnostic: string]: unknown };
+export type UpcomingRelease = { id?: string; showId: string; season: number | null; number: number | null; name: string; airDate: string; scheduleSource: 'TMDB' | 'TVMaze' };
+export type UpcomingResponse = { releases: UpcomingRelease[]; returningTba: { showId: string }[]; needsReview?: { showId: string; reason: string }[]; unavailable?: { showId: string }[]; [diagnostic: string]: unknown };
 
 const pad = (value: number) => String(value).padStart(2, '0');
 export const episodeCode = (season: number, episode: number) => `S${pad(season)}E${pad(episode)}`;
@@ -367,7 +366,7 @@ export function auditShow(input: ShowAuditInput) {
     if (summary.legacyPosition && !card.includes(savedCode(summary)!)) add('card_hides_saved_position', 'warning', `Shows card says "${card}" and omits the saved position ${savedCode(summary)}.`);
     if (expected?.legacy.blocking && !expected.explicitCoversAll && !attentionReason(summary)) add('review_case_not_surfaced', 'warning', `The saved position needs review (${expected.legacy.issues.filter(i => i.severity !== 'info').map(i => i.code).join(', ')}) but no page surfaces it for review.`);
     if (continueWatching && !summary.nextEpisode) add('continue_watching_without_next', 'warning', `Listed in Continue watching as "${continueWatchingLabel(summary)}" with no episode to continue.`);
-    // Home's "Upcoming episodes" renders GET /show/upcoming itself (pages/welcome-page.tsx), so it cannot diverge from the Upcoming page.
+    // Home's "Coming soon" renders GET /show/upcoming through the same grouping as the Upcoming page (lib/upcoming-calendar.ts), so they cannot diverge.
   }
 
   return {
@@ -384,59 +383,41 @@ export function auditShow(input: ShowAuditInput) {
 }
 export type ShowAudit = ReturnType<typeof auditShow>;
 
-/** Upcoming: TMDB is primary; TVMaze may only add schedule entries TMDB cannot provide. */
-export function auditUpcoming(shows: RawShow[], response: UpcomingResponse, factsById: Map<string, TMDBFacts | null>, today: string) {
+/** Upcoming: TVMaze is the only schedule source. Every entry needs a verified identity and a unique, future, regular episode. */
+export function auditUpcoming(shows: RawShow[], raw: UpcomingResponse, factsById: Map<string, TMDBFacts | null>, today: string) {
+  const response = { ...raw, releases: raw.releases || [], returningTba: raw.returningTba || [] }; // a "building" answer has neither yet
   const byShow = new Map<string, UpcomingRelease[]>();
   for (const release of response.releases) byShow.set(release.showId, [...(byShow.get(release.showId) || []), release]);
   const tba = new Set(response.returningTba.map(item => item.showId));
+  const review = new Map((response.needsReview || []).map(item => [item.showId, item]));
+  const unavailable = new Set((response.unavailable || []).map(item => item.showId));
   const known = new Set(shows.map(show => show.id));
   const perShow: Record<string, Issue[]> = {};
   const add = (showId: string, code: string, severity: Severity, detail: string) => (perShow[showId] ||= []).push({ code, severity, detail });
-  for (const release of response.releases) if (!known.has(release.showId)) add(release.showId, 'upcoming_unknown_show', 'error', 'Upcoming lists a show that is not in the library.');
-
-  const coverage = { tmdbOnly: 0, tvmazeOnly: 0, both: 0, none: 0, noTmdbId: 0 };
+  // Pages may still show an entry for the rest of its day in the earliest time zone.
+  const earliest = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const seen = new Set<string>();
+  for (const release of response.releases) {
+    if (!known.has(release.showId)) add(release.showId, 'upcoming_unknown_show', 'error', 'Upcoming lists a show that is not in the library.');
+    if (release.scheduleSource !== 'TVMaze') add(release.showId, 'upcoming_non_tvmaze_source', 'error', `Upcoming lists a ${release.scheduleSource} date; TVMaze is the only schedule source.`);
+    const key = release.id || `${release.showId}:${release.season}:${release.number}`;
+    if (seen.has(key)) add(release.showId, 'upcoming_duplicate_episode', 'error', `Episode ${release.season && release.number ? episodeCode(release.season, release.number) : `"${release.name}"`} is listed more than once.`);
+    seen.add(key);
+    if (!release.season || !release.number) add(release.showId, 'upcoming_unnumbered_episode', 'error', `"${release.name}" has no season/episode number (special or unverified entry).`);
+    if (release.airDate < earliest) add(release.showId, 'upcoming_past_episode', 'error', `${release.airDate} has already premiered.`);
+  }
+  const coverage = { scheduled: 0, returningTba: 0, needsReview: 0, unavailable: 0, none: 0 };
   for (const show of shows) {
     const releases = byShow.get(show.id) || [];
-    const tmdbReleases = releases.filter(r => r.scheduleSource === 'TMDB');
-    const tvmaze = releases.filter(r => r.scheduleSource === 'TVMaze');
-    coverage[!show.tmdbId ? 'noTmdbId' : tmdbReleases.length && tvmaze.length ? 'both' : tmdbReleases.length ? 'tmdbOnly' : tvmaze.length ? 'tvmazeOnly' : 'none']++;
-    if (!show.tmdbId) {
-      const undeclared = releases.filter(r => r.scheduleIdentity !== 'schedule_match' && r.scheduleIdentity !== 'library_title');
-      if (undeclared.length) add(show.id, 'upcoming_without_tmdb_identity', 'error', 'Schedule entries exist for a show without a TMDB association and without a declared schedule identity.');
-      else if (releases.length) add(show.id, 'unlinked_schedule_match', 'info', `${releases.length} schedule entr${releases.length === 1 ? 'y' : 'ies'} from a title-and-description match (${[...new Set(releases.map(r => `${r.scheduleSource}/${r.scheduleIdentity}`))].join(', ')}); not stored, not used for tracking.`);
-      continue;
-    }
-    const facts = factsById.get(show.id);
-    if (!facts) continue;
-    const expected = facts.episodes.filter(e => isRegular(e) && !!e.airDate && e.airDate >= today);
-    if (facts.nextEpisode && facts.nextEpisode.airDate && facts.nextEpisode.airDate >= today && !expected.some(e => e.season === facts.nextEpisode!.season && e.number === facts.nextEpisode!.number)) expected.push({ ...facts.nextEpisode });
-    const listed = new Map(tmdbReleases.filter(r => r.season && r.number).map(r => [keyOf(r.season!, r.number!), r]));
-    const missing = expected.filter(e => !listed.has(keyOf(e.season, e.number)) && !releases.some(r => r.season === e.season && r.number === e.number));
-    if (missing.length) add(show.id, 'upcoming_missing_tmdb_episode', 'error', `TMDB dates these episodes, but Upcoming omits them: ${missing.slice(0, 8).map(e => `${episodeCode(e.season, e.number)} ${e.airDate}`).join(', ')}.`);
-    for (const e of expected) {
-      const r = listed.get(keyOf(e.season, e.number));
-      if (r && r.airDate !== e.airDate) add(show.id, 'upcoming_date_differs_from_tmdb', 'warning', `${episodeCode(e.season, e.number)}: Upcoming ${r.airDate}, TMDB now ${e.airDate} (cache or conflict).`);
-    }
-    const tvmazeOverTmdb = tvmaze.filter(r => r.season && r.number && expected.some(e => e.season === r.season && e.number === r.number));
-    if (tvmazeOverTmdb.length) add(show.id, 'tvmaze_replaced_tmdb', 'error', `TVMaze supplied dates TMDB already provides: ${tvmazeOverTmdb.map(r => episodeCode(r.season!, r.number!)).join(', ')}.`);
-    if (tvmaze.length) add(show.id, 'tvmaze_supplement', 'info', `TVMaze added ${tvmaze.length} schedule entr${tvmaze.length === 1 ? 'y' : 'ies'} (${tvmaze.filter(r => !r.season).length} unmapped to TMDB numbering); TMDB dated ${expected.length}.`);
-    if (FINAL_STATUSES.includes(facts.status || '') && releases.length) add(show.id, 'upcoming_for_final_series', 'warning', `TMDB status is "${facts.status}", yet Upcoming lists ${releases.length} entr${releases.length === 1 ? 'y' : 'ies'}.`);
-    if (CONTINUING_STATUSES.includes(facts.status || '') && !releases.length && !tba.has(show.id)) add(show.id, 'returning_show_missing', 'error', `TMDB status "${facts.status}", no dated entry, and not listed as returning without a date.`);
-    for (const r of releases.filter(r => r.scheduleConflict)) add(show.id, 'schedule_conflict', 'warning', `${r.season && r.number ? episodeCode(r.season, r.number) : `"${r.name}"`}: TMDB and TVMaze disagree on the date.`);
+    const flagged = review.get(show.id);
+    coverage[releases.length ? 'scheduled' : tba.has(show.id) ? 'returningTba' : flagged ? 'needsReview' : unavailable.has(show.id) ? 'unavailable' : 'none']++;
+    if (flagged && (releases.length || tba.has(show.id))) add(show.id, 'upcoming_unverified_identity', 'error', 'Schedule entries are listed although the TVMaze identity needs review.');
+    if (flagged) add(show.id, 'tvmaze_identity_review', 'info', `TVMaze identity not verified (${flagged.reason}); no schedule shown.`);
+    const facts = show.tmdbId ? factsById.get(show.id) : null;
+    if (facts && CONTINUING_STATUSES.includes(facts.status || '') && !releases.length && !tba.has(show.id) && !flagged) add(show.id, 'tmdb_returning_without_tvmaze_schedule', 'info', `TMDB status "${facts.status}", but TVMaze lists no upcoming or returning schedule.`);
   }
   const library: Issue[] = [];
-  const failureTypes = (response.tmdbFailureTypes || {}) as Record<string, number>;
-  const unlinked = shows.filter(show => !show.tmdbId).length;
-  if (unlinked && (failureTypes.catalog_404 || 0) > 0) library.push({ code: 'unlinked_shows_counted_as_tmdb_failures', severity: 'warning', detail: `Upcoming reports ${failureTypes.catalog_404} "catalog_404" TMDB failure(s) for ${unlinked} show(s) that have no TMDB association; these are not provider failures.` });
-  const definitivelyOver = shows.filter(show => {
-    const facts = show.tmdbId ? factsById.get(show.id) : null;
-    return !!facts && FINAL_STATUSES.includes(facts.status || '') && facts.inProduction === false && !facts.nextEpisodeAnnounced && !facts.episodes.some(e => isRegular(e) && !!e.airDate && e.airDate >= today);
-  }).length;
-  const linked = shows.filter(show => show.tmdbId).length;
-  const queried = typeof response.tvmazeQueriedShows === 'number' ? response.tvmazeQueriedShows as number
-    : ((response.tvmazeVerifiedShows as number) || 0) + ((response.tvmazeAmbiguousShows as number) || 0); // older API: lower bound
-  const allowed = linked - definitivelyOver + unlinked;
-  if (queried > allowed) library.push({ code: 'tvmaze_queried_for_final_series', severity: 'warning', detail: `TVMaze was queried for ${queried} show(s), but at most ${allowed} may need it (linked shows not definitively over, plus unlinked shows); at least ${queried - allowed} lookup(s) were for ended/canceled series with nothing scheduled.` });
+  if ((response as { status?: string }).status === 'building') library.push({ code: 'upcoming_building', severity: 'warning', detail: 'The schedule was still being built when the audit ran.' });
   return { perShow, coverage, library, releases: response.releases.length, returningWithoutDate: response.returningTba.length };
 }
 

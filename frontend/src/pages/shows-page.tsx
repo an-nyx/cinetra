@@ -36,7 +36,10 @@ export default function ShowsPage() {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [filters, setFilters] = useState<ListFiltersType>(() => {
     const savedSort = localStorage.getItem('showsSortBy');
-    return savedSort ? { sortBy: savedSort as ListFiltersType['sortBy'] } : {};
+    // Home's "See all" links open the library filtered by a personal status (e.g. /shows?status=watching).
+    const linkedStatus = new URLSearchParams(window.location.search).get('status') as PersonalStatus | null;
+    const statusFilter = linkedStatus && linkedStatus in personalStatusLabels ? linkedStatus : undefined;
+    return { ...(savedSort ? { sortBy: savedSort as ListFiltersType['sortBy'] } : {}), ...(statusFilter ? { statusFilter } : {}) };
   });
   const navigate = useNavigate();
   const [key, setKey] = useState(+new Date());

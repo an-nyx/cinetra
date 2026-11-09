@@ -248,3 +248,30 @@ h1, h2, h3 { letter-spacing: -0.035em; }
     width: min(100%, calc(var(--poster-h) / 1.07));
   }
 }
+
+/* Compact Home dashboard and Upcoming calendar (phone-first). */
+.dash-card { border: 1px solid var(--border); border-radius: 1rem; background: var(--card); }
+.dark .dash-card { background: linear-gradient(145deg, oklch(0.235 0.024 205 / 82%), oklch(0.18 0.018 215 / 94%)); }
+.dash-row { transition: border-color 200ms ease, background-color 200ms ease; }
+.dash-row:hover { border-color: oklch(0.78 0.14 165 / 32%); }
+.dash-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 2.25rem; }
+.dash-heading h2 { font-size: 0.95rem; font-weight: 650; letter-spacing: -0.01em; }
+.dash-link { display: inline-flex; align-items: center; min-height: 2.75rem; padding-inline: 0.25rem; color: var(--primary); font-size: 0.8rem; font-weight: 600; }
+.dash-poster { flex-shrink: 0; border-radius: 0.5rem; object-fit: cover; background: var(--muted); }
+/* Horizontal rails bleed to the screen edge but never widen the page. */
+.h-rail { display: flex; gap: 0.625rem; margin-inline: -1rem; padding-inline: 1rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scroll-padding-inline: 1rem; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.h-rail::-webkit-scrollbar { display: none; }
+.h-rail > * { scroll-snap-align: start; }
+@media (min-width: 768px) { .h-rail { margin-inline: 0; padding-inline: 0; } }
+/* A small visible control with a 44px touch area (the element must be positioned, e.g. relative or absolute). */
+.touch-target::after { position: absolute; inset: -6px; content: ""; }
+.mini-progress { height: 0.25rem; overflow: hidden; border-radius: 999px; background: oklch(0.52 0.025 190 / 26%); }
+.mini-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, oklch(0.64 0.14 164), var(--primary)); }
+.release-day { position: sticky; top: calc(4rem + env(safe-area-inset-top)); z-index: 10; margin-inline: -1rem; padding: 0.5rem 1rem 0.375rem; background: var(--background); background: color-mix(in oklab, var(--background) 92%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+@media (min-width: 768px) { .release-day { margin-inline: 0; padding-inline: 0; } }
+.release-day-group { content-visibility: auto; contain-intrinsic-size: auto 220px; }
+.release-tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.125rem 0.45rem; background: oklch(0.78 0.14 165 / 13%); color: var(--primary); font-size: 0.625rem; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.4; }
+.filter-rail { display: flex; gap: 0.5rem; margin-inline: -1rem; padding: 0.125rem 1rem; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.filter-rail::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) { .filter-rail { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { .dash-row { transition: none !important; } }
