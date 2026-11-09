@@ -3,6 +3,7 @@ import { useAuth } from "./hooks/use-auth.tsx";
 import {
   createBrowserRouter,
   Navigate,
+  useRouteError,
   
 } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -22,6 +23,7 @@ import MatchReviewPage from "./pages/match-review-page.tsx";
 const router = createBrowserRouter([
   {
     path: "/",
+    errorElement: <RouteRecovery />,
     element: (
       <ProtectedRoute>
         <HomePage />
@@ -59,6 +61,12 @@ const router = createBrowserRouter([
     element: <SignupPage />,
   },
 ]);
+
+function RouteRecovery() {
+  const error = useRouteError();
+  console.error('Cinetra route error', error);
+  return <main className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-10 text-foreground"><section className="w-full max-w-md rounded-2xl border bg-card p-6 text-center shadow-lg"><p className="cinema-eyebrow">Cinetra</p><h1 className="mt-3 text-2xl font-semibold">This page could not be opened</h1><p className="mt-2 text-sm text-muted-foreground">Your library data is still saved. Try again or return to your home page.</p><div className="mt-5 flex justify-center gap-3"><button className="min-h-11 rounded-xl border px-4 text-sm font-medium" onClick={() => window.location.reload()}>Reload</button><a className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground" href="/">Go to Home</a></div></section></main>;
+}
 
 const App: FC = () => {
   return (

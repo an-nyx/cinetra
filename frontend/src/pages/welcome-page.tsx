@@ -8,7 +8,7 @@ import { ShowService } from "@/services";
 import type { TrackingSummary, TrackedEpisode } from "@/services/show.service";
 import type { ShowType } from "@/types";
 
-const code = (e: TrackedEpisode) => `S${String(e.season).padStart(2, '0')}E${String(e.number).padStart(2, '0')}`;
+const code = (e: TrackedEpisode | null | undefined) => e && Number.isInteger(e.season) && Number.isInteger(e.number) ? `S${String(e.season).padStart(2, '0')}E${String(e.number).padStart(2, '0')}` : null;
 export default function WelcomePage() {
   const [shows, setShows] = useState<ShowType[]>([]);
   const [tracking, setTracking] = useState<TrackingSummary[]>([]);
@@ -22,12 +22,12 @@ export default function WelcomePage() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); window.addEventListener('tracking-updated', load); return () => window.removeEventListener('tracking-updated', load); }, [load]);
-  const items = tracking.filter(item => !item.error);
+  const items = tracking.filter(item => item && typeof item === 'object' && !item.error);
   const continuing = items.filter(item => (item.nextEpisode || item.legacyPosition) && !['planned', 'paused', 'dropped'].includes(item.status || '') && (item.status !== 'completed' || item.newEpisodes > 0));
   const newEpisodes = items.filter(item => item.newEpisodes > 0);
-  const upcoming = items.filter(item => item.upcomingEpisode).sort((a, b) => a.upcomingEpisode!.airDate!.localeCompare(b.upcomingEpisode!.airDate!));
-  const recent = items.flatMap(item => item.recentHistory.map(event => ({ item, event }))).sort((a, b) => b.event.watchedAt.localeCompare(a.event.watchedAt)).slice(0, 5);
-  const featured = continuing[0];
+  const upcoming = items.filter(item => item.upcomingEpisode && Number.isInteger(item.upcomingEpisode.season) && Number.isInteger(item.upcomingEpisode.number) && item.upcomingEpisode.airDate).sort((a, b) => (a.upcomingEpisode?.airDate || '').localeCompare(b.upcomingEpisode?.airDate || ''));
+  const recent = items.flatMap(item => (Array.isArray(item.recentHistory) ? item.recentHistory : []).filter(event => event && event.watchedAt).map(event => ({ item, event }))).sort((a, b) => b.event.watchedAt.localeCompare(a.event.watchedAt)).slice(0, 5);
+  const featured = continuing.find(item => item.nextEpisode && code(item.nextEpisode)) || continuing[0];
   const markNext = async (item: TrackingSummary) => {
     if (!item.nextEpisode || busy) return;
     setBusy(true);
@@ -36,7 +36,7 @@ export default function WelcomePage() {
     finally { setBusy(false); }
   };
   return <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-7 pb-24 md:px-8 md:py-10">
-    <header className="relative isolate overflow-hidden rounded-[1.6rem] border border-primary/15 bg-card px-6 py-8 sm:px-9 sm:py-10">{featured?.posterURL && <img src={featured.posterURL} alt="" aria-hidden="true" className="absolute -right-6 -top-20 -z-10 h-[160%] w-1/2 rotate-6 object-cover opacity-[.16] blur-[2px]" />}<div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/90 via-background/70 to-transparent" /><div className="flex items-start justify-between gap-3"><div><p className="cinema-eyebrow">Your personal watch space</p><h1 className="mt-3 max-w-xl text-3xl font-semibold leading-tight sm:text-5xl">Pick up where you left off<span className="text-primary">.</span></h1><p className="mt-3 max-w-lg text-sm text-muted-foreground sm:text-base">Your next episodes, release dates, and progress in one place.</p></div><Button variant="outline" size="icon" onClick={load} aria-label="Refresh dashboard"><RefreshCw className="size-4" /></Button></div>{featured && <button type="button" onClick={() => setSelectedShow(featured.showId)} className="mt-7 flex max-w-lg items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-left text-xs text-primary transition-colors hover:bg-primary/20 sm:text-sm"><Play className="size-4 fill-current" /><span className="truncate">Up next: <strong>{featured.name}</strong> · {code(featured.nextEpisode!)}</span><ArrowUpRight className="size-4 shrink-0" /></button>}</header>
+    <header className="relative isolate overflow-hidden rounded-[1.6rem] border border-primary/15 bg-card px-6 py-8 sm:px-9 sm:py-10">{featured?.posterURL && <img src={featured.posterURL} alt="" aria-hidden="true" className="absolute -right-6 -top-20 -z-10 h-[160%] w-1/2 rotate-6 object-cover opacity-[.16] blur-[2px]" />}<div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/90 via-background/70 to-transparent" /><div className="flex items-start justify-between gap-3"><div><p className="cinema-eyebrow">Your personal watch space</p><h1 className="mt-3 max-w-xl text-3xl font-semibold leading-tight sm:text-5xl">Pick up where you left off<span className="text-primary">.</span></h1><p className="mt-3 max-w-lg text-sm text-muted-foreground sm:text-base">Your next episodes, release dates, and progress in one place.</p></div><Button variant="outline" size="icon" onClick={load} aria-label="Refresh dashboard"><RefreshCw className="size-4" /></Button></div>{featured && <button type="button" onClick={() => setSelectedShow(featured.showId)} className="mt-7 flex max-w-lg items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-left text-xs text-primary transition-colors hover:bg-primary/20 sm:text-sm"><Play className="size-4 fill-current" /><span className="truncate">{featured.nextEpisode ? <>Up next: <strong>{featured.name}</strong> · {code(featured.nextEpisode)}</> : <>Saved position: <strong>{featured.name}</strong> · S{featured.legacyPosition?.normalizedSeason ?? '—'}E{featured.legacyPosition?.normalizedEpisode ?? '—'}</>}</span><ArrowUpRight className="size-4 shrink-0" /></button>}</header>
     {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">{error}</p>}
     {loading ? <div className="space-y-5" aria-label="Loading dashboard"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[1,2,3,4].map(n => <Skeleton key={n} className="h-25 rounded-2xl" />)}</div><Skeleton className="h-60 rounded-2xl" /></div> : <>
       <section aria-label="Quick watching statistics" className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[[shows.length, 'Shows in library'], [items.filter(item => item.status === 'watching').length, 'Currently watching'], [items.reduce((n, item) => n + item.watchedCount, 0), 'Episodes watched'], [items.reduce((n, item) => n + item.remainingCount, 0), 'Ready to watch']].map(([value, label]) => <div key={label} className="cinema-surface p-4"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{label}</p></div>)}</section>
