@@ -78,7 +78,7 @@ export default function ShowsPage() {
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
       <div className="library-heading mb-7 flex flex-col gap-5">
-        <div><p className="cinema-eyebrow mb-2">Your library</p><h1 className="text-4xl font-semibold tracking-tight">TV shows<span className="ml-3 text-base font-normal text-muted-foreground">{shows.length}</span></h1></div>
+        <div><p className="cinema-eyebrow mb-2">Your collection</p><h1 className="text-4xl font-semibold tracking-tight">TV shows<span className="ml-3 text-base font-normal text-muted-foreground">{shows.length}</span></h1><p className="mt-2 text-sm text-muted-foreground">Your stories, right where you left them.</p></div>
         <div className="flex min-w-0 items-center gap-3">
           <InputGroup>
             <InputGroupInput
@@ -228,7 +228,7 @@ export default function ShowsPage() {
         }
 
         return (
-          <div className="grid w-full grid-cols-2 gap-x-4 gap-y-7 min-[480px]:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sortedShows.map((show) => (
               <Show
                 type="show"

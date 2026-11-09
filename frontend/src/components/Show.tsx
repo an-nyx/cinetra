@@ -53,31 +53,18 @@ export default function Show({
   };
 
   return (
-    <article className="group relative min-w-0">
-      <button
-        type="button"
-        style={borderColor ? { borderColor, borderWidth: 2 } : undefined}
-        className="cinema-poster relative block aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-muted text-left transition-[transform,box-shadow,border-color] duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-[0_20px_45px_rgba(0,0,0,0.35)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none"
-        onClick={() => setSelectedShow(id)}
-        aria-label={`Open ${name}`}
-      >
-        <span className="absolute inset-0 flex items-center justify-center text-muted-foreground"><Tv className="size-10" /></span>
-        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transform-none" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
-        <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-        {tracking && tracking.progressPercent !== null && <span className="absolute bottom-0 left-0 h-1 bg-primary transition-[width] duration-500" style={{ width: `${tracking.progressPercent}%` }} />}
-        <span className="absolute inset-x-0 bottom-0 line-clamp-2 p-3 pb-4 text-sm font-semibold leading-5 text-white sm:text-base">{name}</span>
+    <article className="group relative flex min-w-0 gap-4 rounded-2xl border bg-card/70 p-3 shadow-sm transition-colors hover:bg-card sm:gap-5 sm:p-4" style={borderColor ? { borderColor } : undefined}>
+      <button type="button" onClick={() => setSelectedShow(id)} aria-label={`Open ${name}`} className="relative block aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-xl bg-muted text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary sm:w-28">
+        <span className="absolute inset-0 flex items-center justify-center"><Tv className="size-8" /></span>
+        {posterURL && <img loading="lazy" className="relative h-full w-full object-cover" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
       </button>
-      <p className="mt-2 px-1 text-xs font-medium text-foreground/80">Personal status: {personalStatusLabels[savedStatus]}</p>
-      {tracking && !tracking.error && <div className="mt-3 space-y-2 px-1"><div className="flex items-center justify-between gap-1 text-xs"><span className="truncate text-muted-foreground">{viewingStateLabel(tracking)}</span><span className="shrink-0 font-semibold text-primary" title={tracking.progressUnavailable?.detail}>{tracking.progressPercent === null ? tracking.progressUnavailable?.label || 'Unavailable' : `${tracking.progressPercent}%`}</span></div>{positionDetails(tracking) && <p className="truncate text-xs text-muted-foreground">{positionDetails(tracking)}</p>}{tracking.newEpisodes > 0 && <span className="cinema-tag">{tracking.newEpisodes} new episode{tracking.newEpisodes === 1 ? '' : 's'}</span>}{tracking.nextEpisode && onMarkNext && <button type="button" className="min-h-10 w-full rounded-xl border border-primary/35 px-2 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onMarkNext(tracking)}>Mark next watched</button>}</div>}
-      <button
-        type="button"
-        className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-primary"
-        aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`}
-        aria-pressed={favorite}
-        onClick={() => toggleFavorite(id, favorite)}
-      >
-        <Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} />
-      </button>
+      <div className="flex min-w-0 flex-1 flex-col py-0.5 pr-9">
+        <p className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><span aria-hidden="true" className="size-1.5 rounded-full" style={{ backgroundColor: borderColor || 'currentColor' }} />{personalStatusLabels[savedStatus]}</p>
+        <button type="button" onClick={() => setSelectedShow(id)} className="line-clamp-2 text-left text-base font-semibold leading-snug text-foreground hover:text-primary sm:text-lg">{name}</button>
+        {tracking && !tracking.error && <div className="mt-2 space-y-1 text-xs text-muted-foreground"><p>{viewingStateLabel(tracking)}<span className="ml-2 font-semibold text-foreground" title={tracking.progressUnavailable?.detail}>{tracking.progressPercent === null ? tracking.progressUnavailable?.label || 'Unavailable' : `${tracking.progressPercent}%`}</span></p>{positionDetails(tracking) && <p className="line-clamp-2">{positionDetails(tracking)}</p>}{tracking.newEpisodes > 0 && <p className="font-medium text-primary">{tracking.newEpisodes} new episode{tracking.newEpisodes === 1 ? '' : 's'}</p>}</div>}
+        {tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="mt-auto min-h-10 self-start pt-2 text-left text-xs font-semibold text-primary hover:underline" onClick={() => onMarkNext(tracking)}>Mark next watched <span aria-hidden="true">→</span></button>}
+      </div>
+      <button type="button" className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary" aria-label={`${favorite ? "Remove" : "Add"} ${name} ${favorite ? "from" : "to"} favorites`} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}><Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} /></button>
     </article>
   );
 }
