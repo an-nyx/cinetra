@@ -1,4 +1,5 @@
 import { SignupForm } from "@/components/signup-form";
+import BrandLogo from "@/components/brand-logo";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthService } from "@/services";
@@ -25,8 +26,8 @@ export default function SignupPage() {
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
-          <a href="/" className="flex items-center gap-2 font-medium">
-            Cinetra
+          <a href="/" aria-label="Cinetra home" className="flex items-center gap-2 font-medium">
+            <BrandLogo size={32} />
           </a>
         </div>
         <div className="flex flex-1 items-center justify-center">
