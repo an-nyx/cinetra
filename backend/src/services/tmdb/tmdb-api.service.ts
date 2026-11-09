@@ -130,6 +130,14 @@ export class TMDBApiService implements TMDBService {
     return response.data;
   }
 
+  /** TheTVDB and IMDb identifiers TMDB lists for a series; used to find the same series on TVMaze. */
+  async getExternalIds(id: number): Promise<{ tvdbId: number | null; imdbId: string | null }> {
+    const response = await this.cached<AxiosResponse<{ tvdb_id?: number | null; imdb_id?: string | null }>>(`external:${id}`, () => this.get(`/tv/${id}/external_ids`));
+    const tvdb = response.data.tvdb_id;
+    const imdb = response.data.imdb_id;
+    return { tvdbId: typeof tvdb === 'number' && tvdb > 0 ? tvdb : null, imdbId: typeof imdb === 'string' && /^tt\d+$/.test(imdb.trim()) ? imdb.trim() : null };
+  }
+
   async getSeason(id: number, season: number): Promise<SeasonDetails> {
     const response = await this.cached<AxiosResponse<SeasonDetails>>(`season:${id}:${season}`, () => this.get<SeasonDetails>(`/tv/${id}/season/${season}`));
     return response.data;

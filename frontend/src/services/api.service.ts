@@ -56,6 +56,8 @@ export class ApiService {
     if (existing && existing.expires > Date.now()) return existing.promise as Promise<AxiosResponse<T>>;
     const currentGeneration = generation;
     const promise = this.api.get<T>(url, config).then(response => {
+      // A schedule that is still being built is an interim answer: never cache it.
+      if ((response.data as { status?: string } | null)?.status === "building") { if (cache.get(key)?.promise === promise) cache.delete(key); return response; }
       if (currentGeneration === generation && cache.get(key)?.promise === promise) cache.set(key, { expires: Date.now() + ttl, promise });
       return response;
     }).catch(error => { if (cache.get(key)?.promise === promise) cache.delete(key); throw error; });

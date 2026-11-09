@@ -47,3 +47,43 @@ export function attentionReason(s: TrackingSummary): string | null {
   if (!s.guideAvailable && (s.legacyPosition || s.explicitWatchedCount > 0)) return s.metadataError || "Episode data unavailable";
   return null;
 }
+
+const latestWatch = (s: TrackingSummary) => {
+  const times = (Array.isArray(s.recentHistory) ? s.recentHistory : []).map(e => Date.parse(e?.watchedAt)).filter(Number.isFinite);
+  return times.length ? Math.max(...times) : 0;
+};
+const statusRank = (s: TrackingSummary) => (s.status === "watching" ? 0 : !s.status ? 1 : 2);
+
+/**
+ * What Home shows, chosen from the user's own tracking data (never a fixed show):
+ * - featured + continueWatching: playable shows (released next episode; never Dropped, Planned or Paused), most
+ *   recently watched first, Watching before other statuses;
+ * - newEpisodes: released, unwatched regular episodes that aired after the latest watch (TMDB data; future
+ *   episodes are never "available"), excluding Dropped shows and the featured show;
+ * - recent: real recorded watch timestamps only (saved positions carry no dates and are never shown as activity).
+ */
+export function homeDashboard(tracking: TrackingSummary[], continueLimit = 6) {
+  const items = tracking.filter(item => item && typeof item === "object" && !item.error);
+  const playable = items.filter(canContinueWatching)
+    .sort((a, b) => latestWatch(b) - latestWatch(a) || statusRank(a) - statusRank(b) || b.newEpisodes - a.newEpisodes || a.name.localeCompare(b.name));
+  const featured = playable[0] || null;
+  const newEpisodes = items
+    .filter(item => item.status !== "dropped" && item.showId !== featured?.showId && item.countDataAvailable && item.remainingCount > 0 && (item.newEpisodes > 0 || !!item.newSeasonToWatch))
+    .sort((a, b) => Number(!!b.newSeasonToWatch) - Number(!!a.newSeasonToWatch) || latestWatch(b) - latestWatch(a) || b.newEpisodes - a.newEpisodes || a.name.localeCompare(b.name));
+  const recent = items.flatMap(item => (Array.isArray(item.recentHistory) ? item.recentHistory : [])
+    .filter(event => event && Number.isFinite(Date.parse(event.watchedAt)) && Number.isInteger(event.season) && Number.isInteger(event.episode))
+    .map(event => ({ item, event })))
+    .sort((a, b) => Date.parse(b.event.watchedAt) - Date.parse(a.event.watchedAt));
+  // Totals add up only shows whose counts are verified (reliable released-episode metadata); others are left out.
+  const verified = items.filter(item => item.countDataAvailable && item.progressPercent !== null);
+  return {
+    featured, continueWatching: playable.slice(1, 1 + continueLimit), moreToContinue: Math.max(0, playable.length - 1 - continueLimit),
+    newEpisodes, recent,
+    watching: items.filter(item => item.status === "watching").length,
+    episodesWatched: verified.length ? verified.reduce((n, item) => n + item.watchedCount, 0) : null,
+    verifiedShows: verified.length,
+    watchlist: items.filter(item => item.status === "planned"),
+    attention: items.flatMap(item => { const reason = attentionReason(item); return reason ? [{ item, reason }] : []; }),
+    unavailable: tracking.filter(item => item?.error).length,
+  };
+}
