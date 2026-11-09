@@ -55,6 +55,10 @@ model EpisodeWatch {
   season    Int
   episode   Int
   watchedAt DateTime @default(now())
+  checkpointBeforeSeason Int?
+  checkpointBeforeEpisode Int?
+  checkpointAfterSeason Int?
+  checkpointAfterEpisode Int?
 
   @@unique([showId, season, episode])
   @@index([showId, watchedAt])

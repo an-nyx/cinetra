@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import { TMDBApiService } from '../src/services/tmdb/tmdb-api.service';
+import { prisma } from '../src/database/prisma';
+import { setEpisodeWatched, EpisodeGuideError } from '../src/services/episode-guide.service';
+import { ShowPrismaRepository } from '../src/modules/show/infra/show-prisma.repository';
+if (!process.env.DATABASE_URL?.includes('/cinetra_episode_toggle_test_20261109')) throw new Error('Use the isolated episode toggle test database only.');
+TMDBApiService.prototype.getShow = async () => ({ seasons: [{ season_number: 1, episode_count: 3, air_date: '2020-01-01' }], status: 'Returning Series' });
+TMDBApiService.prototype.getSeason = async () => ({ episodes: [1, 2, 3].map(n => ({ episode_number: n, name: `Episode ${n}`, air_date: '2020-01-01', runtime: null })) });
+async function main() {
+  const user = await prisma.user.create({ data: { email: `test-${Date.now()}@example.invalid`, username: 'test', password: 'not-a-password' } });
+  const show = await prisma.show.create({ data: { userId: user.id, name: 'Test only', tmdbId: 912345, seasonsWatched: 1, episodesWatched: 0, favorite: true, status: 'watching' } });
+  const mark = (n: number, watched: boolean) => setEpisodeWatched(show.id, user.id, 1, n, watched);
+  const state = async () => ({ show: (await prisma.show.findUniqueOrThrow({ where: { id: show.id } })), watches: await prisma.episodeWatch.findMany({ where: { showId: show.id }, orderBy: { episode: 'asc' } }) });
+  await mark(1, true); await mark(1, true);
+  let s = await state(); assert.equal(s.show.episodesWatched, 1); assert.equal(s.watches.length, 1);
+  await mark(1, false); await mark(1, false);
+  s = await state(); assert.equal(s.show.episodesWatched, 0); assert.equal(s.watches.length, 0);
+  await mark(3, true); s = await state(); assert.equal(s.show.episodesWatched, 0); assert.deepEqual(s.watches.map(w => w.episode), [3]);
+  await mark(1, true); await mark(2, true); s = await state(); assert.equal(s.show.episodesWatched, 3); assert.deepEqual(s.watches.map(w => w.episode), [1, 2, 3]);
+  await mark(2, false); s = await state(); assert.equal(s.show.episodesWatched, 1); assert.deepEqual(s.watches.map(w => w.episode), [1, 3]);
+  await mark(1, false); await mark(1, false);
+  await new ShowPrismaRepository().update(show.id, { seasonsWatched: 1, episodesWatched: 2 }, user.id);
+  await assert.rejects(mark(2, false), (e: unknown) => e instanceof EpisodeGuideError && e.status === 409);
+  // An old individual record inside a saved position can be removed without silently moving that position.
+  await prisma.episodeWatch.create({ data: { showId: show.id, season: 1, episode: 2 } });
+  await mark(2, false); s = await state(); assert.equal(s.show.episodesWatched, 2); assert.ok(!s.watches.some(w => w.episode === 2));
+  await assert.rejects(mark(2, false), (e: unknown) => e instanceof EpisodeGuideError && e.status === 409);
+  s = await state(); assert.equal(s.show.episodesWatched, 2); assert.equal(s.show.favorite, true); assert.equal(s.show.status, 'watching'); assert.equal(s.show.tmdbId, 912345);
+  console.log('Episode toggle integration tests passed');
+}
+main().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => prisma.$disconnect());
