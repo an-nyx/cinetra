@@ -1,8 +1,10 @@
 export type ScheduleSource = 'TMDB' | 'TVMaze';
+/** How the show's schedule identity was established: stored TMDB link, a corroborated schedule-only TMDB match, or the library title (TVMaze). */
+export type ScheduleIdentity = 'linked' | 'schedule_match' | 'library_title';
 export type UpcomingItem = {
   showId: string; showName: string; posterURL: string | null; showStatus: string | null;
   season: number | null; number: number | null; name: string; airDate: string; airTimestamp: string | null;
-  seasonPremiere: boolean; scheduleSource: ScheduleSource; scheduleConflict: boolean;
+  seasonPremiere: boolean; scheduleSource: ScheduleSource; scheduleConflict: boolean; scheduleIdentity?: ScheduleIdentity;
 };
 
 export function upcomingItemKey(item: UpcomingItem) {
@@ -40,4 +42,20 @@ export function mergeUpcomingItems(items: UpcomingItem[]) {
 
 export function isReturningWithoutDate(broadcastStatus: string | null | undefined, hasDatedRelease: boolean) {
   return !hasDatedRelease && ['Returning Series', 'In Production', 'Planned'].includes(broadcastStatus || '');
+}
+
+export type TVMazeNeedInput = {
+  tmdbResponded: boolean; tmdbFailed: boolean; tmdbSeasonFailures: number; scheduleMetadataIncomplete: boolean;
+  tmdbReleaseCount: number; broadcastStatus: string | null | undefined; inProduction: boolean | null | undefined; nextEpisodeAnnounced: boolean;
+};
+
+/**
+ * TVMaze is a schedule-only supplement. Query it only when TMDB could not provide a usable schedule, and never for a
+ * series TMDB definitively reports as over (Ended/Canceled, not in production, nothing announced, nothing dated ahead).
+ */
+export function needsTVMazeSupplement(input: TVMazeNeedInput) {
+  const definitivelyOver = input.tmdbResponded && ['Ended', 'Canceled'].includes(input.broadcastStatus || '')
+    && input.inProduction === false && !input.nextEpisodeAnnounced && input.tmdbReleaseCount === 0;
+  if (definitivelyOver) return false;
+  return input.tmdbFailed || input.tmdbSeasonFailures > 0 || input.scheduleMetadataIncomplete || input.tmdbReleaseCount < 2;
 }

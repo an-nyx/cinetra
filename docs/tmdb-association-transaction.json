@@ -1,0 +1,463 @@
+{
+  "mode": "apply",
+  "reportPath": "docs/tmdb-match-revalidation.json",
+  "reportSha256": "59cd2ce9c32ce46588a03c618a005c5604527e8b67a11a62f5ecf71cff672767",
+  "eligible": 90,
+  "alreadyLinked": 0,
+  "updates": 90,
+  "skipChanged": 0,
+  "duplicateProposalConflicts": 0,
+  "occupiedIdConflicts": 0,
+  "rollbackBeforeImage": [
+    {
+      "showId": "2ebe67e5-fd57-43b7-9c89-0f6ecb462a65",
+      "previousTmdbId": null,
+      "appliedTmdbId": 108545
+    },
+    {
+      "showId": "1560e100-c8d1-4ed8-a0d2-c8410794fc4e",
+      "previousTmdbId": null,
+      "appliedTmdbId": 82452
+    },
+    {
+      "showId": "e3f71349-eed0-4c03-b076-7fb5ae765d92",
+      "previousTmdbId": null,
+      "appliedTmdbId": 114461
+    },
+    {
+      "showId": "21856a28-f1ca-4d0a-93ce-da74f87ff655",
+      "previousTmdbId": null,
+      "appliedTmdbId": 39340
+    },
+    {
+      "showId": "c73335a7-932e-432b-903b-1a7e377c9144",
+      "previousTmdbId": null,
+      "appliedTmdbId": 110316
+    },
+    {
+      "showId": "2707daff-a91e-40a8-b732-8968fcce46bb",
+      "previousTmdbId": null,
+      "appliedTmdbId": 157239
+    },
+    {
+      "showId": "10228043-e138-42ee-9693-bc756e12a2f3",
+      "previousTmdbId": null,
+      "appliedTmdbId": 155421
+    },
+    {
+      "showId": "fa4ef113-bdb8-4716-835e-8e0fbcc10fc7",
+      "previousTmdbId": null,
+      "appliedTmdbId": 79130
+    },
+    {
+      "showId": "ca41203b-3062-45fe-b483-73041bd209ab",
+      "previousTmdbId": null,
+      "appliedTmdbId": 62710
+    },
+    {
+      "showId": "6dd0d0fe-0ca0-4217-832d-ccd6124ec64f",
+      "previousTmdbId": null,
+      "appliedTmdbId": 80307
+    },
+    {
+      "showId": "56cb75b3-73de-436a-b83f-d7a70559e255",
+      "previousTmdbId": null,
+      "appliedTmdbId": 308014
+    },
+    {
+      "showId": "5db694fb-e161-4148-81d7-f4c2a351f9f8",
+      "previousTmdbId": null,
+      "appliedTmdbId": 249039
+    },
+    {
+      "showId": "3b5470df-735d-41d0-91bf-ef30f1ff8f6b",
+      "previousTmdbId": null,
+      "appliedTmdbId": 146176
+    },
+    {
+      "showId": "0facc4a1-5fe8-4650-be46-6c3f669371f8",
+      "previousTmdbId": null,
+      "appliedTmdbId": 83867
+    },
+    {
+      "showId": "97fe5f9d-2342-47ef-919a-561fb2fd2440",
+      "previousTmdbId": null,
+      "appliedTmdbId": 87108
+    },
+    {
+      "showId": "b9ce0a27-c5c4-493f-812a-b987596ccf4b",
+      "previousTmdbId": null,
+      "appliedTmdbId": 41727
+    },
+    {
+      "showId": "81f83a25-7a23-4c51-bdab-8d6a2cdb8f38",
+      "previousTmdbId": null,
+      "appliedTmdbId": 153657
+    },
+    {
+      "showId": "502d9236-41f7-42fc-95e9-8c9aa5223f40",
+      "previousTmdbId": null,
+      "appliedTmdbId": 67026
+    },
+    {
+      "showId": "6e072e57-3c04-4ff9-a923-6a206f1fd3ed",
+      "previousTmdbId": null,
+      "appliedTmdbId": 90027
+    },
+    {
+      "showId": "e661768e-67b2-4083-b9a8-af3e605a4afd",
+      "previousTmdbId": null,
+      "appliedTmdbId": 62858
+    },
+    {
+      "showId": "d39d55ad-8e41-4701-a0a5-ec60b717a53b",
+      "previousTmdbId": null,
+      "appliedTmdbId": 147050
+    },
+    {
+      "showId": "473ba306-ec1d-4503-9362-621aa2957de6",
+      "previousTmdbId": null,
+      "appliedTmdbId": 217522
+    },
+    {
+      "showId": "9c0c88dc-3fa3-4c39-8162-37c40557f0e3",
+      "previousTmdbId": null,
+      "appliedTmdbId": 1399
+    },
+    {
+      "showId": "7f022400-b2a5-46cb-aa3b-29e34c9f464d",
+      "previousTmdbId": null,
+      "appliedTmdbId": 76652
+    },
+    {
+      "showId": "c50cc4a0-c7b2-466e-8a56-4114371ee292",
+      "previousTmdbId": null,
+      "appliedTmdbId": 281281
+    },
+    {
+      "showId": "51c431cb-de16-4291-9c50-a976f0da6d48",
+      "previousTmdbId": null,
+      "appliedTmdbId": 88239
+    },
+    {
+      "showId": "6d3c8571-bd3b-412b-b8a9-3799ecfb5803",
+      "previousTmdbId": null,
+      "appliedTmdbId": 259731
+    },
+    {
+      "showId": "67acc4b0-0a33-4a26-81a7-9f3aad0ff6e2",
+      "previousTmdbId": null,
+      "appliedTmdbId": 220801
+    },
+    {
+      "showId": "670e1bcd-d17c-4fa2-9eaa-88d637e7b593",
+      "previousTmdbId": null,
+      "appliedTmdbId": 52814
+    },
+    {
+      "showId": "2e28ad33-9652-4e29-b6ef-0f5f6af67d23",
+      "previousTmdbId": null,
+      "appliedTmdbId": 132117
+    },
+    {
+      "showId": "e9b70733-4d1e-44ef-b98e-8ceef2fa0a82",
+      "previousTmdbId": null,
+      "appliedTmdbId": 1407
+    },
+    {
+      "showId": "d7459f58-b2a4-4e99-820e-6623fb7b6f69",
+      "previousTmdbId": null,
+      "appliedTmdbId": 62822
+    },
+    {
+      "showId": "049add53-7371-481f-bf05-7c3926c4c312",
+      "previousTmdbId": null,
+      "appliedTmdbId": 121710
+    },
+    {
+      "showId": "877e81d7-fdc0-48e7-b3d3-f3e048caf50f",
+      "previousTmdbId": null,
+      "appliedTmdbId": 276563
+    },
+    {
+      "showId": "518fa390-3ed3-488c-ba03-e296723efef0",
+      "previousTmdbId": null,
+      "appliedTmdbId": 291339
+    },
+    {
+      "showId": "c8a5d1fb-fbc4-400a-8cfa-24d427798ada",
+      "previousTmdbId": null,
+      "appliedTmdbId": 278178
+    },
+    {
+      "showId": "e8d123d7-9135-4dcf-b243-24fe75e4e2d0",
+      "previousTmdbId": null,
+      "appliedTmdbId": 70593
+    },
+    {
+      "showId": "66ba88e9-7b61-43ab-a1ef-eb32df3e0376",
+      "previousTmdbId": null,
+      "appliedTmdbId": 127235
+    },
+    {
+      "showId": "31ac6e87-10c1-425b-81fa-a9369859eb92",
+      "previousTmdbId": null,
+      "appliedTmdbId": 62127
+    },
+    {
+      "showId": "2c8c52a7-b152-41d6-a5fd-9c64b0e564f1",
+      "previousTmdbId": null,
+      "appliedTmdbId": 81224
+    },
+    {
+      "showId": "63b13721-67d6-49cb-9622-a8d33f8c1d03",
+      "previousTmdbId": null,
+      "appliedTmdbId": 272418
+    },
+    {
+      "showId": "398390f8-e0f3-4f56-be1e-df6eccd6cdfe",
+      "previousTmdbId": null,
+      "appliedTmdbId": 118642
+    },
+    {
+      "showId": "3474505a-55ee-4f97-babe-b2de8611a8b0",
+      "previousTmdbId": null,
+      "appliedTmdbId": 70513
+    },
+    {
+      "showId": "b3652803-694e-45c4-882f-7da830ed7912",
+      "previousTmdbId": null,
+      "appliedTmdbId": 156933
+    },
+    {
+      "showId": "9af9e207-c40a-419d-975f-edae5ce45a39",
+      "previousTmdbId": null,
+      "appliedTmdbId": 126308
+    },
+    {
+      "showId": "e20b6447-0767-4b90-8546-2a162f57bda2",
+      "previousTmdbId": null,
+      "appliedTmdbId": 71446
+    },
+    {
+      "showId": "98d4e0cc-eec8-4be1-b022-b46e0b6c2f2b",
+      "previousTmdbId": null,
+      "appliedTmdbId": 230351
+    },
+    {
+      "showId": "66945c24-a9fa-48b7-b8d6-ebce529a86a3",
+      "previousTmdbId": null,
+      "appliedTmdbId": 77994
+    },
+    {
+      "showId": "e7fa6b1b-9cf1-42df-91b5-6ef24e2f3841",
+      "previousTmdbId": null,
+      "appliedTmdbId": 85720
+    },
+    {
+      "showId": "f9c68b9c-8218-438a-b974-8ae94855c371",
+      "previousTmdbId": null,
+      "appliedTmdbId": 220102
+    },
+    {
+      "showId": "90f48675-27b4-424d-b9ee-9aa7c8fa1174",
+      "previousTmdbId": null,
+      "appliedTmdbId": 63210
+    },
+    {
+      "showId": "b3e0ea07-777f-4b39-9853-c66dacb90304",
+      "previousTmdbId": null,
+      "appliedTmdbId": 254071
+    },
+    {
+      "showId": "6fa16978-d15f-4635-875f-19f5c9fa1115",
+      "previousTmdbId": null,
+      "appliedTmdbId": 228305
+    },
+    {
+      "showId": "afdebfd0-467a-4330-8b2b-f1cc12966be4",
+      "previousTmdbId": null,
+      "appliedTmdbId": 19885
+    },
+    {
+      "showId": "deb11f33-a2a3-4c19-943c-0cff537de81c",
+      "previousTmdbId": null,
+      "appliedTmdbId": 81747
+    },
+    {
+      "showId": "c0f0e960-d110-4fe5-92e5-9490e2a300d3",
+      "previousTmdbId": null,
+      "appliedTmdbId": 66732
+    },
+    {
+      "showId": "f7d1164c-70f8-4784-9189-cfd2f55db2fd",
+      "previousTmdbId": null,
+      "appliedTmdbId": 72710
+    },
+    {
+      "showId": "a9bfe0ef-4a0b-414d-a710-24c3c88976de",
+      "previousTmdbId": null,
+      "appliedTmdbId": 69629
+    },
+    {
+      "showId": "0e69a782-5ca1-43d6-95d7-620f18ebedfe",
+      "previousTmdbId": null,
+      "appliedTmdbId": 69478
+    },
+    {
+      "showId": "dbf3466f-9b43-4c74-9c85-34a6100e14e7",
+      "previousTmdbId": null,
+      "appliedTmdbId": 236235
+    },
+    {
+      "showId": "c5de0bd2-f672-4cb4-b2c6-f4769b264a6e",
+      "previousTmdbId": null,
+      "appliedTmdbId": 115036
+    },
+    {
+      "showId": "7c08a7d7-314e-446e-9440-825c3b206533",
+      "previousTmdbId": null,
+      "appliedTmdbId": 222766
+    },
+    {
+      "showId": "07f51733-e451-4ae6-9379-e0cdcfffec46",
+      "previousTmdbId": null,
+      "appliedTmdbId": 226362
+    },
+    {
+      "showId": "c5b94cfe-fd8d-4890-aa40-0ce5051c4cd1",
+      "previousTmdbId": null,
+      "appliedTmdbId": 82585
+    },
+    {
+      "showId": "acb58546-2f6e-41ae-a362-f3e8a066bb3a",
+      "previousTmdbId": null,
+      "appliedTmdbId": 82856
+    },
+    {
+      "showId": "2f31722a-7d2a-43f5-86ab-2a4f36e5384e",
+      "previousTmdbId": null,
+      "appliedTmdbId": 34415
+    },
+    {
+      "showId": "2a13d480-119d-4590-a5f0-3fbaaef738a8",
+      "previousTmdbId": null,
+      "appliedTmdbId": 100088
+    },
+    {
+      "showId": "ca2aea8c-3f53-44e3-a958-62c643fcaecb",
+      "previousTmdbId": null,
+      "appliedTmdbId": 129552
+    },
+    {
+      "showId": "5875c41f-5a6e-4092-ae50-c21ff9db851b",
+      "previousTmdbId": null,
+      "appliedTmdbId": 63333
+    },
+    {
+      "showId": "6ebd6132-0245-4869-a180-62dbdcb85b78",
+      "previousTmdbId": null,
+      "appliedTmdbId": 90755
+    },
+    {
+      "showId": "11c2c390-6fde-462d-b076-c34ada705faf",
+      "previousTmdbId": null,
+      "appliedTmdbId": 68315
+    },
+    {
+      "showId": "d794f9d9-acd2-46b9-8a35-ad4202e0c6a8",
+      "previousTmdbId": null,
+      "appliedTmdbId": 221079
+    },
+    {
+      "showId": "abb5a92c-060b-4337-b4b5-56a8f3f238c2",
+      "previousTmdbId": null,
+      "appliedTmdbId": 84661
+    },
+    {
+      "showId": "bcb54198-a15f-489a-bf04-8792ad380548",
+      "previousTmdbId": null,
+      "appliedTmdbId": 194764
+    },
+    {
+      "showId": "fb684443-ba20-46a4-b48c-05a3c289bdec",
+      "previousTmdbId": null,
+      "appliedTmdbId": 93533
+    },
+    {
+      "showId": "0e8ddf37-163f-43db-9285-7fc34868fad6",
+      "previousTmdbId": null,
+      "appliedTmdbId": 66276
+    },
+    {
+      "showId": "3e70d533-0644-48dd-acb0-d975df9ab41a",
+      "previousTmdbId": null,
+      "appliedTmdbId": 39852
+    },
+    {
+      "showId": "c3856ae2-0450-4b02-a315-db3be066560f",
+      "previousTmdbId": null,
+      "appliedTmdbId": 95403
+    },
+    {
+      "showId": "e6076c79-51e6-4536-ada3-b82ac0302415",
+      "previousTmdbId": null,
+      "appliedTmdbId": 194583
+    },
+    {
+      "showId": "b2f466cb-4fa8-46f7-86b9-619fe6bddad7",
+      "previousTmdbId": null,
+      "appliedTmdbId": 206586
+    },
+    {
+      "showId": "9ff4fa12-49a5-4bf9-bd1a-77bc7080086c",
+      "previousTmdbId": null,
+      "appliedTmdbId": 280888
+    },
+    {
+      "showId": "33f8ceb3-a8b1-4abe-b27c-49a00ce65b48",
+      "previousTmdbId": null,
+      "appliedTmdbId": 21510
+    },
+    {
+      "showId": "158244c8-2504-4ee4-9788-405c91c60a7d",
+      "previousTmdbId": null,
+      "appliedTmdbId": 81355
+    },
+    {
+      "showId": "ae80e32e-6d58-4033-b4ef-570722e99e8e",
+      "previousTmdbId": null,
+      "appliedTmdbId": 219064
+    },
+    {
+      "showId": "f4f70f34-a276-4a4b-a418-8ecae3d5b068",
+      "previousTmdbId": null,
+      "appliedTmdbId": 262848
+    },
+    {
+      "showId": "350d6eb7-a5d8-40f7-b215-b1cca058de16",
+      "previousTmdbId": null,
+      "appliedTmdbId": 248852
+    },
+    {
+      "showId": "8faead83-3ac2-4d30-a6f9-7d4705da06a2",
+      "previousTmdbId": null,
+      "appliedTmdbId": 270476
+    },
+    {
+      "showId": "8af562cc-219b-48ec-aba0-b1b149019aa2",
+      "previousTmdbId": null,
+      "appliedTmdbId": 44217
+    },
+    {
+      "showId": "a8c65e23-a96e-450f-aa40-5804ab60c20a",
+      "previousTmdbId": null,
+      "appliedTmdbId": 63247
+    },
+    {
+      "showId": "840d9ddb-9496-48ed-9a8a-ca20da542b8a",
+      "previousTmdbId": null,
+      "appliedTmdbId": 120168
+    }
+  ]
+}
