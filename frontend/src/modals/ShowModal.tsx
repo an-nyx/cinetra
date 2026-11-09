@@ -66,7 +66,12 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows }:
   const act = async (action: () => Promise<unknown>, selectedSeason = season) => {
     if (!selectedShow || busy) return;
     setBusy(true); setError("");
-    try { await action(); await refresh(selectedShow, selectedSeason); }
+    try {
+      await action();
+      // Marking the next episode can advance the saved checkpoint server-side; show the stored position at once.
+      const [, updated] = await Promise.all([refresh(selectedShow, selectedSeason), ShowService.getShowById(selectedShow).catch(() => null)]);
+      if (updated) setShows(current => current.map(item => item.id === updated.id ? updated : item));
+    }
     catch { setError('Could not save progress. Please try again.'); }
     finally { setBusy(false); }
   };

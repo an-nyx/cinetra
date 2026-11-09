@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "build": "tsc",
-    "test:tracking": "ts-node tests/legacy-progress.test.ts && ts-node tests/upcoming-schedule.test.ts && ts-node tests/tmdb-error-sanitization.test.ts && ts-node tests/tracking-audit.test.ts && ts-node tests/schedule-and-progress-reasons.test.ts",
+    "test:tracking": "ts-node tests/legacy-progress.test.ts && ts-node tests/upcoming-schedule.test.ts && ts-node tests/tmdb-error-sanitization.test.ts && ts-node tests/tracking-audit.test.ts && ts-node tests/schedule-and-progress-reasons.test.ts && ts-node tests/season-progress.test.ts",
     "start": "node dist/src/index.js",
     "dev": "nodemon src/index.ts"
   },
