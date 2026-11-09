@@ -18,7 +18,7 @@ export function viewingStateLabel(s: TrackingSummary) {
   case "caught_up": return "Caught up";
   case "not_started": return "Not started";
   case "in_progress": return "In progress";
-  case "needs_review": return "Saved position needs review";
+  case "needs_review": return "Needs review";
   default: return s.guideAvailable ? "Progress unverified" : "Episode data unavailable";
   }
 }

@@ -90,6 +90,14 @@ export class TMDBApiService implements TMDBService {
     }
   }
 
+  /** Raw TV search candidates (first page) for schedule-only identity checks. Never used to create or link shows. */
+  async searchTVCandidates(query: string): Promise<Array<{ id: number; name?: string; original_name?: string; overview?: string; first_air_date?: string }>> {
+    query = query?.trim().slice(0, 100);
+    if (!query) return [];
+    const response = await this.cached(`candidates:tv:${query.toLowerCase()}`, () => this.get<{ results: Array<{ id: number; name?: string; original_name?: string; overview?: string; first_air_date?: string }> }>('/search/tv', { params: { query } }));
+    return response.data.results || [];
+  }
+
   async getShow(id: number): Promise<TMDBShowDetails> {
     const response = await this.cached<AxiosResponse<TMDBShowDetails>>(`tv:${id}`, () => this.get<TMDBShowDetails>(`/tv/${id}`));
     return response.data;

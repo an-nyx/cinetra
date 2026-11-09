@@ -43,13 +43,15 @@ export interface TrackedEpisode { season: number; number: number; name: string; 
 export interface UpcomingRelease {
   showId: string; showName: string; posterURL: string | null; showStatus: string | null;
   season: number | null; number: number | null; name: string; airDate: string; airTimestamp: string | null; seasonPremiere: boolean;
-  scheduleSource: 'TMDB' | 'TVMaze'; scheduleConflict?: boolean;
+  scheduleSource: 'TMDB' | 'TVMaze'; scheduleConflict?: boolean; scheduleIdentity?: 'linked' | 'schedule_match' | 'library_title';
 }
 export interface ReturningTba { showId: string; showName: string; posterURL: string | null; broadcastStatus: string }
 export interface TrackingSummary {
   showId: string; name: string; posterURL: string | null; status: string | null; source: string | null;
   guideAvailable: boolean; countDataAvailable: boolean; legacyPosition: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number | null; normalizedEpisode?: number | null; needsReview?: boolean } | null;
   watchedCount: number; explicitWatchedCount: number; legacyInferredCount: number; releasedCount: number; remainingCount: number; progressPercent: number | null;
+  /** Present only when no percentage can be shown: why, in a short label and one sentence. */
+  progressUnavailable?: { code: string; label: string; detail: string } | null;
   broadcastStatus?: 'ended' | 'canceled' | 'returning' | 'in_production' | 'planned' | 'unknown';
   viewingState?: 'unknown' | 'fully_watched' | 'caught_up' | 'in_progress' | 'not_started' | 'needs_review';
   completionEligible?: boolean; finalSeason?: number | null; finalityConfirmed?: boolean;
@@ -65,7 +67,7 @@ class ShowServiceClass extends ApiService {
     return response.data;
   }
 
-  async getUpcomingReleases(): Promise<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeQueriedShows?: number; tvmazeSkippedFinalShows?: number; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }> {
+  async getUpcomingReleases(): Promise<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeQueriedShows?: number; tvmazeSkippedFinalShows?: number; unlinkedScheduleMatches?: { tmdb: number; tvmaze: number; unmatched: number }; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }> {
     const response = await this.get<{ releases: UpcomingRelease[]; returningTba: ReturningTba[]; failedShows: number; evaluatedShows: number; showsWithTMDBId: number; showsWithoutTMDBId: number; tmdbResponses: number; tmdbFailures: number; tmdbFailureTypes: Record<string, number>; tmdbSeasonFailures: number; incompleteTMDBSchedules: number; scheduledTMDBEpisodes: number; scheduledTVMazeEpisodes: number; tvmazeVerifiedShows: number; tvmazeAmbiguousShows: number; scheduleConflicts: number; returningWithoutDate: number }>("/show/upcoming");
     return response.data;
   }

@@ -25,8 +25,9 @@ export const ISSUE_CATEGORY: Record<string, IssueCategory> = {
   details_differ_from_list: 'defect', details_unavailable: 'defect', summary_missing: 'defect', summary_error: 'defect',
   card_hides_next_episode: 'defect', card_hides_saved_position: 'defect', review_case_not_surfaced: 'defect', continue_watching_without_next: 'defect', home_upcoming_differs: 'defect',
   unlinked_shows_counted_as_tmdb_failures: 'defect', tvmaze_queried_for_final_series: 'defect',
+  percent_unavailable_without_reason: 'defect', percent_reason_mismatch: 'defect', unlinked_schedule_match: 'informational',
   upcoming_missing_tmdb_episode: 'defect', tvmaze_replaced_tmdb: 'defect', upcoming_without_tmdb_identity: 'defect', returning_show_missing: 'defect', upcoming_unknown_show: 'defect',
-  library_summary_count: 'defect', home_totals_hidden: 'defect', caught_up_continue_watching_split: 'defect', library_tracking_failed: 'defect', upcoming_failed: 'defect',
+  library_summary_count: 'defect', home_totals_hidden: 'defect', caught_up_continue_watching_split: 'defect', library_tracking_failed: 'defect', upcoming_failed: 'defect', home_totals_partial: 'informational',
   no_tmdb_id: 'insufficient_metadata', tmdb_unavailable: 'insufficient_metadata', production_metadata_error: 'insufficient_metadata', episode_guide_unavailable: 'insufficient_metadata',
   no_regular_episodes: 'insufficient_metadata', season_count_mismatch: 'insufficient_metadata', undated_before_released: 'insufficient_metadata',
   upcoming_date_differs_from_tmdb: 'insufficient_metadata', upcoming_for_final_series: 'insufficient_metadata', schedule_conflict: 'insufficient_metadata',
@@ -57,11 +58,11 @@ export type Summary = {
   showId: string; name?: string; status?: string | null; guideAvailable?: boolean; countDataAvailable?: boolean;
   legacyPosition?: { fullSeasons: number; episodesInNextSeason: number; normalizedSeason?: number | null; normalizedEpisode?: number | null; needsReview?: boolean } | null;
   watchedCount?: number; explicitWatchedCount?: number; legacyInferredCount?: number; releasedCount?: number; remainingCount?: number;
-  progressPercent?: number | null; broadcastStatus?: string; viewingState?: string; completionEligible?: boolean;
+  progressPercent?: number | null; progressUnavailable?: { code: string; label: string; detail: string } | null; broadcastStatus?: string; viewingState?: string; completionEligible?: boolean;
   metadataError?: string | null; statusProgressNote?: string | null;
   nextEpisode?: EpisodeRef | null; upcomingEpisode?: EpisodeRef | null; newEpisodes?: number; error?: string | null;
 };
-export type UpcomingRelease = { showId: string; season: number | null; number: number | null; name: string; airDate: string; scheduleSource: 'TMDB' | 'TVMaze'; scheduleConflict?: boolean };
+export type UpcomingRelease = { showId: string; season: number | null; number: number | null; name: string; airDate: string; scheduleSource: 'TMDB' | 'TVMaze'; scheduleConflict?: boolean; scheduleIdentity?: 'linked' | 'schedule_match' | 'library_title' };
 export type UpcomingResponse = { releases: UpcomingRelease[]; returningTba: { showId: string; broadcastStatus: string }[]; [diagnostic: string]: unknown };
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -216,7 +217,7 @@ export function viewingStateLabel(s: Summary) {
     case 'caught_up': return 'Caught up';
     case 'not_started': return 'Not started';
     case 'in_progress': return 'In progress';
-    case 'needs_review': return 'Saved position needs review';
+    case 'needs_review': return 'Needs review';
     default: return s.guideAvailable ? 'Progress unverified' : 'Episode data unavailable';
   }
 }
@@ -279,6 +280,13 @@ export function auditShow(input: ShowAuditInput) {
   const expected = catalog ? expectedTracking(show, catalog, explicit, today) : null;
   if (expected) issues.push(...expected.issues);
   const classification = expected ? expectedClassification(expected, facts, today) : { state: 'unverifiable' as const, reason: 'Production episode metadata is unavailable.' };
+
+  // A missing percentage must always say why, and an unlinked show must say so.
+  if (summary && !summary.error && (summary.progressPercent ?? null) === null) {
+    if (!summary.progressUnavailable) add('percent_unavailable_without_reason', 'error', 'No percentage is shown and no reason is given.');
+    else if (!show.tmdbId && summary.progressUnavailable.code !== 'no_tmdb_association') add('percent_reason_mismatch', 'error', `The show has no TMDB association, but the stated reason is "${summary.progressUnavailable.code}".`);
+    else if (show.tmdbId && summary.progressUnavailable.code === 'no_tmdb_association') add('percent_reason_mismatch', 'error', 'The show is linked to TMDB, but the stated reason is "no_tmdb_association".');
+  }
 
   // Details (GET /show/:id/tracking) must agree with the list endpoint used by Shows, Home and Continue watching.
   if (input.detailError) add('details_unavailable', 'error', `GET /show/:id/tracking failed: ${input.detailError}.`);
@@ -359,11 +367,7 @@ export function auditShow(input: ShowAuditInput) {
     if (summary.legacyPosition && !card.includes(savedCode(summary)!)) add('card_hides_saved_position', 'warning', `Shows card says "${card}" and omits the saved position ${savedCode(summary)}.`);
     if (expected?.legacy.blocking && !expected.explicitCoversAll && !attentionReason(summary)) add('review_case_not_surfaced', 'warning', `The saved position needs review (${expected.legacy.issues.filter(i => i.severity !== 'info').map(i => i.code).join(', ')}) but no page surfaces it for review.`);
     if (continueWatching && !summary.nextEpisode) add('continue_watching_without_next', 'warning', `Listed in Continue watching as "${continueWatchingLabel(summary)}" with no episode to continue.`);
-    const homeNext = summary.upcomingEpisode;
-    const pageNext = input.upcoming.filter(r => r.airDate > today).sort((a, b) => a.airDate.localeCompare(b.airDate))[0];
-    const homeText = homeNext ? `${homeNext.airDate} ${episodeCode(homeNext.season, homeNext.number)}` : 'none';
-    const pageText = pageNext ? `${pageNext.airDate} ${pageNext.season && pageNext.number ? episodeCode(pageNext.season, pageNext.number) : `"${pageNext.name}"`} (${pageNext.scheduleSource})` : 'none';
-    if ((homeNext?.airDate || null) !== (pageNext?.airDate || null)) add('home_upcoming_differs', 'warning', `Home "Upcoming episodes" shows ${homeText}; the Upcoming page shows ${pageText}.`);
+    // Home's "Upcoming episodes" renders GET /show/upcoming itself (pages/welcome-page.tsx), so it cannot diverge from the Upcoming page.
   }
 
   return {
@@ -396,7 +400,12 @@ export function auditUpcoming(shows: RawShow[], response: UpcomingResponse, fact
     const tmdbReleases = releases.filter(r => r.scheduleSource === 'TMDB');
     const tvmaze = releases.filter(r => r.scheduleSource === 'TVMaze');
     coverage[!show.tmdbId ? 'noTmdbId' : tmdbReleases.length && tvmaze.length ? 'both' : tmdbReleases.length ? 'tmdbOnly' : tvmaze.length ? 'tvmazeOnly' : 'none']++;
-    if (!show.tmdbId) { if (releases.length) add(show.id, 'upcoming_without_tmdb_identity', 'error', 'Schedule entries exist for a show without a TMDB association.'); continue; }
+    if (!show.tmdbId) {
+      const undeclared = releases.filter(r => r.scheduleIdentity !== 'schedule_match' && r.scheduleIdentity !== 'library_title');
+      if (undeclared.length) add(show.id, 'upcoming_without_tmdb_identity', 'error', 'Schedule entries exist for a show without a TMDB association and without a declared schedule identity.');
+      else if (releases.length) add(show.id, 'unlinked_schedule_match', 'info', `${releases.length} schedule entr${releases.length === 1 ? 'y' : 'ies'} from a title-and-description match (${[...new Set(releases.map(r => `${r.scheduleSource}/${r.scheduleIdentity}`))].join(', ')}); not stored, not used for tracking.`);
+      continue;
+    }
     const facts = factsById.get(show.id);
     if (!facts) continue;
     const expected = facts.episodes.filter(e => isRegular(e) && !!e.airDate && e.airDate >= today);
@@ -426,7 +435,8 @@ export function auditUpcoming(shows: RawShow[], response: UpcomingResponse, fact
   const linked = shows.filter(show => show.tmdbId).length;
   const queried = typeof response.tvmazeQueriedShows === 'number' ? response.tvmazeQueriedShows as number
     : ((response.tvmazeVerifiedShows as number) || 0) + ((response.tvmazeAmbiguousShows as number) || 0); // older API: lower bound
-  if (queried > linked - definitivelyOver) library.push({ code: 'tvmaze_queried_for_final_series', severity: 'warning', detail: `TVMaze was queried for ${queried} show(s), but only ${linked - definitivelyOver} linked show(s) are not definitively over; at least ${queried - (linked - definitivelyOver)} lookup(s) were for ended/canceled series with nothing scheduled.` });
+  const allowed = linked - definitivelyOver + unlinked;
+  if (queried > allowed) library.push({ code: 'tvmaze_queried_for_final_series', severity: 'warning', detail: `TVMaze was queried for ${queried} show(s), but at most ${allowed} may need it (linked shows not definitively over, plus unlinked shows); at least ${queried - allowed} lookup(s) were for ended/canceled series with nothing scheduled.` });
   return { perShow, coverage, library, releases: response.releases.length, returningWithoutDate: response.returningTba.length };
 }
 
@@ -435,8 +445,10 @@ export function auditLibrarySurfaces(summaries: Summary[], showCount: number) {
   const issues: Issue[] = [];
   const valid = summaries.filter(s => !s.error);
   if (summaries.length !== showCount) issues.push({ code: 'library_summary_count', severity: 'error', detail: `GET /show returned ${showCount} shows but GET /show/tracking returned ${summaries.length} summaries.` });
-  const incomplete = valid.filter(s => !s.countDataAvailable).length;
-  if (valid.length !== showCount || incomplete) issues.push({ code: 'home_totals_hidden', severity: 'warning', detail: `Home "Episodes watched" and "Ready to watch" show "—" because ${incomplete + (showCount - valid.length)} show(s) lack complete counts.` });
+  // Home sums only shows with verified counts and labels the tiles "from N of M shows" (pages/welcome-page.tsx).
+  const verified = valid.filter(s => s.countDataAvailable && s.progressPercent !== null && s.progressPercent !== undefined).length;
+  if (!verified && showCount) issues.push({ code: 'home_totals_hidden', severity: 'warning', detail: 'Home shows "—" for episode totals because no show has verified counts.' });
+  else if (verified < showCount) issues.push({ code: 'home_totals_partial', severity: 'info', detail: `Home episode totals cover ${verified} of ${showCount} shows and say so; the rest lack verified episode data.` });
   const caughtUp = valid.filter(s => s.viewingState === 'caught_up');
   const listed = caughtUp.filter(inContinueWatching).length;
   if (listed && listed < caughtUp.length) issues.push({ code: 'caught_up_continue_watching_split', severity: 'warning', detail: `${listed} caught-up show(s) appear in Continue watching and ${caughtUp.length - listed} do not; the only difference is whether a saved legacy position exists.` });

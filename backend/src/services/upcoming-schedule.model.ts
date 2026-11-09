@@ -1,8 +1,10 @@
 export type ScheduleSource = 'TMDB' | 'TVMaze';
+/** How the show's schedule identity was established: stored TMDB link, a corroborated schedule-only TMDB match, or the library title (TVMaze). */
+export type ScheduleIdentity = 'linked' | 'schedule_match' | 'library_title';
 export type UpcomingItem = {
   showId: string; showName: string; posterURL: string | null; showStatus: string | null;
   season: number | null; number: number | null; name: string; airDate: string; airTimestamp: string | null;
-  seasonPremiere: boolean; scheduleSource: ScheduleSource; scheduleConflict: boolean;
+  seasonPremiere: boolean; scheduleSource: ScheduleSource; scheduleConflict: boolean; scheduleIdentity?: ScheduleIdentity;
 };
 
 export function upcomingItemKey(item: UpcomingItem) {
