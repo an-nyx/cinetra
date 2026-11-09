@@ -35,11 +35,10 @@ export default function ShowsPage() {
   const [search, setSearch] = useState<string>("");
   const [controlsOpen, setControlsOpen] = useState(false);
   const [filters, setFilters] = useState<ListFiltersType>(() => {
-    const savedSort = localStorage.getItem('showsSortBy');
     // Home's "See all" links open the library filtered by a personal status (e.g. /shows?status=watching).
     const linkedStatus = new URLSearchParams(window.location.search).get('status') as PersonalStatus | null;
     const statusFilter = linkedStatus && linkedStatus in personalStatusLabels ? linkedStatus : undefined;
-    return { ...(savedSort ? { sortBy: savedSort as ListFiltersType['sortBy'] } : {}), ...(statusFilter ? { statusFilter } : {}) };
+    return { sortBy: 'dateNewest', ...(statusFilter ? { statusFilter } : {}) };
   });
   const navigate = useNavigate();
   const [key, setKey] = useState(+new Date());
@@ -71,13 +70,6 @@ export default function ShowsPage() {
     catch (error) { console.error('Could not mark next episode watched', error); }
   };
 
-  useEffect(() => {
-    if (filters.sortBy) {
-      localStorage.setItem('showsSortBy', filters.sortBy);
-    } else {
-      localStorage.removeItem('showsSortBy');
-    }
-  }, [filters.sortBy]);
 
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
@@ -120,9 +112,9 @@ export default function ShowsPage() {
           <SelectTrigger aria-label="Filter watching status" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">All watching statuses</SelectItem>{(['watching', 'completed', 'dropped', 'planned', 'paused', 'none'] as const).map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}</SelectContent>
         </Select>
-        <Select value={filters.sortBy ?? 'default'} onValueChange={(value: NonNullable<ListFiltersType['sortBy']> | 'default') => setFilters({ ...filters, sortBy: value === 'default' ? undefined : value })}>
+        <Select value={filters.sortBy ?? 'dateNewest'} onValueChange={(value: NonNullable<ListFiltersType['sortBy']>) => setFilters({ ...filters, sortBy: value })}>
           <SelectTrigger aria-label="Sort library" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="default">Sort by</SelectItem><SelectItem value="nameAsc">Name (A-Z)</SelectItem><SelectItem value="nameDesc">Name (Z-A)</SelectItem><SelectItem value="dateNewest">Date Added (Newest)</SelectItem><SelectItem value="dateOldest">Date Added (Oldest)</SelectItem><SelectItem value="updatedNewest">Updated (Newest)</SelectItem><SelectItem value="updatedOldest">Updated (Oldest)</SelectItem></SelectContent>
+          <SelectContent><SelectItem value="nameAsc">Name (A-Z)</SelectItem><SelectItem value="nameDesc">Name (Z-A)</SelectItem><SelectItem value="dateNewest">Date Added (Newest)</SelectItem><SelectItem value="dateOldest">Date Added (Oldest)</SelectItem><SelectItem value="updatedNewest">Updated (Newest)</SelectItem><SelectItem value="updatedOldest">Updated (Oldest)</SelectItem></SelectContent>
         </Select>
         <Button type="button" variant="outline" size="icon" className="size-10" aria-label="Search and more filters" aria-expanded={controlsOpen} aria-controls="show-filters" onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
       </div>

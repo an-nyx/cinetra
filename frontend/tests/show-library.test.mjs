@@ -18,3 +18,13 @@ test('status, completion, favorite, search and sorting combine', () => {
   assert.deepEqual(filterAndSortShows(shows, '', { statusFilter: 'watching', completeFilter: 'completed' }), []);
   assert.deepEqual(filterAndSortShows(shows, '', { sortBy: 'nameDesc' }).map(s => s.name), ['Waiting', 'Stopped', 'Planned', 'Paused', 'Legacy', 'Done']);
 });
+
+test('date added newest uses creation time, independently of update time', () => {
+  const items = [
+    { ...make('Older', 'watching', false, false, '2020-01-01'), updatedAt: '2026-01-01' },
+    { ...make('Newest', 'watching', false, false, '2024-01-01'), updatedAt: '2024-01-01' },
+    { ...make('Middle', 'watching', false, false, '2022-01-01'), updatedAt: '2025-01-01' },
+  ];
+  assert.deepEqual(filterAndSortShows(items, '', { sortBy: 'dateNewest' }).map(s => s.name), ['Newest', 'Middle', 'Older']);
+  assert.deepEqual(filterAndSortShows(items, '', { sortBy: 'updatedNewest' }).map(s => s.name), ['Older', 'Middle', 'Newest']);
+});
