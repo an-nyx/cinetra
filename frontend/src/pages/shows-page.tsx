@@ -228,7 +228,7 @@ export default function ShowsPage() {
         }
 
         return (
-          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid w-full grid-cols-2 gap-x-3 gap-y-5 min-[480px]:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {sortedShows.map((show) => (
               <Show
                 type="show"
