@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import ShowModal from '@/modals/ShowModal';
 import { ApiService, ShowService } from '@/services';
-import type { ReturningTba, UpcomingRelease } from '@/services/show.service';
+import type { ReturningTba, UpcomingRelease, TrackingSummary } from '@/services/show.service';
 import type { ShowType } from '@/types';
 
 type Filter = 'all' | 'today' | 'week' | 'month' | 'premieres';
@@ -62,6 +62,7 @@ export default function UpcomingPage() {
   const [releases, setReleases] = useState<UpcomingRelease[]>([]);
   const [returningTba, setReturningTba] = useState<ReturningTba[]>([]);
   const [shows, setShows] = useState<ShowType[]>([]);
+  const [tracking, setTracking] = useState<TrackingSummary[]>([]);
   const [failedShows, setFailedShows] = useState(0);
   const [tmdbFailureTypes, setTMDBFailureTypes] = useState<Record<string, number>>({});
   const [showsWithoutTMDBId, setShowsWithoutTMDBId] = useState(0);
@@ -87,6 +88,7 @@ export default function UpcomingPage() {
       setAmbiguousSchedules(data.tvmazeAmbiguousShows || 0);
       setCoverage({ evaluated: data.evaluatedShows || 0, tmdbEntries: data.scheduledTMDBEpisodes || 0, tvmazeEntries: data.scheduledTVMazeEpisodes || 0, unlinked: data.unlinkedScheduleMatches || null });
       ShowService.getAllShows().then(setShows).catch(() => {});
+      ShowService.getLibraryTracking().then(setTracking).catch(() => setTracking([]));
       setNow(new Date());
       setError('');
     } catch { setError('Upcoming releases could not be loaded. Please try again.'); }
@@ -115,6 +117,7 @@ export default function UpcomingPage() {
       </div>
       <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => { ApiService.clearCache(); refresh(); }} disabled={refreshing}><RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh</Button>
     </header>
+    {tracking.some(item => item.newSeasonToWatch) && <section className="space-y-2 rounded-xl border border-primary/25 bg-card p-4" aria-label="New seasons to watch"><h2 className="font-semibold">New seasons to watch</h2><p className="text-xs text-muted-foreground">Released episodes from your Completed shows. Your personal statuses remain unchanged.</p>{tracking.filter(item => item.newSeasonToWatch).map(item => <button key={item.showId} type="button" onClick={() => setSelectedShow(item.showId)} className="block w-full rounded-lg border p-3 text-left text-sm"><span className="font-semibold">{item.name} · Season {item.newSeasonToWatch!.season}</span><span className="mt-1 block text-xs text-muted-foreground">{item.newSeasonToWatch!.episodes.map(e => `E${String(e.number).padStart(2, '0')} ${e.name}`).join(' · ')}</span><span className="mt-1 block text-xs text-primary">Review and resume Watching</span></button>)}</section>}
     <nav aria-label="Upcoming filters" className="flex flex-wrap items-center gap-2">{filters.map(option => <button key={option.id} type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)} className="upcoming-filter px-3.5 py-2 text-xs font-semibold sm:text-sm">{option.label}</button>)}<span className="ml-auto text-xs text-muted-foreground">{loading ? 'Loading releases…' : error && !releases.length ? '' : `${visible.length} release${visible.length === 1 ? '' : 's'}`}</span></nav>
     {error && <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">{error}</p>}
     {!loading && (tmdbFailureTypes.http_401 || 0) > 0 && <p role="status" className="text-xs text-destructive">TMDB rejected authentication, so some schedules are missing. See Schedule coverage below.</p>}

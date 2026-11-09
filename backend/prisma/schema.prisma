@@ -38,6 +38,7 @@ model Show {
   tvmazeId        Int?
   status          String?
   episodeWatches  EpisodeWatch[]
+  completedMonitorFrom DateTime?
   user            User     @relation(fields: [userId], references: [id])
   userId          String
   createdAt       DateTime @default(now())

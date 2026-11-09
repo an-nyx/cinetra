@@ -57,6 +57,7 @@ export interface TrackingSummary {
   completionEligible?: boolean; finalSeason?: number | null; finalityConfirmed?: boolean;
   metadataError?: string | null; statusProgressNote?: string | null;
   lastEpisode: TrackedEpisode | null; nextEpisode: TrackedEpisode | null; upcomingEpisode: TrackedEpisode | null;
+  newSeasonToWatch?: { season: number; count: number; episodes: { number: number; name: string; airDate: string }[] } | null;
   newEpisodes: number; recentHistory: { season: number; episode: number; watchedAt: string }[];
   error?: string | null;
 }

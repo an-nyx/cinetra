@@ -14,7 +14,7 @@ export type Catalog = Omit<EpisodeCatalog, 'episodes'> & {
   episodes: CatalogEpisode[]; source: 'TMDB'; broadcastStatus: string | null; inProduction: boolean | null; nextEpisodeAnnounced: boolean;
   meta?: CatalogMeta;
 };
-export type TrackedShow = { id: string; name: string; posterURL: string | null; status: string | null; completed: boolean; seasonsWatched: number; episodesWatched: number };
+export type TrackedShow = { id: string; name: string; posterURL: string | null; status: string | null; completed: boolean; seasonsWatched: number; episodesWatched: number; completedMonitorFrom?: Date | null };
 export type WatchRecord = { season: number; episode: number; watchedAt: Date };
 
 /** Map TMDB's broadcast status onto the tracking model. Unrecognised values stay "unknown" rather than being guessed. */
@@ -174,6 +174,27 @@ export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null,
       : remaining.length ? `Your personal status is Completed, but ${remaining.length} released episode${remaining.length === 1 ? '' : 's'} are not confirmed as watched. Your status has not been changed.`
         : 'Your personal status is Completed, but available metadata does not verify completion. Your status has not been changed.'
     : null;
+  // A stored last-update boundary is a conservative upper bound for the time the personal status was set.
+  // A missing boundary or incomplete metadata is ambiguous and must not produce a new-season claim.
+  const monitoredAfter = show.completedMonitorFrom?.toISOString().slice(0, 10);
+  const newSeasonToWatch = (() => {
+    if (!manualCompleted || !catalog || !monitoredAfter || !progress.progressReliable) return null;
+    for (const season of [...catalog.seasons].sort((a, b) => a.number - b.number)) {
+      if (season.number <= 1) continue;
+      const seasonEpisodes = episodes.filter(e => e.season === season.number && e.number > 0);
+      const premiere = seasonEpisodes.find(e => e.number === 1);
+      if (!premiere?.airDate || premiere.airDate < '2024-01-01' || premiere.airDate <= monitoredAfter || premiere.airDate > today) continue;
+      const priorComplete = Array.from({ length: season.number - 1 }, (_, i) => i + 1).every(number => {
+        const declared = catalog.seasons.find(s => s.number === number);
+        const prior = episodes.filter(e => e.season === number && e.number > 0);
+        return !!declared && declared.episodeCount > 0 && prior.length === declared.episodeCount && prior.every(e => e.watched && !!e.airDate && e.airDate <= today);
+      });
+      if (!priorComplete) continue;
+      const unwatched = seasonEpisodes.filter(e => !e.watched && !!e.airDate && e.airDate <= today);
+      if (unwatched.length) return { season: season.number, count: unwatched.length, episodes: unwatched.map(e => ({ number: e.number, name: e.name, airDate: e.airDate })) };
+    }
+    return null;
+  })();
   const legacyInferredCount = episodes.filter(e => e.watchSource === 'legacy' || e.watchSource === 'both').length;
   const kept = hasSavedPosition ? ` Your saved position ${code(show.seasonsWatched, show.episodesWatched)} is kept.` : '';
   const failure = metadataFailure || (!catalog ? 'tmdb_unavailable' : null);
@@ -191,7 +212,7 @@ export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null,
     guideAvailable: !!catalog && episodes.length > 0, countDataAvailable: progress.releasedMetadataReliable,
     legacyPosition: hasSavedPosition ? { fullSeasons: show.seasonsWatched, episodesInNextSeason: show.episodesWatched, normalizedSeason: legacy.normalizedSeason, normalizedEpisode: legacy.normalizedEpisode, needsReview: legacy.needsReview } : null,
     watchedCount: watched, explicitWatchedCount: watches.length, legacyInferredCount, releasedCount: released.length, remainingCount: remaining.length,
-    progressPercent: progress.progressPercent, progressUnavailable, broadcastStatus, viewingState: progress.viewingState, completionEligible: fullyWatched, finalSeason, finalityConfirmed, metadataError, statusProgressNote,
+    progressPercent: progress.progressPercent, progressUnavailable, newSeasonToWatch, broadcastStatus, viewingState: progress.viewingState, completionEligible: fullyWatched, finalSeason, finalityConfirmed, metadataError, statusProgressNote,
     lastEpisode: last, nextEpisode: progress.progressReliable ? remaining[0] || null : null, upcomingEpisode: upcoming[0] || null,
     // "New" = released and unwatched, aired after your latest watch (its date, or for a saved position without
     // individual records, the air date of the latest episode it covers).

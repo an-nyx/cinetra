@@ -46,7 +46,15 @@ export class ShowPrismaRepository implements ShowRepository {
     }
 
     const updatedShow = await this.prisma.$transaction(async tx => {
-      const result = await tx.show.update({ where: { id: showId }, data: showData });
+      await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
+      const current = await tx.show.findFirst({ where: { id: showId, userId } });
+      if (!current) return null;
+      const wasCompleted = current.status === 'completed' || (!current.status && current.completed);
+      const nextStatus = showData.status !== undefined ? showData.status : current.status;
+      const nextCompletedFlag = showData.completed !== undefined ? showData.completed : current.completed;
+      const isCompleted = nextStatus === 'completed' || (!nextStatus && nextCompletedFlag);
+      const boundary = isCompleted && !wasCompleted ? new Date() : !isCompleted && wasCompleted ? null : undefined;
+      const result = await tx.show.update({ where: { id: showId }, data: { ...showData, ...(boundary !== undefined ? { completedMonitorFrom: boundary } : {}) } });
       if (showData.seasonsWatched !== undefined || showData.episodesWatched !== undefined) {
         await tx.episodeWatch.updateMany({ where: { showId }, data: { checkpointBeforeSeason: null, checkpointBeforeEpisode: null, checkpointAfterSeason: null, checkpointAfterEpisode: null } });
       }
