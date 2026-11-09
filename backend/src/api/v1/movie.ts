@@ -38,7 +38,7 @@ router.get("/search", async (req: Request, res: Response) => {
 });
 
 // Read-only, keyed by this user's saved IDs. Builds outside the request so Home never waits for TMDB.
-const discovery = new Map<string, { signature: string; until: number; result?: Awaited<ReturnType<typeof discoverMovies>>; running?: Promise<void> }>();
+const discovery = new Map<string, { signature: string; until: number; result?: Awaited<ReturnType<typeof discoverMovies>>; running?: Promise<void>; failed?: boolean; forcedAt?: number }>();
 router.get('/upcoming', async (req: Request, res: Response) => {
   try {
     const movies = await movieModule.Queries.GetAllQuery.execute(req.user.id);
@@ -46,14 +46,21 @@ router.get('/upcoming', async (req: Request, res: Response) => {
     const region = typeof req.query.region === 'string' && /^[A-Z]{2}$/.test(req.query.region) ? req.query.region : undefined;
     const signature = JSON.stringify([ids.slice().sort(), region]);
     let entry = discovery.get(req.user.id);
-    if (!entry || entry.signature !== signature || entry.until < Date.now()) {
-      entry = { signature, until: Date.now() + 12 * 60 * 60_000 };
+    if (!entry) { entry = { signature, until: 0 }; discovery.set(req.user.id, entry); }
+    const force = req.query.refresh === '1' && Date.now() - (entry.forcedAt || 0) > 30_000;
+    if (force) { entry.forcedAt = Date.now(); entry.until = 0; }
+    if (!entry.running && (entry.signature !== signature || entry.until < Date.now())) {
       const current = entry;
-      current.running = discoverMovies(ids, new Date().toISOString().slice(0, 10), region).then(result => { current.result = result; if (result.unresolved) current.until = Date.now() + 5 * 60_000; }).catch(() => { current.until = 0; }).finally(() => { current.running = undefined; });
-      if (discovery.size >= 500) discovery.delete(discovery.keys().next().value!);
-      discovery.set(req.user.id, entry);
+      current.signature = signature;
+      current.running = discoverMovies(ids, new Date().toISOString().slice(0, 10), region).then(result => {
+        current.failed = result.providerFailures > 0;
+        if (!result.providerFailures || !current.result) current.result = result;
+        current.until = Date.now() + (result.unresolved ? 5 * 60_000 : 12 * 60 * 60_000);
+      }).catch(() => { current.failed = true; current.until = Date.now() + 60_000; }).finally(() => { current.running = undefined; });
+      if (discovery.size > 500) { const oldest = discovery.keys().next().value!; if (oldest !== req.user.id) discovery.delete(oldest); }
     }
-    res.json(entry.result || { status: 'building' });
+    if (!entry.result && entry.failed && !entry.running) { res.status(503).json({ message: 'Movie discovery unavailable' }); return; }
+    res.json(entry.result ? { ...entry.result, refreshing: !!entry.running || entry.signature !== signature, refreshError: !!entry.failed } : { status: 'building' });
   } catch { res.status(503).json({ message: 'Movie discovery unavailable' }); }
 });
 

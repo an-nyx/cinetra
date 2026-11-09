@@ -33,6 +33,9 @@ async function run() {
   assert.deepEqual(result.releases.map(x => x.tmdbId), [3]);
   const incomplete = await discoverMovies([1], today, undefined, { ...provider, collection: async () => ({ ...group, parts: [] }) });
   assert.equal(incomplete.releases.length, 0); assert.equal(incomplete.unresolved, 1);
+  const unavailable = await discoverMovies([1], today, undefined, { ...provider, details: async () => { throw new Error('provider down'); } });
+  assert.equal(unavailable.providerFailures, 1);
+  assert.equal(unavailable.releases.length, 0);
   console.log('Movie discovery tests passed');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

@@ -50,6 +50,7 @@ export class SWRCache<V> {
 
   /** The cached value, if any, without loading or refreshing. */
   peek(key: string): V | undefined { const entry = this.entries.get(key); return entry?.hasValue ? entry.value : undefined; }
+  isRefreshing(key: string) { return !!this.entries.get(key)?.pending; }
   /** Keys that currently hold a value. */
   keys() { return [...this.entries.entries()].filter(([, e]) => e.hasValue).map(([key]) => key); }
   delete(key: string) { this.entries.delete(key); }

@@ -1,3 +1,4 @@
+import { clearUpcomingCache } from "@/lib/upcoming-cache";
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 const cache = new Map<string, { expires: number; promise: Promise<AxiosResponse<unknown>> }>();
@@ -40,6 +41,7 @@ export class ApiService {
         // Handle common errors here if needed
         if (error.response?.status === 401) {
           // Token expired or invalid
+          clearUpcomingCache();
           localStorage.removeItem("Authorization");
           window.location.href = "/login";
         }
@@ -57,7 +59,7 @@ export class ApiService {
     const currentGeneration = generation;
     const promise = this.api.get<T>(url, config).then(response => {
       // A schedule that is still being built is an interim answer: never cache it.
-      if ((response.data as { status?: string } | null)?.status === "building") { if (cache.get(key)?.promise === promise) cache.delete(key); return response; }
+      if (((response.data as { status?: string; refreshing?: boolean } | null)?.status === "building" || (response.data as { refreshing?: boolean } | null)?.refreshing)) { if (cache.get(key)?.promise === promise) cache.delete(key); return response; }
       if (currentGeneration === generation && cache.get(key)?.promise === promise) cache.set(key, { expires: Date.now() + ttl, promise });
       return response;
     }).catch(error => { if (cache.get(key)?.promise === promise) cache.delete(key); throw error; });

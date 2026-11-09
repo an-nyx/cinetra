@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { AlertTriangle, CalendarDays, ChevronDown, Info, RefreshCw, Tv } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import ShowModal from "@/modals/ShowModal";
 import { ShowService } from "@/services";
 import type { ShowType } from "@/types";
@@ -69,7 +68,7 @@ function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: 
 }
 
 export default function UpcomingPage() {
-  const { schedule, building, loading, refreshing, error, refresh } = useUpcomingSchedule();
+  const { schedule, cached, building, loading, refreshing, error, refresh } = useUpcomingSchedule();
   const now = useNow();
   const [params] = useSearchParams();
   const [category, setCategory] = useState<"all" | "tv" | "movies">(params.get("category") === "movies" ? "movies" : "all");
@@ -94,7 +93,7 @@ export default function UpcomingPage() {
   const stats = calendarStats(events);
   const counts = useMemo(() => Object.fromEntries(calendarFilters.map(f => [f.id, filterEvents(events, f.id, now).length])) as Record<CalendarFilter, number>, [events, now]);
   const coverage = schedule?.coverage;
-  const updated = schedule ? new Date(schedule.generatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
+  const updated = schedule ? new Date(schedule.generatedAt).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : null;
 
   return <div className="mx-auto w-full min-w-0 max-w-3xl px-4 pb-4 pt-3 md:px-8 md:pt-6">
     <header className="flex items-start justify-between gap-3">
@@ -102,7 +101,7 @@ export default function UpcomingPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Upcoming</h1>
         <p className="text-xs text-muted-foreground">Episodes and collection releases, by date</p>
       </div>
-      <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={refresh} disabled={refreshing || loading} aria-label="Refresh schedule">
+      <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={() => { refresh(); movies.retry(); }} disabled={refreshing} aria-label="Refresh schedules">
         <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
       </Button>
     </header>
@@ -113,6 +112,8 @@ export default function UpcomingPage() {
       <span><strong className="font-semibold text-primary">{stats.premieres}</strong> {stats.premieres === 1 ? "premiere" : "premieres"}</span>
       {updated && <span className="ml-auto">Updated {updated}</span>}
     </p>}
+    {cached && category !== "movies" && <p role="status" className="mt-2 text-xs text-muted-foreground">Showing saved TV releases while the schedule refreshes.</p>}
+    {movies.data && category !== "tv" && <p role="status" className="mt-2 text-xs text-muted-foreground">{movies.cached ? "Showing saved movie releases. " : ""}Movies updated {new Date(movies.data.generatedAt).toLocaleString()}.</p>}
     {schedule?.stale && category !== "movies" && <p role="status" className="mt-2 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
       <AlertTriangle className="mt-px size-3.5 shrink-0" />TVMaze could not be reached for some shows; their last saved schedule is shown and may be out of date.
     </p>}
@@ -128,14 +129,16 @@ export default function UpcomingPage() {
 
     {error && <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm"><span>{error}</span><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></div>}
 
-    {movies.error && category !== "tv" && <p role="status" className="mt-3 text-xs text-muted-foreground">Movie releases are unavailable right now.</p>}
+    {movies.error && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span>Movie releases could not be refreshed.</span><Button size="sm" variant="outline" onClick={movies.retry}>Retry movies</Button></div>}
     {days.length > 0 && <section aria-label="Scheduled releases" className="mt-2">{days.map(({ day, events: dayEvents, movies: dayMovies }) => <section key={day} aria-labelledby={`day-${day}`} className="release-day-group">
       <h2 id={`day-${day}`} className="release-day flex items-baseline justify-between text-[11px] font-bold tracking-[0.12em] text-muted-foreground"><span>{dayHeading(day)}</span>{relativeDay(day, now) && <span className="text-primary">{relativeDay(day, now)}</span>}</h2>
       <div className="space-y-2 pb-2">{dayEvents.map(event => <ReleaseCard key={event.key} event={event} onOpen={setSelectedShow} />)}{dayMovies.map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div>
     </section>)}</section>}
     {category !== "tv" && filter === "all" && !!movies.data?.releases.some(movie => !movie.date) && <details className="dash-card group mt-4 px-3 py-1"><summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold">Upcoming Movies — Date TBA<ChevronDown className="ml-auto size-4" /></summary><p className="pb-2 text-xs text-muted-foreground">TMDB lists these collection members, but their release details are unconfirmed.</p><div className="space-y-2 pb-2">{movies.data.releases.filter(movie => !movie.date).map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div></details>}
-    {loading && !schedule && category !== "movies" && <div className="mt-4 space-y-2" aria-label="Loading upcoming releases" aria-busy="true">{building && building.total > 0 && <p className="text-xs text-muted-foreground">Preparing your TVMaze schedule… {building.done} of {building.total} shows checked</p>}<Skeleton className="h-[86px] rounded-2xl" /></div>}
-    {!days.length && (category === "movies" || !loading) && (category === "tv" || movies.data) && !error && <div className="dash-card mt-4 px-4 py-6 text-center"><CalendarDays className="mx-auto size-7 text-primary" /><h2 className="mt-2 text-sm font-semibold">{category === "tv" ? emptyText[filter] : "No dated releases for this filter."}</h2><p className="mt-1 text-xs text-muted-foreground">Try another filter.</p></div>}
+    {(loading || building) && category !== "movies" && <div role="status" className="dash-card mt-4 flex items-center justify-between gap-3 p-3 text-xs text-muted-foreground"><span>{building && building.total > 0 ? `Preparing TV releases… ${building.done} of ${building.total} shows checked` : "Preparing TV releases…"}</span><Button size="sm" variant="outline" onClick={refresh} disabled={refreshing}>Retry TV</Button></div>}
+    {movies.loading && !movies.data && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span>Preparing movie releases…</span><Button size="sm" variant="outline" onClick={movies.retry}>Retry movies</Button></div>}
+    {!days.length && !building && (category === "movies" || !loading) && (category === "tv" || movies.data) && !error && <div className="dash-card mt-4 px-4 py-6 text-center"><CalendarDays className="mx-auto size-7 text-primary" /><h2 className="mt-2 text-sm font-semibold">{category === "tv" ? emptyText[filter] : "No dated releases for this filter."}</h2><p className="mt-1 text-xs text-muted-foreground">Try another filter.</p></div>}
+
     {schedule && category !== "movies" && <>
       {schedule.returningTba.length > 0 && <details className="dash-card group mt-4 px-3 py-1">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
