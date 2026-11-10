@@ -3,6 +3,7 @@ import authRouter from "./auth";
 import showRouter from "./show";
 import movieRouter from "./movie";
 import userRouter from "./user";
+import notificationsRouter from "./notifications";
 import { protectedRoute } from "../../middlewares/protectedRoute";
 import { getHealth } from "../../services/episode-guide.service";
 
@@ -19,5 +20,6 @@ router.get("/health", async (_req, res) => {
 router.use("/show", protectedRoute, showRouter);
 router.use("/movie", protectedRoute, movieRouter);
 router.use("/user", userRouter);
+router.use("/notifications", protectedRoute, notificationsRouter);
 
 export default router;

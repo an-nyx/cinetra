@@ -9,7 +9,10 @@
     "test:tracking": "ts-node tests/new-season-notice.test.ts && ts-node tests/manual-dropped-status.test.ts && ts-node tests/legacy-progress.test.ts && ts-node tests/upcoming-schedule.test.ts && ts-node tests/tvmaze-service.test.ts && ts-node tests/tmdb-error-sanitization.test.ts && ts-node tests/tracking-audit.test.ts && ts-node tests/schedule-and-progress-reasons.test.ts && ts-node tests/season-progress.test.ts && ts-node tests/performance-cache.test.ts && ts-node tests/rematch.test.ts",
     "start": "node dist/src/index.js",
     "dev": "nodemon src/index.ts",
-    "test:movie-discovery": "ts-node tests/movie-discovery.test.ts"
+    "test:movie-discovery": "ts-node tests/movie-discovery.test.ts",
+    "test:notifications": "ts-node tests/episode-alerts.test.ts && ts-node tests/push-notifications.integration.test.ts",
+    "notify:run-local": "ts-node scripts/run-episode-notifier.ts",
+    "vapid:generate": "ts-node scripts/generate-vapid-keys.ts"
   },
   "keywords": [],
   "author": "",
@@ -25,7 +28,8 @@
     "morgan": "^1.10.1",
     "prisma": "^6.19.0",
     "ts-node": "^10.9.2",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -34,6 +38,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.19.1",
+    "@types/web-push": "3.6.4",
     "nodemon": "^3.1.11",
     "typescript": "^5.9.3"
   }

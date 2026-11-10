@@ -106,6 +106,21 @@ function scheduleOnlyTMDBMatch(show: { id: string; name: string; overview: strin
 /** Where an error came from, so Upcoming can say which provider was unreachable. */
 const providerOf = (error: unknown): 'TMDB' | 'TVMaze' => axios.isAxiosError(error) && String(error.config?.baseURL || '').includes('tvmaze') ? 'TVMaze' : 'TMDB';
 
+/**
+ * TVMaze identity for a TMDB series (cached): TheTVDB/IMDb IDs TMDB lists first, then the strict title fallback.
+ * Shared by Upcoming and new-episode notifications so both trust exactly the same matches.
+ */
+export function resolveShowIdentity(seriesId: number, show: { name: string; overview: string | null }) {
+  return resolveIdentity({
+    tmdbId: seriesId,
+    externalIds: () => tmdb.getExternalIds(seriesId),
+    evidence: async () => {
+      const details = await tmdb.getShow(seriesId);
+      return { names: [details.name, details.original_name, show.name], firstAirDate: details.first_air_date || null, overview: details.overview || show.overview || null };
+    },
+  });
+}
+
 type UpcomingShowRow = { id: string; name: string; overview: string | null; posterURL: string | null; status: string | null; completed: boolean; tmdbId: number | null; tvmazeId: number | null };
 /**
  * One show's TVMaze-only schedule. Identity: the stored TMDB association (or a strictly corroborated schedule-only
@@ -121,18 +136,9 @@ async function upcomingOutcome(show: UpcomingShowRow, linkedTmdbIds: ReadonlySet
     if (match.tmdbId === null) return match.reason === 'search_failed' ? { kind: 'unavailable', show: library, provider: 'TMDB' } : { kind: 'review', show: library, reason: 'no_tmdb_identity' };
     tmdbId = match.tmdbId; tmdbBasis = 'schedule_match';
   }
-  const seriesId = tmdbId;
   let identity: Awaited<ReturnType<typeof resolveIdentity>>;
-  try {
-    identity = await resolveIdentity({
-      tmdbId: seriesId,
-      externalIds: () => tmdb.getExternalIds(seriesId),
-      evidence: async () => {
-        const details = await tmdb.getShow(seriesId);
-        return { names: [details.name, details.original_name, show.name], firstAirDate: details.first_air_date || null, overview: details.overview || show.overview || null };
-      },
-    });
-  } catch (error) { return { kind: 'unavailable', show: library, provider: providerOf(error) }; }
+  try { identity = await resolveShowIdentity(tmdbId, show); }
+  catch (error) { return { kind: 'unavailable', show: library, provider: providerOf(error) }; }
   if (identity.status !== 'verified') return { kind: 'review', show: library, reason: identity.reason };
   if (show.tvmazeId && show.tvmazeId !== identity.tvmazeId) return { kind: 'review', show: library, reason: 'stored_tvmaze_conflict' };
   try {

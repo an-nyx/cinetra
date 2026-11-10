@@ -5,6 +5,7 @@ import path from "path";
 import morgan from "morgan";
 import apiRoutes from "./api/v1";
 import { warmCaches } from "./services/episode-guide.service";
+import { startNotificationScheduler } from "./services/notifications/notification-scheduler";
 
 const app = express();
 
@@ -40,4 +41,6 @@ app.listen(port, () => {
     setTimeout(() => { warmCaches().catch(() => {}); }, 2000);
     setInterval(() => { warmCaches().catch(() => {}); }, 60 * 60_000).unref();
   }
+  // New-episode push notifications: off unless NOTIFICATIONS_SCHEDULER=enabled and VAPID keys are set.
+  startNotificationScheduler();
 });

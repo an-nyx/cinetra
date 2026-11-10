@@ -1,3 +1,4 @@
+import { T, phrase, useLanguage } from "@/i18n";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { MovieService } from "@/services";
@@ -30,6 +31,7 @@ interface ListFiltersType {
 }
 
 export default function MoviesPage() {
+  const { language } = useLanguage();
   const [addMovieModalStatus, setAddMovieModalStatus] = useState<boolean>(false);
   const [movies, setMovies] = useState<MovieType[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<string>("");
@@ -68,15 +70,15 @@ export default function MoviesPage() {
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
       <div className="library-heading mb-2 flex flex-col gap-2 sm:mb-7 sm:gap-5">
-        <div className="hidden sm:block"><p className="cinema-eyebrow mb-2">Your library</p><h1 className="text-4xl font-semibold tracking-tight">Movies<span className="ml-3 text-base font-normal text-muted-foreground">{movies.length}</span></h1></div>
+        <div className="hidden sm:block"><p className="cinema-eyebrow mb-2"><T>Your library</T></p><h1 className="text-4xl font-semibold tracking-tight"><T>Movies</T><span className="ml-3 text-base font-normal text-muted-foreground">{movies.length}</span></h1></div>
         <div className={`${controlsOpen ? "flex" : "hidden"} min-w-0 items-center gap-2 sm:flex`}>
           <InputGroup>
             <InputGroupInput
               id="search"
               type="text"
               name="search"
-              aria-label="Search your movies"
-              placeholder="Search for a movie..."
+              aria-label={phrase(language, "Search your movies")}
+              placeholder={phrase(language, "Search for a movie...")}
               value={search}
               onChange={(e) => setSearch(e.target.value.toLowerCase())}
               className="min-w-0 w-full"
@@ -89,7 +91,7 @@ export default function MoviesPage() {
             onClick={() => setAddMovieModalStatus(true)}
             className="shrink-0 gap-2 rounded-xl font-medium"
           >
-            <Plus className="size-4" /><span>Add movie</span>
+            <Plus className="size-4" /><span><T>Add movie</T></span>
           </Button>
           <AddMovieModal
             modalStatus={addMovieModalStatus}
@@ -101,9 +103,9 @@ export default function MoviesPage() {
       </div>
 
       <div className="mb-2 flex items-center gap-2 sm:hidden">
-        <h1 className="min-w-0 flex-1 text-lg font-semibold">Movies <span className="text-xs font-normal text-muted-foreground">{movies.length}</span></h1>
-        <Button type="button" variant="outline" size="icon" aria-label="Search and filter movies" aria-expanded={controlsOpen} onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
-        <Button type="button" size="icon" aria-label="Add movie" onClick={() => setAddMovieModalStatus(true)}><Plus className="size-4" /></Button>
+        <h1 className="min-w-0 flex-1 text-lg font-semibold"><T>Movies</T> <span className="text-xs font-normal text-muted-foreground">{movies.length}</span></h1>
+        <Button type="button" variant="outline" size="icon" aria-label={phrase(language, "Search and filter movies")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
+        <Button type="button" size="icon" aria-label={phrase(language, "Add movie")} onClick={() => setAddMovieModalStatus(true)}><Plus className="size-4" /></Button>
       </div>
       <div className={`library-filters mb-2 flex-wrap items-center gap-2 sm:mb-6 sm:flex ${controlsOpen ? "flex" : "hidden"}`}>
         <div className="flex flex-wrap items-center gap-2">
@@ -114,12 +116,12 @@ export default function MoviesPage() {
               setFilters({ ...filters, favoriteFilter: value })
             }
           >
-            <SelectTrigger aria-label="Filter favorites" className="w-auto min-w-[130px]">
-              <SelectValue placeholder="All favorites" />
+            <SelectTrigger aria-label={phrase(language, "Filter favorites")} className="w-auto min-w-[130px]">
+              <SelectValue placeholder={phrase(language, "All favorites")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="favorite">Favorite</SelectItem>
-              <SelectItem value="notFavorite">Not Favorite</SelectItem>
+              <SelectItem value="favorite"><T>Favorite</T></SelectItem>
+              <SelectItem value="notFavorite"><T>Not Favorite</T></SelectItem>
             </SelectContent>
           </Select>
 
@@ -137,7 +139,7 @@ export default function MoviesPage() {
               className="flex items-center gap-1.5 h-9"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Reset</span>
+              <span><T>Reset</T></span>
             </Button>
           )}
         </div>
@@ -150,16 +152,16 @@ export default function MoviesPage() {
             setFilters({ ...filters, sortBy: value })
           }
         >
-          <SelectTrigger aria-label="Sort library" className="w-auto min-w-[130px]">
-            <SelectValue placeholder="Sort by" />
+          <SelectTrigger aria-label={phrase(language, "Sort library")} className="w-auto min-w-[130px]">
+            <SelectValue placeholder={phrase(language, "Sort by")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
-            <SelectItem value="nameDesc">Name (Z-A)</SelectItem>
-            <SelectItem value="dateNewest">Date Added (Newest)</SelectItem>
-            <SelectItem value="dateOldest">Date Added (Oldest)</SelectItem>
-            <SelectItem value="updatedNewest">Updated (Newest)</SelectItem>
-            <SelectItem value="updatedOldest">Updated (Oldest)</SelectItem>
+            <SelectItem value="nameAsc"><T>Name (A-Z)</T></SelectItem>
+            <SelectItem value="nameDesc"><T>Name (Z-A)</T></SelectItem>
+            <SelectItem value="dateNewest"><T>Date Added (Newest)</T></SelectItem>
+            <SelectItem value="dateOldest"><T>Date Added (Oldest)</T></SelectItem>
+            <SelectItem value="updatedNewest"><T>Updated (Newest)</T></SelectItem>
+            <SelectItem value="updatedOldest"><T>Updated (Oldest)</T></SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -208,19 +210,19 @@ export default function MoviesPage() {
               <div className="text-center space-y-4">
                 <div className="text-6xl mb-4">🎬</div>
                 <h3 className="text-xl font-semibold text-foreground">
-                  {movies.length === 0 ? "No movies yet" : "No movies found"}
+                  {phrase(language, movies.length === 0 ? "No movies yet" : "No movies found")}
                 </h3>
                 <p className="text-muted-foreground max-w-md">
                   {movies.length === 0
-                    ? "Start building your collection by adding your first movie!"
-                    : "Try adjusting your search or filters to find what you're looking for."}
+                    ? phrase(language, "Start building your collection by adding your first movie!")
+                    : phrase(language, "Try adjusting your search or filters to find what you're looking for.")}
                 </p>
                 {movies.length === 0 && (
                   <Button
                     onClick={() => setAddMovieModalStatus(true)}
                     className="mt-4"
                   >
-                    Add Your First Movie
+                    <T>Add Your First Movie</T>
                   </Button>
                 )}
               </div>

@@ -23,6 +23,8 @@ model User {
   updatedAt DateTime @updatedAt
   Show      Show[]
   Movie     Movie[]
+  notificationPreference NotificationPreference?
+  pushSubscriptions      PushSubscription[]
 }
 
 model Show {
@@ -92,4 +94,70 @@ model MovieWatch {
   watchedAt DateTime @default(now())
 
   @@index([movieId, watchedAt])
+}
+
+/// One row per user. Defaults: TV episode alerts on (once a device is subscribed), movies and digest off.
+model NotificationPreference {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  newEpisodes Boolean  @default(true)
+  movies      Boolean  @default(false)
+  dailyDigest Boolean  @default(false)
+  /// Only "all_except_dropped" is supported: every saved show except those marked Dropped.
+  showScope   String   @default("all_except_dropped")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// A browser/device Web Push subscription. The endpoint is a capability URL and is never returned to clients.
+model PushSubscription {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the endpoint, used for lookups so the raw endpoint never appears in a query log or URL.
+  endpointHash String   @unique
+  endpoint     String
+  p256dh       String
+  auth         String
+  /// Episodes that premiered before this instant are never announced to this device (no backlog on opt-in).
+  notifyFrom   DateTime
+  userAgent    String?
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  failureCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deliveries   NotificationDelivery[]
+
+  @@index([userId])
+}
+
+/// Durable delivery ledger. The unique key makes each (device, TVMaze episode, event) deliverable at most once.
+model NotificationDelivery {
+  id              String    @id @default(uuid())
+  userId          String
+  subscriptionId  String
+  subscription    PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tvmazeShowId    Int
+  tvmazeEpisodeId Int
+  eventType       String
+  /// Library show the notification opens (not a foreign key: the ledger outlives a removed show).
+  showId          String
+  season          Int
+  episode         Int
+  premieredAt     DateTime
+  /// pending -> sending -> sent | retry | failed | expired | uncertain
+  status          String    @default("pending")
+  attempts        Int       @default(0)
+  claimToken      String?
+  claimedAt       DateTime?
+  nextAttemptAt   DateTime  @default(now())
+  sentAt          DateTime?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, subscriptionId, tvmazeShowId, tvmazeEpisodeId, eventType])
+  @@index([status, nextAttemptAt])
+  @@index([status, claimedAt])
 }

@@ -1,3 +1,4 @@
+import { T } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,14 +62,14 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
       {...props}
     >
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Create an account</h1>
+        <h1 className="text-2xl font-bold"><T>Create an account</T></h1>
         <p className="text-muted-foreground text-sm text-balance">
-          Enter your information below to create your account
+          <T>Enter your information below to create your account</T>
         </p>
       </div>
       <div className="grid gap-6">
         <div className="grid gap-3">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="username"><T>Username</T></Label>
           <Input
             id="username"
             autoComplete="username"
@@ -80,7 +81,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           />
         </div>
         <div className="grid gap-3">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email"><T>Email</T></Label>
           <Input
             id="email"
             autoComplete="email"
@@ -92,7 +93,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           />
         </div>
         <div className="grid gap-3">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password"><T>Password</T></Label>
           <Input
             id="password"
             autoComplete="new-password"
@@ -103,7 +104,7 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           />
         </div>
         <div className="grid gap-3">
-          <Label htmlFor="passwordConfirmation">Confirm Password</Label>
+          <Label htmlFor="passwordConfirmation"><T>Confirm Password</T></Label>
           <Input
             id="passwordConfirmation"
             autoComplete="new-password"
@@ -119,13 +120,13 @@ export function SignupForm({ className, handleSubmit: onSubmit, ...props }: Sign
           </div>
         )}
         <Button type="submit" className="w-full">
-          Sign up
+          <T>Sign up</T>
         </Button>
       </div>
       <div className="text-center text-sm">
-        Already have an account?{" "}
+        <T>Already have an account?</T>{" "}
         <a href="/login" className="underline underline-offset-4">
-          Login
+          <T>Login</T>
         </a>
       </div>
     </form>

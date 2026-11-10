@@ -1,3 +1,4 @@
+import { T } from "@/i18n";
 import { useEffect, useState } from "react";
 import { ShowService } from "@/services";
 import {
@@ -105,16 +106,16 @@ export default function AddShowModal({
     <Dialog open={modalStatus} onOpenChange={(open) => { if (!open) closeModal(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a show</DialogTitle>
+          <DialogTitle><T>Add a show</T></DialogTitle>
           <DialogDescription>
-            Add the show you watched and keep track of it.
+            <T>Add the show you watched and keep track of it.</T>
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Search Section */}
           <div className="space-y-1">
             <Label htmlFor="searchInput" className="text-sm font-medium">
-              Search the show you want to add
+              <T>Search the show you want to add</T>
             </Label>
             <Input
               id="searchInput"
@@ -147,7 +148,7 @@ export default function AddShowModal({
             <div className="flex gap-4 rounded-xl border bg-muted/40 p-3">
               <img src={show.posterURL} alt="" className="h-28 w-[4.7rem] shrink-0 rounded-lg object-cover" />
               <div className="min-w-0">
-                <p className="mb-1 text-xs text-primary">Ready to add</p>
+                <p className="mb-1 text-xs text-primary"><T>Ready to add</T></p>
                 <h3 className="font-semibold">{show.name}</h3>
                 <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{show.overview}</p>
               </div>
@@ -161,9 +162,9 @@ export default function AddShowModal({
               type="button"
               onClick={() => closeModal()}
             >
-              Cancel
+              <T>Cancel</T>
             </Button>
-            <Button type="submit" disabled={!show.name}>Add to library</Button>
+            <Button type="submit" disabled={!show.name}><T>Add to library</T></Button>
           </DialogFooter>
         </form>
       </DialogContent>

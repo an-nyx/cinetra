@@ -1,3 +1,4 @@
+import { T } from "@/i18n";
 import { Check, Tv } from "lucide-react";
 import { posterSrc } from "@/lib/poster";
 
@@ -18,9 +19,9 @@ export default function TmdbResultCard({ result, onSelect, disabled, current }: 
     <SeriesPoster url={result.posterURL} className="h-[4.5rem] w-12" />
     <span className="min-w-0 flex-1">
       <span className="flex items-baseline gap-2"><span className="min-w-0 break-words font-semibold leading-5">{result.name}</span><span className="shrink-0 text-sm text-muted-foreground">{result.year || "Year unknown"}</span></span>
-      {result.originalName && result.originalName !== result.name && <span className="block truncate text-xs text-muted-foreground">Original title: {result.originalName}</span>}
+      {result.originalName && result.originalName !== result.name && <span className="block truncate text-xs text-muted-foreground"><T>Original title:</T> {result.originalName}</span>}
       <span className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">{result.overview || "No description available."}</span>
-      {current && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary"><Check className="size-3" />Current match</span>}
+      {current && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary"><Check className="size-3" /><T>Current match</T></span>}
     </span>
   </button>;
 }

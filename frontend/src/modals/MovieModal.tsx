@@ -1,3 +1,6 @@
+import { movieWatchHistory, ratingLabel } from "@/i18n/tracking";
+import { T, phrase, useLanguage } from "@/i18n";
+import { useLocalizedOverview } from "@/hooks/use-localized-overview";
 import { posterSrc } from "@/lib/poster";
 import { useEffect, useState } from "react";
 import { MovieService } from "@/services";
@@ -49,6 +52,8 @@ export default function MovieModal({
     updatedAt: "",
     createdAt: "",
   });
+  const { language } = useLanguage();
+  const localizedOverview = useLocalizedOverview("movie", selectedMovie, movie.overview);
   const [showFullOverview, setShowFullOverview] = useState(false);
   const [info, setInfo] = useState<MovieInfo | null>(null);
   const [watches, setWatches] = useState<MovieWatch[]>([]);
@@ -87,7 +92,7 @@ export default function MovieModal({
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString(language === "ar" ? "ar" : language === "fr" ? "fr-FR" : "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -121,41 +126,41 @@ export default function MovieModal({
       <DialogContent className="max-w-2xl gap-3 p-4 sm:p-6">
         <div className="flex min-w-0 items-start gap-3 pr-10">
           <img src={posterSrc(movie.posterURL, "w342")} alt="" className="h-24 w-16 shrink-0 rounded-lg object-cover shadow-md" onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/300x450?text=No+Image"; }} />
-          <div className="min-w-0 pt-1"><DialogTitle className="text-left text-xl leading-tight">{movie.name}</DialogTitle></div>
+          <div className="min-w-0 pt-1"><DialogTitle className="text-left text-xl leading-tight"><bdi>{movie.name}</bdi></DialogTitle></div>
         </div>
         <div>
-          <Label className="mb-1 block text-sm font-semibold">Overview</Label>
-          <DialogDescription className={`text-sm leading-snug ${showFullOverview ? '' : 'line-clamp-2'}`}>{movie.overview || "No overview available."}</DialogDescription>
-          {movie.overview && <button type="button" onClick={() => setShowFullOverview(!showFullOverview)} className="min-h-11 text-sm font-medium text-emerald-300">{showFullOverview ? "Read less" : "Read more"}</button>}
+          <Label className="mb-1 block text-sm font-semibold"><T>Overview</T></Label>
+          <DialogDescription className={`text-sm leading-snug ${showFullOverview ? '' : 'line-clamp-2'}`}>{localizedOverview.loading ? phrase(language, "Loading description…") : localizedOverview.overview || phrase(language, language === "en" ? "No overview available." : "Description unavailable in this language.")}</DialogDescription>
+          {localizedOverview.overview && <button type="button" onClick={() => setShowFullOverview(!showFullOverview)} className="min-h-11 text-sm font-medium text-emerald-300">{phrase(language, showFullOverview ? "Read less" : "Read more")}</button>}
         </div>
         <Separator />
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Your tracking</Label>
+          <Label className="text-base font-semibold"><T>Your tracking</T></Label>
           <div className="space-y-1">
-            <div role="group" aria-label="Movie status" className="space-y-0">
-              <div className="flex min-h-11 items-center justify-between text-sm"><span>Status</span>{movie.status && <button type="button" disabled={saving} onClick={() => saveMovie({ status: null })} className="min-h-11 px-2 text-xs text-muted-foreground">Clear status</button>}</div>
+            <div role="group" aria-label={phrase(language, "Movie status")} className="space-y-0">
+              <div className="flex min-h-11 items-center justify-between text-sm"><span><T>Status</T></span>{movie.status && <button type="button" disabled={saving} onClick={() => saveMovie({ status: null })} className="min-h-11 px-2 text-xs text-muted-foreground"><T>Clear status</T></button>}</div>
               <div className="flex gap-2">
-                {(['watchlist', 'watched'] as const).map(status => <button key={status} type="button" disabled={saving} aria-pressed={movie.status === status} onClick={() => saveMovie({ status })} className={`min-h-11 flex-1 rounded-full border px-4 text-sm font-medium ${movie.status === status ? 'border-emerald-300/50 bg-emerald-300/15 text-emerald-200' : 'border-white/20 bg-background text-foreground'}`}>{status === 'watchlist' ? 'Watchlist' : 'Watched'}</button>)}
+                {(['watchlist', 'watched'] as const).map(status => <button key={status} type="button" disabled={saving} aria-pressed={movie.status === status} onClick={() => saveMovie({ status })} className={`min-h-11 flex-1 rounded-full border px-4 text-sm font-medium ${movie.status === status ? 'border-emerald-300/50 bg-emerald-300/15 text-emerald-200' : 'border-white/20 bg-background text-foreground'}`}>{phrase(language, status === 'watchlist' ? 'Watchlist' : 'Watched')}</button>)}
               </div>
             </div>
-            <div role="group" aria-label="Movie rating" className="space-y-0">
-              <div className="flex min-h-11 items-center justify-between text-sm"><span>Your rating {movie.rating ? `· ${movie.rating}/10` : '· Not rated'}</span>{movie.rating != null && <button type="button" disabled={saving} onClick={() => saveMovie({ rating: null })} className="min-h-11 px-2 text-xs text-muted-foreground">Clear rating</button>}</div>
+            <div role="group" aria-label={phrase(language, "Movie rating")} className="space-y-0">
+              <div className="flex min-h-11 items-center justify-between text-sm"><span><T>Your rating</T> {movie.rating ? `· ${movie.rating}/10` : `· ${phrase(language, 'Not rated')}`}</span>{movie.rating != null && <button type="button" disabled={saving} onClick={() => saveMovie({ rating: null })} className="min-h-11 px-2 text-xs text-muted-foreground"><T>Clear rating</T></button>}</div>
               <div className="flex items-center">
-                {[1, 2, 3, 4, 5].map(star => <button key={star} type="button" disabled={saving} aria-label={`Rate ${star} ${star === 1 ? 'star' : 'stars'} (${star * 2}/10)`} aria-pressed={movie.rating === star * 2} onClick={() => saveMovie({ rating: star * 2 })} className="flex size-11 items-center justify-center text-emerald-300"><span className="relative"><Star aria-hidden="true" className="size-7" /><span className="absolute inset-0 overflow-hidden" style={{ width: `${Math.max(0, Math.min(100, ((movie.rating || 0) - (star - 1) * 2) * 50))}%` }}><Star aria-hidden="true" className="size-7 fill-emerald-300" /></span></span></button>)}
+                {[1, 2, 3, 4, 5].map(star => <button key={star} type="button" disabled={saving} aria-label={ratingLabel(language, star)} aria-pressed={movie.rating === star * 2} onClick={() => saveMovie({ rating: star * 2 })} className="flex size-11 items-center justify-center text-emerald-300"><span className="relative"><Star aria-hidden="true" className="size-7" /><span className="absolute inset-0 overflow-hidden" style={{ width: `${Math.max(0, Math.min(100, ((movie.rating || 0) - (star - 1) * 2) * 50))}%` }}><Star aria-hidden="true" className="size-7 fill-emerald-300" /></span></span></button>)}
               </div>
-              <p className="sr-only">Each star equals 2 points out of 10.</p>
+              <p className="sr-only"><T>Each star equals 2 points out of 10.</T></p>
             </div>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="movie-notes">Personal notes or review</Label>
-            <Textarea className="min-h-11 h-11 resize-y focus:h-24" id="movie-notes" value={notes} onChange={event => setNotes(event.target.value)} onBlur={() => { if (notes !== (movie.notes || "")) saveMovie({ notes }); }} placeholder="Add your thoughts…" />
+            <Label htmlFor="movie-notes"><T>Personal notes or review</T></Label>
+            <Textarea className="min-h-11 h-11 resize-y focus:h-24" id="movie-notes" value={notes} onChange={event => setNotes(event.target.value)} onBlur={() => { if (notes !== (movie.notes || "")) saveMovie({ notes }); }} placeholder={phrase(language, "Add your thoughts…")} />
           </div>
           {info && (info.year || info.runtime || info.genres.length > 0 || info.trailerUrl) && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             {[info.year, info.runtime ? `${info.runtime} min` : null, info.genres.join(', ') || null].filter(Boolean).map((item, index) => <span key={index}>{index > 0 && <span aria-hidden="true" className="mr-2">·</span>}{item}</span>)}
-            {info.trailerUrl && <a href={info.trailerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-300 hover:underline">Watch trailer<span className="sr-only"> (opens in a new tab)</span></a>}
+            {info.trailerUrl && <a href={info.trailerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-300 hover:underline"><T>Watch trailer</T> <span className="sr-only"><T>(opens in a new tab)</T></span></a>}
           </div>}
-          {watches.length > 0 && <p className="text-xs text-muted-foreground">Watched {watches.length} {watches.length === 1 ? "time" : "times"} · Last watched {formatDate(watches[0].watchedAt)}</p>}
-          {trackingError && <p role="alert" className="text-xs text-destructive">{trackingError}</p>}
+          {watches.length > 0 && <p className="text-xs text-muted-foreground">{movieWatchHistory(language, watches.length, formatDate(watches[0].watchedAt))}</p>}
+          {trackingError && <p role="alert" className="text-xs text-destructive">{phrase(language, trackingError)}</p>}
         </div>
 
         {/* Metadata and Actions */}
@@ -164,11 +169,11 @@ export default function MovieModal({
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground mb-3">
             <div className="flex items-center gap-2">
               <Calendar className="w-3 h-3" />
-              <span>Added: {formatDate(movie.createdAt)}</span>
+              <span>{phrase(language, "Added:")} {formatDate(movie.createdAt)}</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-3 h-3" />
-              <span>Last updated: {formatDate(movie.updatedAt)}</span>
+              <span>{phrase(language, "Last updated:")} {formatDate(movie.updatedAt)}</span>
             </div>
           </div>
 
@@ -180,21 +185,20 @@ export default function MovieModal({
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="flex-1">
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                  <T>Delete</T>
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogTitle><T>Are you absolutely sure?</T></AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the movie
-                    &ldquo;{movie.name}&rdquo; from your collection.
+                    <T>This action cannot be undone. This will permanently delete the movie from your collection.</T> <bdi>{movie.name}</bdi>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel><T>Cancel</T></AlertDialogCancel>
                   <AlertDialogAction onClick={deleteMovie}>
-                    Delete
+                    <T>Delete</T>
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

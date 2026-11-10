@@ -13,9 +13,11 @@ export type TVMazeEpisode = {
   id: number; season: number | null; number: number | null; type?: string | null; name?: string | null;
   airdate?: string | null; airtime?: string | null; airstamp?: string | null; runtime?: number | null;
 };
+/** A broadcast network or web channel. `country.timezone` (IANA) is where TVMaze's local air dates and times apply. */
+export type TVMazeChannel = { name?: string | null; country?: { timezone?: string | null } | null };
 export type TVMazeShow = {
   id: number; name: string; premiered?: string | null; summary?: string | null; status?: string | null; updated?: number | null;
-  externals?: TVMazeExternals | null; network?: { name?: string | null } | null; webChannel?: { name?: string | null } | null;
+  externals?: TVMazeExternals | null; network?: TVMazeChannel | null; webChannel?: TVMazeChannel | null;
 };
 /** External identifiers TMDB publishes for a series. */
 export type TMDBExternalIds = { tvdbId: number | null; imdbId: string | null };

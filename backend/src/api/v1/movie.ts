@@ -9,6 +9,17 @@ import { movieInfo } from '../../services/movie-info.model';
 const router = Router();
 
 const tmdb = new TMDBApiService();
+router.get('/:id/localized-overview', async (req: Request<{id: string}>, res: Response) => {
+  const language = req.query.language;
+  if (language !== 'ar' && language !== 'fr-FR') { res.status(400).json({ message: 'Unsupported language' }); return; }
+  try {
+    const item = await movieModule.Queries.GetByIdQuery.execute(req.params.id, req.user.id);
+    if (!item) { res.sendStatus(404); return; }
+    if (!item.tmdbId) { res.json({ overview: null }); return; }
+    res.json({ overview: await tmdb.getLocalizedOverview('movie', item.tmdbId, language) });
+  } catch { res.status(502).json({ message: 'Localized overview unavailable' }); }
+});
+
 router.get('/:id/info', async (req: Request<{id: string}>, res: Response) => {
   try {
     const movie = await movieModule.Queries.GetByIdQuery.execute(req.params.id, req.user.id);

@@ -32,6 +32,9 @@ async function throttled<T>(request: () => Promise<T>): Promise<T> {
 }
 const isNotFound = (error: unknown) => axios.isAxiosError(error) && error.response?.status === 404;
 
+// Keep the channel name and, when TVMaze lists one, the time zone its local air dates refer to (used by notifications).
+const channel = (value: TVMazeShow['network']) => value ? { name: value.name, country: value.country?.timezone ? { timezone: value.country.timezone } : null } : null;
+
 type CachedSchedule = { show: TVMazeShow; episodes: TVMazeEpisode[]; fetchedAt: number };
 // Episode lists: fresh for 12 hours, kept up to a week, and refreshed early when the TVMaze updates feed says the show changed.
 const scheduleCache = new SWRCache<CachedSchedule>({ freshMs: 12 * 60 * 60_000, staleMs: 7 * 24 * 60 * 60_000, retryMs: 10 * 60_000, maxEntries: 3000 });
@@ -52,7 +55,7 @@ async function loadSchedule(tvmazeId: number): Promise<CachedSchedule> {
       : { id: e.id, season: e.season, number: e.number, type: e.type, airdate: e.airdate });
     failedRefresh.delete(tvmazeId);
     return {
-      show: { id: show.id, name: show.name, premiered: show.premiered, status: show.status, updated: show.updated, externals: show.externals, network: show.network ? { name: show.network.name } : null, webChannel: show.webChannel ? { name: show.webChannel.name } : null },
+      show: { id: show.id, name: show.name, premiered: show.premiered, status: show.status, updated: show.updated, externals: show.externals, network: channel(show.network), webChannel: channel(show.webChannel) },
       episodes, fetchedAt: Date.now(),
     };
   } catch (error) { failedRefresh.set(tvmazeId, Date.now()); throw error; }

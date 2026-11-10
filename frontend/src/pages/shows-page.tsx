@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router";
+import { T, phrase, useLanguage } from "@/i18n";
+import { useLocation, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
@@ -29,6 +30,7 @@ type ListFiltersType = LibraryFilters;
 const watchingStatusOptions = ['watching', 'completed', 'dropped'] as const;
 
 export default function ShowsPage() {
+  const { language } = useLanguage();
   const [addShowModalStatus, setAddShowModalStatus] = useState<boolean>(false);
   const [shows, setShows] = useState<ShowType[]>([]);
   const [tracking, setTracking] = useState<TrackingSummary[]>([]);
@@ -42,7 +44,19 @@ export default function ShowsPage() {
     return { sortBy: 'dateNewest', ...(statusFilter ? { statusFilter } : {}) };
   });
   const navigate = useNavigate();
+  const location = useLocation();
   const [key, setKey] = useState(+new Date());
+
+  // Notification links open a show's details: /shows?show=<id> (also when Cinetra is already open on this page).
+  useEffect(() => {
+    const linked = new URLSearchParams(location.search).get('show');
+    if (linked) setSelectedShow(linked);
+  }, [location.search]);
+  const closeShow = () => {
+    setSelectedShow("");
+    const params = new URLSearchParams(location.search);
+    if (params.has('show')) { params.delete('show'); navigate({ search: params.toString() ? `?${params}` : '' }, { replace: true }); }
+  };
 
   useEffect(() => {
     const loadShows = async () => {
@@ -75,7 +89,7 @@ export default function ShowsPage() {
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
       <div className={`library-heading flex flex-col gap-2 sm:mb-7 sm:gap-5 ${controlsOpen ? 'mb-2' : 'mb-0'}`}>
-        <div className="hidden sm:block"><p className="cinema-eyebrow mb-2 hidden sm:block">Your collection</p><h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">TV shows<span className="ml-3 text-sm font-normal text-muted-foreground sm:text-base">{shows.length}</span></h1><p className="mt-2 hidden text-sm text-muted-foreground sm:block">Your stories, right where you left them.</p></div>
+        <div className="hidden sm:block"><p className="cinema-eyebrow mb-2 hidden sm:block"><T>Your collection</T></p><h1 className="text-2xl font-semibold tracking-tight sm:text-4xl"><T>TV shows</T><span className="ml-3 text-sm font-normal text-muted-foreground sm:text-base">{shows.length}</span></h1><p className="mt-2 hidden text-sm text-muted-foreground sm:block"><T>Your stories, right where you left them.</T></p></div>
 
         <div className={`${controlsOpen ? 'flex' : 'hidden'} min-w-0 items-center gap-3 sm:flex`}>
           <InputGroup>
@@ -83,8 +97,8 @@ export default function ShowsPage() {
               id="search"
               type="text"
               name="search"
-              aria-label="Search your shows"
-              placeholder="Search for a show..."
+              aria-label={phrase(language, "Search your shows")}
+              placeholder={phrase(language, "Search for a show...")}
               value={search}
               onChange={(e) => setSearch(e.target.value.toLowerCase())}
               className="min-w-0 w-full"
@@ -97,7 +111,7 @@ export default function ShowsPage() {
             onClick={() => setAddShowModalStatus(true)}
             className="shrink-0 gap-2 rounded-xl font-medium"
           >
-            <Plus className="size-4" /><span>Add show</span>
+            <Plus className="size-4" /><span><T>Add show</T></span>
           </Button>
           <AddShowModal
             modalStatus={addShowModalStatus}
@@ -110,14 +124,14 @@ export default function ShowsPage() {
 
       <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-1.5 sm:hidden">
         <Select value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
-          <SelectTrigger aria-label="Filter watching status" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue>{filters.statusFilter ? personalStatusLabels[filters.statusFilter] : 'All watching statuses'}</SelectValue></SelectTrigger>
-          <SelectContent><SelectItem value="all">All watching statuses</SelectItem>{watchingStatusOptions.map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}</SelectContent>
+          <SelectTrigger aria-label={phrase(language, "Filter watching status")} className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue>{filters.statusFilter ? phrase(language, personalStatusLabels[filters.statusFilter]) : phrase(language, 'All watching statuses')}</SelectValue></SelectTrigger>
+          <SelectContent><SelectItem value="all"><T>All watching statuses</T></SelectItem>{watchingStatusOptions.map(status => <SelectItem key={status} value={status}>{phrase(language, personalStatusLabels[status])}</SelectItem>)}</SelectContent>
         </Select>
         <Select value={filters.sortBy ?? 'dateNewest'} onValueChange={(value: NonNullable<ListFiltersType['sortBy']>) => setFilters({ ...filters, sortBy: value })}>
-          <SelectTrigger aria-label="Sort library" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="nameAsc">Name (A-Z)</SelectItem><SelectItem value="nameDesc">Name (Z-A)</SelectItem><SelectItem value="dateNewest">Date Added (Newest)</SelectItem><SelectItem value="dateOldest">Date Added (Oldest)</SelectItem><SelectItem value="updatedNewest">Updated (Newest)</SelectItem><SelectItem value="updatedOldest">Updated (Oldest)</SelectItem></SelectContent>
+          <SelectTrigger aria-label={phrase(language, "Sort library")} className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="nameAsc"><T>Name (A-Z)</T></SelectItem><SelectItem value="nameDesc"><T>Name (Z-A)</T></SelectItem><SelectItem value="dateNewest"><T>Date Added (Newest)</T></SelectItem><SelectItem value="dateOldest"><T>Date Added (Oldest)</T></SelectItem><SelectItem value="updatedNewest"><T>Updated (Newest)</T></SelectItem><SelectItem value="updatedOldest"><T>Updated (Oldest)</T></SelectItem></SelectContent>
         </Select>
-        <Button type="button" variant="outline" size="icon" className="size-10" aria-label="Search and more filters" aria-expanded={controlsOpen} aria-controls="show-filters" onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
+        <Button type="button" variant="outline" size="icon" className="size-10" aria-label={phrase(language, "Search and more filters")} aria-expanded={controlsOpen} aria-controls="show-filters" onClick={() => setControlsOpen(open => !open)}><SlidersHorizontal className="size-4" /></Button>
       </div>
 
       <div id="show-filters" className={`library-filters mb-3 flex-wrap items-center gap-2 sm:mb-6 sm:flex ${controlsOpen ? 'flex' : 'hidden'}`}>
@@ -129,12 +143,12 @@ export default function ShowsPage() {
               setFilters({ ...filters, favoriteFilter: value })
             }
           >
-            <SelectTrigger aria-label="Filter favorites" className="w-auto min-w-[130px]">
-              <SelectValue placeholder="All favorites" />
+            <SelectTrigger aria-label={phrase(language, "Filter favorites")} className="w-auto min-w-[130px]">
+              <SelectValue placeholder={phrase(language, "All favorites")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="favorite">Favorite</SelectItem>
-              <SelectItem value="notFavorite">Not Favorite</SelectItem>
+              <SelectItem value="favorite"><T>Favorite</T></SelectItem>
+              <SelectItem value="notFavorite"><T>Not Favorite</T></SelectItem>
             </SelectContent>
           </Select>
 
@@ -145,22 +159,22 @@ export default function ShowsPage() {
               setFilters({ ...filters, completeFilter: value })
             }
           >
-            <SelectTrigger aria-label="Filter completion" className="w-auto min-w-[130px]">
-              <SelectValue placeholder="All completion" />
+            <SelectTrigger aria-label={phrase(language, "Filter completion")} className="w-auto min-w-[130px]">
+              <SelectValue placeholder={phrase(language, "All completion")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="notCompleted">Not Completed</SelectItem>
+              <SelectItem value="completed"><T>Completed</T></SelectItem>
+              <SelectItem value="notCompleted"><T>Not Completed</T></SelectItem>
             </SelectContent>
           </Select>
 
           <Select key={`status-${key}`} name="statusFilter" value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
-            <SelectTrigger aria-label="Filter watching status" className="hidden w-auto min-w-[190px] max-w-full sm:flex">
-              <SelectValue>{filters.statusFilter ? personalStatusLabels[filters.statusFilter] : 'All watching statuses'}</SelectValue>
+            <SelectTrigger aria-label={phrase(language, "Filter watching status")} className="hidden w-auto min-w-[190px] max-w-full sm:flex">
+              <SelectValue>{filters.statusFilter ? phrase(language, personalStatusLabels[filters.statusFilter]) : phrase(language, 'All watching statuses')}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All watching statuses</SelectItem>
-              {watchingStatusOptions.map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}
+              <SelectItem value="all"><T>All watching statuses</T></SelectItem>
+              {watchingStatusOptions.map(status => <SelectItem key={status} value={status}>{phrase(language, personalStatusLabels[status])}</SelectItem>)}
             </SelectContent>
           </Select>
 
@@ -179,7 +193,7 @@ export default function ShowsPage() {
               className="flex items-center gap-1.5 h-9"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Reset</span>
+              <span><T>Reset</T></span>
             </Button>
           )}
         </div>
@@ -192,16 +206,16 @@ export default function ShowsPage() {
             setFilters({ ...filters, sortBy: value })
           }
         >
-          <SelectTrigger aria-label="Sort library" className="hidden w-auto min-w-[130px] sm:flex">
-            <SelectValue placeholder="Sort by" />
+          <SelectTrigger aria-label={phrase(language, "Sort library")} className="hidden w-auto min-w-[130px] sm:flex">
+            <SelectValue placeholder={phrase(language, "Sort by")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
-            <SelectItem value="nameDesc">Name (Z-A)</SelectItem>
-            <SelectItem value="dateNewest">Date Added (Newest)</SelectItem>
-            <SelectItem value="dateOldest">Date Added (Oldest)</SelectItem>
-            <SelectItem value="updatedNewest">Updated (Newest)</SelectItem>
-            <SelectItem value="updatedOldest">Updated (Oldest)</SelectItem>
+            <SelectItem value="nameAsc"><T>Name (A-Z)</T></SelectItem>
+            <SelectItem value="nameDesc"><T>Name (Z-A)</T></SelectItem>
+            <SelectItem value="dateNewest"><T>Date Added (Newest)</T></SelectItem>
+            <SelectItem value="dateOldest"><T>Date Added (Oldest)</T></SelectItem>
+            <SelectItem value="updatedNewest"><T>Updated (Newest)</T></SelectItem>
+            <SelectItem value="updatedOldest"><T>Updated (Oldest)</T></SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -217,19 +231,19 @@ export default function ShowsPage() {
               <div className="text-center space-y-4">
                 <div className="text-6xl mb-4">📺</div>
                 <h3 className="text-xl font-semibold text-foreground">
-                  {shows.length === 0 ? "No shows yet" : "No shows found"}
+                  {phrase(language, shows.length === 0 ? "No shows yet" : "No shows found")}
                 </h3>
                 <p className="text-muted-foreground max-w-md">
                   {shows.length === 0
-                    ? "Start building your collection by adding your first show!"
-                    : "Try adjusting your search or filters to find what you're looking for."}
+                    ? phrase(language, "Start building your collection by adding your first show!")
+                    : phrase(language, "Try adjusting your search or filters to find what you're looking for.")}
                 </p>
                 {shows.length === 0 && (
                   <Button
                     onClick={() => setAddShowModalStatus(true)}
                     className="mt-4"
                   >
-                    Add Your First Show
+                    <T>Add Your First Show</T>
                   </Button>
                 )}
               </div>
@@ -259,7 +273,7 @@ export default function ShowsPage() {
       <ShowModal
         type="show"
         selectedShow={selectedShow}
-        closeModal={() => setSelectedShow("")}
+        closeModal={closeShow}
         shows={shows}
         setShows={setShows}
       />

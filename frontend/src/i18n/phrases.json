@@ -1,0 +1,1178 @@
+{
+  "The watch room": [
+    "Espace de visionnage",
+    "متابعة الحلقات"
+  ],
+  "Personal status": [
+    "Statut personnel",
+    "حالة المشاهدة"
+  ],
+  "Your progress": [
+    "Votre progression",
+    "تقدم المشاهدة"
+  ],
+  "Edit progress": [
+    "Modifier la progression",
+    "تعديل التقدم"
+  ],
+  "Episode tracking ·": [
+    "Suivi des épisodes ·",
+    "تتبع الحلقات ·"
+  ],
+  "Saved viewing position": [
+    "Position de visionnage enregistrée",
+    "آخر حلقة وصلت إليها"
+  ],
+  "No status selected": [
+    "Aucun statut sélectionné",
+    "بدون حالة"
+  ],
+  "Edit show": [
+    "Modifier la série",
+    "تعديل المسلسل"
+  ],
+  "Loading real episode data…": [
+    "Chargement des données des épisodes…",
+    "جارٍ تحميل بيانات الحلقات…"
+  ],
+  "Season": [
+    "Saison",
+    "الموسم"
+  ],
+  "Episodes watched in season": [
+    "Épisodes vus dans la saison",
+    "الحلقات المشاهدة في الموسم"
+  ],
+  "Save position": [
+    "Enregistrer la position",
+    "حفظ الموضع"
+  ],
+  "New season to watch": [
+    "Nouvelle saison à regarder",
+    "موسم جديد للمشاهدة"
+  ],
+  "Resume Watching": [
+    "Reprendre le visionnage",
+    "استئناف المشاهدة"
+  ],
+  "of released episodes": [
+    "des épisodes diffusés",
+    "من الحلقات المعروضة"
+  ],
+  "Why no percentage:": [
+    "Pourquoi aucun pourcentage :",
+    "سبب عدم ظهور النسبة:"
+  ],
+  "Watch next": [
+    "À regarder ensuite",
+    "المشاهدة التالية"
+  ],
+  "Mark next episode watched": [
+    "Marquer le prochain épisode comme vu",
+    "تحديد الحلقة التالية كمشاهَدة"
+  ],
+  "Last watched": [
+    "Dernier épisode vu",
+    "آخر حلقة شوهدت"
+  ],
+  "Episode guide": [
+    "Guide des épisodes",
+    "دليل الحلقات"
+  ],
+  "Seasons & episodes": [
+    "Saisons et épisodes",
+    "المواسم والحلقات"
+  ],
+  "Mark released season episodes watched": [
+    "Marquer les épisodes diffusés comme vus",
+    "تحديد حلقات الموسم المعروضة كمشاهدة"
+  ],
+  "Recently watched": [
+    "Vus récemment",
+    "شوهدت مؤخرًا"
+  ],
+  "Link to TMDB": [
+    "Lier à TMDB",
+    "الربط بـ TMDB"
+  ],
+  "Delete show": [
+    "Supprimer la série",
+    "حذف المسلسل"
+  ],
+  "No verified episode guide is available for this show. You can still edit the saved position above.": [
+    "Aucun guide vérifié des épisodes n’est disponible pour cette série. Vous pouvez toujours modifier la position enregistrée ci-dessus.",
+    "لا يتوفر دليل حلقات موثوق لهذا المسلسل. لا يزال بإمكانك تعديل الموضع المحفوظ أعلاه."
+  ],
+  "This show is not linked to TMDB, so its episode guide is unavailable.": [
+    "Cette série n’est pas liée à TMDB ; son guide des épisodes est indisponible.",
+    "هذا المسلسل غير مرتبط بـ TMDB، لذا فإن دليل حلقاته غير متاح."
+  ],
+  "Fully watched · series completion verified": [
+    "Tout vu · fin de la série vérifiée",
+    "تمت المشاهدة بالكامل · تم التحقق من انتهاء المسلسل"
+  ],
+  "Caught up with currently released episodes. Future episodes may follow.": [
+    "À jour des épisodes diffusés. D’autres épisodes peuvent suivre.",
+    "تمت مشاهدة جميع الحلقات المعروضة حاليًا. قد تُعرض حلقات أخرى لاحقًا."
+  ],
+  "Not started · no saved position or watched episodes yet.": [
+    "Non commencé · aucune position ni aucun épisode vu enregistré.",
+    "لم تبدأ المشاهدة · لا يوجد موضع محفوظ أو حلقات مشاهدة بعد."
+  ],
+  "Your library": [
+    "Votre bibliothèque",
+    "مكتبتك"
+  ],
+  "Your collection": [
+    "Votre collection",
+    "مجموعتك"
+  ],
+  "TV shows": [
+    "Séries",
+    "المسلسلات"
+  ],
+  "Your stories, right where you left them.": [
+    "Vos histoires, là où vous les avez laissées.",
+    "قصصك، من حيث توقفت."
+  ],
+  "Add show": [
+    "Ajouter une série",
+    "إضافة مسلسل"
+  ],
+  "Add movie": [
+    "Ajouter un film",
+    "إضافة فيلم"
+  ],
+  "Add Your First Show": [
+    "Ajoutez votre première série",
+    "أضف مسلسلك الأول"
+  ],
+  "Add Your First Movie": [
+    "Ajoutez votre premier film",
+    "أضف فيلمك الأول"
+  ],
+  "All watching statuses": [
+    "Tous les statuts",
+    "جميع الحالات"
+  ],
+  "Completed": [
+    "Terminé",
+    "أكملت مشاهدته"
+  ],
+  "Not Completed": [
+    "Non terminé",
+    "غير مكتمل"
+  ],
+  "Favorite": [
+    "Favori",
+    "المفضلة"
+  ],
+  "Not Favorite": [
+    "Non favori",
+    "ليست في المفضلة"
+  ],
+  "Reset": [
+    "Réinitialiser",
+    "إعادة تعيين"
+  ],
+  "Up next": [
+    "À suivre",
+    "التالي"
+  ],
+  "Continue watching": [
+    "Continuer à regarder",
+    "متابعة المشاهدة"
+  ],
+  "New episodes available": [
+    "Nouveaux épisodes disponibles",
+    "حلقات جديدة متاحة"
+  ],
+  "Coming soon": [
+    "Bientôt disponible",
+    "قريبًا"
+  ],
+  "See all": [
+    "Tout voir",
+    "عرض الكل"
+  ],
+  "Go to Shows": [
+    "Voir les séries",
+    "الانتقال إلى المسلسلات"
+  ],
+  "Mark next watched": [
+    "Marquer le prochain comme vu",
+    "تحديد الحلقة التالية كمشاهَدة"
+  ],
+  "Watchlist": [
+    "À regarder",
+    "قائمة المشاهدة"
+  ],
+  "Watched": [
+    "Vu",
+    "تمت المشاهدة"
+  ],
+  "Needs review": [
+    "À vérifier",
+    "يحتاج إلى مراجعة"
+  ],
+  "Overview": [
+    "Synopsis",
+    "الملخص"
+  ],
+  "Your tracking": [
+    "Votre suivi",
+    "متابعتك"
+  ],
+  "Status": [
+    "Statut",
+    "الحالة"
+  ],
+  "Clear status": [
+    "Effacer le statut",
+    "مسح الحالة"
+  ],
+  "Your rating": [
+    "Votre note",
+    "تقييمك"
+  ],
+  "Clear rating": [
+    "Effacer la note",
+    "مسح التقييم"
+  ],
+  "Personal notes or review": [
+    "Notes ou avis personnels",
+    "ملاحظاتك أو مراجعتك"
+  ],
+  "Watch trailer": [
+    "Voir la bande-annonce",
+    "مشاهدة الإعلان"
+  ],
+  "Delete": [
+    "Supprimer",
+    "حذف"
+  ],
+  "Cancel": [
+    "Annuler",
+    "إلغاء"
+  ],
+  "Retry": [
+    "Réessayer",
+    "إعادة المحاولة"
+  ],
+  "Account Settings": [
+    "Paramètres du compte",
+    "إعدادات الحساب"
+  ],
+  "Add to library": [
+    "Ajouter à la bibliothèque",
+    "إضافة إلى المكتبة"
+  ],
+  "Add a movie": [
+    "Ajouter un film",
+    "إضافة فيلم"
+  ],
+  "Add a show": [
+    "Ajouter une série",
+    "إضافة مسلسل"
+  ],
+  "Search the movie you want to add": [
+    "Recherchez le film à ajouter",
+    "ابحث عن الفيلم الذي تريد إضافته"
+  ],
+  "Search the show you want to add": [
+    "Recherchez la série à ajouter",
+    "ابحث عن المسلسل الذي تريد إضافته"
+  ],
+  "Ready to add": [
+    "Prêt à ajouter",
+    "جاهز للإضافة"
+  ],
+  "No TMDB Match": [
+    "Aucune correspondance TMDB",
+    "المسلسل غير مرتبط بـ TMDB"
+  ],
+  "Movies": [
+    "Films",
+    "الأفلام"
+  ],
+  "Upcoming": [
+    "À venir",
+    "قريبًا"
+  ],
+  "Home": [
+    "Accueil",
+    "الرئيسية"
+  ],
+  "Watching": [
+    "En cours",
+    "أشاهده حاليًا"
+  ],
+  "Dropped": [
+    "Abandonné",
+    "توقفت عن مشاهدته"
+  ],
+  "Planned": [
+    "Prévu",
+    "مخطط"
+  ],
+  "Paused": [
+    "En pause",
+    "متوقف مؤقتًا"
+  ],
+  "Total shows": [
+    "Nombre de séries",
+    "إجمالي المسلسلات"
+  ],
+  "Episodes watched": [
+    "Épisodes vus",
+    "الحلقات المشاهدة"
+  ],
+  "Name (A-Z)": [
+    "Nom (A-Z)",
+    "الاسم (أ-ي)"
+  ],
+  "Name (Z-A)": [
+    "Nom (Z-A)",
+    "الاسم (ي-أ)"
+  ],
+  "Date Added (Newest)": [
+    "Ajout récent",
+    "الأحدث إضافةً"
+  ],
+  "Date Added (Oldest)": [
+    "Ajout ancien",
+    "الأقدم إضافةً"
+  ],
+  "Updated (Newest)": [
+    "Modification récente",
+    "الأحدث تعديلًا"
+  ],
+  "Updated (Oldest)": [
+    "Modification ancienne",
+    "الأقدم تعديلًا"
+  ],
+  "Search your shows": [
+    "Rechercher dans vos séries",
+    "البحث في مسلسلاتك"
+  ],
+  "Search for a show...": [
+    "Rechercher une série…",
+    "البحث عن مسلسل…"
+  ],
+  "Search your movies": [
+    "Rechercher dans vos films",
+    "البحث في أفلامك"
+  ],
+  "Search for a movie...": [
+    "Rechercher un film…",
+    "البحث عن فيلم…"
+  ],
+  "No overview available.": [
+    "Aucun synopsis disponible.",
+    "لا يتوفر ملخص."
+  ],
+  "Guide unavailable": [
+    "Guide indisponible",
+    "الدليل غير متاح"
+  ],
+  "Loading guide": [
+    "Chargement du guide",
+    "جارٍ تحميل الدليل"
+  ],
+  "TV show": [
+    "Série",
+    "مسلسل"
+  ],
+  "No TMDB match": [
+    "Aucune correspondance TMDB",
+    "المسلسل غير مرتبط بـ TMDB"
+  ],
+  "Episode count unavailable": [
+    "Nombre d’épisodes indisponible",
+    "عدد الحلقات غير متاح"
+  ],
+  "Saved position": [
+    "Position enregistrée",
+    "آخر حلقة محفوظة"
+  ],
+  "Season 1 not started.": [
+    "Saison 1 non commencée.",
+    "لم تبدأ الموسم الأول."
+  ],
+  "Unavailable": [
+    "Indisponible",
+    "غير متاح"
+  ],
+  "No regular episode has aired yet.": [
+    "Aucun épisode régulier n’a encore été diffusé.",
+    "لم تُعرض أي حلقة بعد."
+  ],
+  "TMDB sign-in failed": [
+    "Échec de connexion à TMDB",
+    "تعذّر الاتصال بـ TMDB"
+  ],
+  "TMDB entry missing": [
+    "Fiche TMDB introuvable",
+    "تعذّر العثور على المسلسل في TMDB"
+  ],
+  "TMDB unavailable": [
+    "TMDB indisponible",
+    "TMDB غير متاح"
+  ],
+  "Episode data incomplete": [
+    "Données des épisodes incomplètes",
+    "بيانات الحلقات غير مكتملة"
+  ],
+  "Position conflict": [
+    "Position à vérifier",
+    "تحتاج نقطة التوقف إلى مراجعة"
+  ],
+  "Not aired yet": [
+    "Pas encore diffusé",
+    "لم يُعرض بعد"
+  ],
+  "Could not load saved progress. Please retry.": [
+    "Impossible de charger votre progression. Réessayez.",
+    "تعذّر تحميل تقدم المشاهدة. حاول مجددًا."
+  ],
+  "Could not save progress. Please try again.": [
+    "Impossible d’enregistrer votre progression. Réessayez.",
+    "تعذّر حفظ تقدم المشاهدة. حاول مجددًا."
+  ],
+  "Could not load this season.": [
+    "Impossible de charger cette saison.",
+    "تعذّر تحميل هذا الموسم."
+  ],
+  "Could not delete this show.": [
+    "Impossible de supprimer cette série.",
+    "تعذّر حذف المسلسل."
+  ],
+  "Episode counts unavailable; your saved viewing position is preserved below.": [
+    "Nombre d’épisodes indisponible ; votre position enregistrée est conservée ci-dessous.",
+    "عدد الحلقات غير متاح. احتفظنا بآخر حلقة وصلت إليها أدناه."
+  ],
+  "Select the season and number of episodes watched in it. Saving changes only this position; confirmed episode history stays untouched.": [
+    "Choisissez la saison et le nombre d’épisodes vus. L’enregistrement modifie uniquement cette position, sans toucher à votre historique.",
+    "اختر الموسم وعدد الحلقات التي شاهدتها. سيُحدَّث موضع التوقف فقط، دون تغيير سجل المشاهدة."
+  ],
+  "Changing this position changes which episodes are covered by it, including episodes in earlier seasons. Individual watch records are preserved.": [
+    "Cette position détermine les épisodes pris en compte, y compris ceux des saisons précédentes. Les visionnages enregistrés individuellement sont conservés.",
+    "يحدد موضع التوقف الحلقات المحتسبة، بما فيها حلقات المواسم السابقة. ستبقى المشاهدات المسجلة بشكل منفصل كما هي."
+  ],
+  "The saved position is reflected in watched episodes without creating episode records.": [
+    "La position enregistrée est prise en compte sans créer de visionnages individuels.",
+    "يُحتسب موضع التوقف ضمن الحلقات المشاهَدة دون إضافة سجلات مشاهدة منفصلة."
+  ],
+  "The saved position does not fit the available TMDB episode metadata. It is preserved and needs review.": [
+    "La position enregistrée ne correspond pas aux données TMDB disponibles. Elle est conservée et doit être vérifiée.",
+    "لا يتوافق موضع التوقف مع بيانات الحلقات في TMDB. احتفظنا به ويحتاج إلى مراجعة."
+  ],
+  "No episodes logged yet": [
+    "Aucun épisode enregistré",
+    "لم تسجل أي حلقات بعد"
+  ],
+  "No upcoming air date announced": [
+    "Aucune date de diffusion annoncée",
+    "لم يُعلن عن موعد عرض قادم"
+  ],
+  "Air date TBA": [
+    "Date de diffusion à confirmer",
+    "موعد العرض غير معلن"
+  ],
+  "Position saved by the legacy counter; no individual watch date is recorded.": [
+    "Position issue de l’ancien compteur ; aucune date de visionnage individuelle n’est enregistrée.",
+    "حُفظ موضع التوقف باستخدام العداد السابق، دون تسجيل تاريخ مشاهدة منفصل."
+  ],
+  "Episode guide unavailable. Your saved position remains editable above.": [
+    "Guide des épisodes indisponible. Vous pouvez modifier votre position ci-dessus.",
+    "دليل الحلقات غير متاح. يمكنك تعديل تقدمك أعلاه."
+  ],
+  "Final regular episode watched. The series is confirmed ended.": [
+    "Dernier épisode vu. La série est terminée.",
+    "شاهدت الحلقة الأخيرة، وقد تأكد انتهاء المسلسل."
+  ],
+  "Caught up with currently released episodes; future episodes may follow.": [
+    "À jour des épisodes diffusés ; d’autres épisodes peuvent suivre.",
+    "شاهدت جميع الحلقات المعروضة حتى الآن. قد تصدر حلقات أخرى لاحقًا."
+  ],
+  "Next episode unknown from saved position.": [
+    "Impossible de déterminer le prochain épisode à partir de la position enregistrée.",
+    "لا يمكن تحديد الحلقة التالية من موضع التوقف المحفوظ."
+  ],
+  "No released episode to track.": [
+    "Aucun épisode diffusé à suivre.",
+    "لا توجد حلقات معروضة للمتابعة."
+  ],
+  "Loading description…": [
+    "Chargement du synopsis…",
+    "جارٍ تحميل الملخص…"
+  ],
+  "Description unavailable in this language.": [
+    "Synopsis indisponible dans cette langue.",
+    "الملخص غير متاح بهذه اللغة."
+  ],
+  "Read more": [
+    "Lire la suite",
+    "عرض المزيد"
+  ],
+  "Read less": [
+    "Réduire",
+    "عرض أقل"
+  ],
+  "Premiere": [
+    "Première",
+    "عرض أول"
+  ],
+  "Episodes and collection releases, by date": [
+    "Épisodes et sorties de collections, par date",
+    "الحلقات وإصدارات المجموعات حسب التاريخ"
+  ],
+  "Showing saved TV releases while the schedule refreshes.": [
+    "Affichage des sorties TV enregistrées pendant l’actualisation du calendrier.",
+    "نعرض مواعيد المسلسلات المحفوظة أثناء تحديث الجدول."
+  ],
+  "Movie releases could not be refreshed.": [
+    "Impossible d’actualiser les sorties de films.",
+    "تعذّر تحديث مواعيد الأفلام."
+  ],
+  "Retry movies": [
+    "Réessayer pour les films",
+    "إعادة محاولة تحميل الأفلام"
+  ],
+  "Preparing movie releases…": [
+    "Chargement des sorties de films…",
+    "جارٍ تحميل مواعيد الأفلام…"
+  ],
+  "Try another filter.": [
+    "Essayez un autre filtre.",
+    "جرّب عامل تصفية آخر."
+  ],
+  "Returning — Date TBA": [
+    "De retour — date à confirmer",
+    "عائد قريبًا — الموعد غير معلن"
+  ],
+  "Date TBA": [
+    "Date à confirmer",
+    "الموعد غير معلن"
+  ],
+  "Schedule match needs review": [
+    "Correspondance du calendrier à vérifier",
+    "تحتاج مطابقة الجدول إلى مراجعة"
+  ],
+  "These shows could not be matched to TVMaze with certainty, so no dates are shown for them. Nothing was changed.": [
+    "Ces séries n’ont pas pu être associées à TVMaze avec certitude ; aucune date ne s’affiche. Rien n’a été modifié.",
+    "تعذّر التأكد من مطابقة هذه المسلسلات مع TVMaze، لذا لا تظهر لها مواعيد. لم يُغيَّر أي شيء."
+  ],
+  "TVMaze lists these shows as continuing, but no new episode has a confirmed date.": [
+    "TVMaze indique que ces séries continuent, mais aucune date n’est confirmée pour un nouvel épisode.",
+    "يشير TVMaze إلى استمرار هذه المسلسلات، لكن لم يتأكد موعد أي حلقة جديدة."
+  ],
+  "TMDB lists these collection members, but their release details are unconfirmed.": [
+    "TMDB répertorie ces films de collections, mais leurs dates de sortie ne sont pas confirmées.",
+    "يعرض TMDB هذه الأفلام ضمن مجموعاتها، لكن تفاصيل إصدارها غير مؤكدة."
+  ],
+  "Upcoming Movies — Date TBA": [
+    "Films à venir — date à confirmer",
+    "أفلام قادمة — الموعد غير معلن"
+  ],
+  "Times are shown in your time zone when TVMaze confirms them; otherwise only the date is shown.": [
+    "Les heures confirmées par TVMaze sont affichées dans votre fuseau horaire ; sinon, seule la date apparaît.",
+    "تظهر الأوقات بتوقيتك المحلي عندما يؤكدها TVMaze، وإلا فيظهر التاريخ فقط."
+  ],
+  "Manage your account information and preferences": [
+    "Gérez les informations et préférences de votre compte",
+    "إدارة معلومات الحساب والتفضيلات"
+  ],
+  "Username": [
+    "Nom d’utilisateur",
+    "اسم المستخدم"
+  ],
+  "Email": [
+    "Adresse e-mail",
+    "البريد الإلكتروني"
+  ],
+  "Password": [
+    "Mot de passe",
+    "كلمة المرور"
+  ],
+  "Confirm Password": [
+    "Confirmer le mot de passe",
+    "تأكيد كلمة المرور"
+  ],
+  "Login": [
+    "Se connecter",
+    "تسجيل الدخول"
+  ],
+  "Sign up": [
+    "Créer un compte",
+    "إنشاء حساب"
+  ],
+  "Login to your account": [
+    "Connectez-vous à votre compte",
+    "تسجيل الدخول إلى حسابك"
+  ],
+  "Enter your email below to login to your account": [
+    "Saisissez votre adresse e-mail pour vous connecter",
+    "أدخل بريدك الإلكتروني لتسجيل الدخول"
+  ],
+  "Forgot your password?": [
+    "Mot de passe oublié ?",
+    "نسيت كلمة المرور؟"
+  ],
+  "Create an account": [
+    "Créer un compte",
+    "إنشاء حساب"
+  ],
+  "Enter your information below to create your account": [
+    "Renseignez vos informations pour créer votre compte",
+    "أدخل بياناتك لإنشاء حساب"
+  ],
+  "Already have an account?": [
+    "Vous avez déjà un compte ?",
+    "لديك حساب بالفعل؟"
+  ],
+  "Add the movie you watched and keep track of it.": [
+    "Ajoutez un film à votre bibliothèque pour le suivre.",
+    "أضف فيلمًا إلى مكتبتك لتتابعه."
+  ],
+  "Add the show you watched and keep track of it.": [
+    "Ajoutez une série à votre bibliothèque pour la suivre.",
+    "أضف مسلسلًا إلى مكتبتك لتتابعه."
+  ],
+  "Original title:": [
+    "Titre original :",
+    "العنوان الأصلي:"
+  ],
+  "Current match": [
+    "Correspondance actuelle",
+    "المطابقة الحالية"
+  ],
+  "In Movies": [
+    "Dans Films",
+    "في مكتبة الأفلام"
+  ],
+  "Are you absolutely sure?": [
+    "Confirmez-vous la suppression ?",
+    "هل تريد تأكيد الحذف؟"
+  ],
+  "Each star equals 2 points out of 10.": [
+    "Chaque étoile vaut 2 points sur 10.",
+    "كل نجمة تعادل نقطتين من أصل 10."
+  ],
+  "Next": [
+    "À suivre",
+    "التالي"
+  ],
+  "Saved": [
+    "Enregistré",
+    "المحفوظ"
+  ],
+  "Preparing schedule…": [
+    "Chargement du calendrier…",
+    "جارٍ تحميل الجدول…"
+  ],
+  "Upcoming Movies": [
+    "Films à venir",
+    "أفلام قادمة"
+  ],
+  "Saved progress for these shows cannot be placed on episodes. Nothing has been changed.": [
+    "La progression enregistrée de ces séries ne peut pas être associée à leurs épisodes. Rien n’a été modifié.",
+    "تعذّر مطابقة التقدم المحفوظ لهذه المسلسلات مع حلقاتها. لم يُغيَّر أي شيء."
+  ],
+  "Same title? Compare the year, poster and description to pick the right adaptation.": [
+    "Même titre ? Comparez l’année, l’affiche et le synopsis pour choisir la bonne adaptation.",
+    "تتشابه العناوين أحيانًا. قارن سنة الإصدار والملصق والملخص لاختيار النسخة الصحيحة."
+  ],
+  "Searching TMDB…": [
+    "Recherche sur TMDB…",
+    "جارٍ البحث في TMDB…"
+  ],
+  "No TV series found. Try another spelling or the original title.": [
+    "Aucune série trouvée. Essayez une autre orthographe ou le titre original.",
+    "لم نعثر على مسلسل. جرّب كتابة أخرى أو العنوان الأصلي."
+  ],
+  "This is already the current match. Nothing to change.": [
+    "Cette correspondance est déjà utilisée. Aucune modification nécessaire.",
+    "هذه هي المطابقة الحالية بالفعل. لا حاجة إلى أي تغيير."
+  ],
+  "Your personal status, favorite and watch history stay as they are. Nothing is renumbered or deleted.": [
+    "Votre statut, vos favoris et votre historique restent inchangés. Rien n’est renuméroté ni supprimé.",
+    "ستبقى حالة المشاهدة والمفضلة والسجل كما هي. لن يُحذف أي شيء أو تتغير أرقام الحلقات."
+  ],
+  "Keep my saved progress unchanged and review it after the change.": [
+    "Conserver ma progression et la vérifier après la modification.",
+    "الاحتفاظ بتقدمي المحفوظ ومراجعته بعد التغيير."
+  ],
+  "Filter watching status": [
+    "Filtrer par statut",
+    "تصفية حسب حالة المشاهدة"
+  ],
+  "Sort library": [
+    "Trier la bibliothèque",
+    "ترتيب المكتبة"
+  ],
+  "Search and more filters": [
+    "Recherche et autres filtres",
+    "البحث والمزيد من خيارات التصفية"
+  ],
+  "Filter favorites": [
+    "Filtrer les favoris",
+    "تصفية المفضلة"
+  ],
+  "All favorites": [
+    "Tous les favoris",
+    "كل خيارات المفضلة"
+  ],
+  "Filter completion": [
+    "Filtrer par progression",
+    "تصفية حسب الاكتمال"
+  ],
+  "All completion": [
+    "Tous les états",
+    "كل حالات الاكتمال"
+  ],
+  "Sort by": [
+    "Trier par",
+    "ترتيب حسب"
+  ],
+  "Search and filter movies": [
+    "Rechercher et filtrer les films",
+    "البحث عن الأفلام وتصفيتها"
+  ],
+  "Progress season": [
+    "Saison de progression",
+    "موسم التقدم"
+  ],
+  "Released episode progress": [
+    "Progression des épisodes diffusés",
+    "التقدم في الحلقات المعروضة"
+  ],
+  "Movie status": [
+    "Statut du film",
+    "حالة مشاهدة الفيلم"
+  ],
+  "Movie rating": [
+    "Note du film",
+    "تقييم الفيلم"
+  ],
+  "Add your thoughts…": [
+    "Ajoutez vos notes…",
+    "أضف ملاحظاتك…"
+  ],
+  "All Upcoming": [
+    "Toutes les sorties",
+    "كل المواعيد"
+  ],
+  "Today": [
+    "Aujourd’hui",
+    "اليوم"
+  ],
+  "This Week": [
+    "Cette semaine",
+    "هذا الأسبوع"
+  ],
+  "This Month": [
+    "Ce mois-ci",
+    "هذا الشهر"
+  ],
+  "Season Premieres": [
+    "Débuts de saison",
+    "بدايات المواسم"
+  ],
+  "All": [
+    "Tout",
+    "الكل"
+  ],
+  "TV Shows": [
+    "Séries",
+    "المسلسلات"
+  ],
+  "Show less": [
+    "Voir moins",
+    "عرض أقل"
+  ],
+  "Count unavailable": [
+    "Nombre indisponible",
+    "العدد غير متاح"
+  ],
+  "You're caught up — no released episode is waiting.": [
+    "Vous êtes à jour : aucun épisode diffusé en attente.",
+    "أنت على اطلاع بآخر الحلقات؛ لا توجد حلقات معروضة بانتظارك."
+  ],
+  "Add a show to start tracking.": [
+    "Ajoutez une série pour commencer votre suivi.",
+    "أضف مسلسلًا لبدء المتابعة."
+  ],
+  "Fix match": [
+    "Corriger la correspondance",
+    "تصحيح المطابقة"
+  ],
+  "Season not started": [
+    "Saison non commencée",
+    "لم يبدأ الموسم"
+  ],
+  "Saved position (metadata missing)": [
+    "Position enregistrée (données manquantes)",
+    "موضع التوقف المحفوظ (البيانات غير متاحة)"
+  ],
+  "Saved position and individual watches are separate. Tap an individual watch to remove it; a saved-position check remains until you edit that position.": [
+    "La position enregistrée et les visionnages individuels sont distincts. Touchez un visionnage individuel pour le retirer ; la coche liée à la position reste jusqu’à sa modification.",
+    "موضع التوقف والمشاهدات الفردية منفصلان. اضغط على مشاهدة فردية لإزالتها؛ وتبقى علامة موضع التوقف حتى تعدّله."
+  ],
+  "This episode is covered by your saved position. Edit progress below to correct it; individual watches remain unchanged.": [
+    "Cet épisode est couvert par votre position enregistrée. Modifiez votre progression ci-dessous pour la corriger ; les visionnages individuels restent inchangés.",
+    "تُحتسب هذه الحلقة ضمن موضع التوقف المحفوظ. عدّل التقدم أدناه لتصحيحه؛ لن تتغير المشاهدات الفردية."
+  ],
+  "Remove individual watch": [
+    "Retirer le visionnage individuel",
+    "إزالة المشاهدة الفردية"
+  ],
+  "Edit saved position for": [
+    "Modifier la position enregistrée pour",
+    "تعديل موضع التوقف للحلقة"
+  ],
+  "Mark watched": [
+    "Marquer comme vu",
+    "تحديد كمشاهَدة"
+  ],
+  "Edit saved position": [
+    "Modifier la position enregistrée",
+    "تعديل موضع التوقف"
+  ],
+  "Individually logged and saved position": [
+    "Visionnage individuel et position enregistrée",
+    "مسجلة بشكل منفصل وضمن موضع التوقف"
+  ],
+  "Saved position · tap to edit": [
+    "Position enregistrée · toucher pour modifier",
+    "موضع التوقف · اضغط للتعديل"
+  ],
+  "Individually logged · tap to remove": [
+    "Visionnage individuel · toucher pour retirer",
+    "مشاهدة فردية · اضغط للإزالة"
+  ],
+  "Refresh schedules": [
+    "Actualiser les calendriers",
+    "تحديث المواعيد"
+  ],
+  "Release statistics": [
+    "Statistiques des sorties",
+    "إحصاءات الإصدارات"
+  ],
+  "Release categories": [
+    "Catégories de sorties",
+    "فئات الإصدارات"
+  ],
+  "Upcoming filters": [
+    "Filtres des sorties à venir",
+    "تصفية المواعيد القادمة"
+  ],
+  "Scheduled releases": [
+    "Sorties programmées",
+    "الإصدارات المجدولة"
+  ],
+  "Retry TV": [
+    "Réessayer pour les séries",
+    "إعادة محاولة تحميل المسلسلات"
+  ],
+  "TVMaze could not be reached for some shows; their last saved schedule is shown and may be out of date.": [
+    "TVMaze est inaccessible pour certaines séries ; leur dernier calendrier enregistré est affiché et peut être périmé.",
+    "تعذّر الوصول إلى TVMaze لبعض المسلسلات؛ نعرض آخر جدول محفوظ وقد لا يكون محدّثًا."
+  ],
+  "Schedule source: TVMaze": [
+    "Source du calendrier : TVMaze",
+    "مصدر الجدول: TVMaze"
+  ],
+  "Loading dashboard": [
+    "Chargement du tableau de bord",
+    "جارٍ تحميل الصفحة الرئيسية"
+  ],
+  "Refresh dashboard": [
+    "Actualiser le tableau de bord",
+    "تحديث الصفحة الرئيسية"
+  ],
+  "Released episodes watched": [
+    "Épisodes diffusés vus",
+    "الحلقات المعروضة التي شاهدتها"
+  ],
+  "Watching statistics": [
+    "Statistiques de visionnage",
+    "إحصاءات المشاهدة"
+  ],
+  "Not rated": [
+    "Non noté",
+    "بدون تقييم"
+  ],
+  "Could not save movie details. Please try again.": [
+    "Impossible d’enregistrer les détails du film. Réessayez.",
+    "تعذّر حفظ تفاصيل الفيلم. حاول مجددًا."
+  ],
+  "(opens in a new tab)": [
+    "(s’ouvre dans un nouvel onglet)",
+    "(يُفتح في علامة تبويب جديدة)"
+  ],
+  "Added:": [
+    "Ajouté :",
+    "تاريخ الإضافة:"
+  ],
+  "Last updated:": [
+    "Dernière modification :",
+    "آخر تحديث:"
+  ],
+  "This action cannot be undone. This will permanently delete the movie from your collection.": [
+    "Cette action est irréversible. Le film sera définitivement supprimé de votre collection.",
+    "لا يمكن التراجع عن هذا الإجراء. سيُحذف الفيلم نهائيًا من مجموعتك."
+  ],
+  "Linked to the new series. Your saved progress was kept unchanged; it does not fit this series, so please review it below.": [
+    "La nouvelle série est liée. Votre progression a été conservée, mais elle ne correspond pas à cette série ; vérifiez-la ci-dessous.",
+    "تم ربط المسلسل الجديد. احتفظنا بتقدمك دون تغيير، لكنه لا يتوافق مع هذا المسلسل؛ يرجى مراجعته أدناه."
+  ],
+  "Linked to the new series. Your progress, status and favorite were kept.": [
+    "La nouvelle série est liée. Votre progression, votre statut et votre favori ont été conservés.",
+    "تم ربط المسلسل الجديد. احتفظنا بتقدمك وحالة المشاهدة والمفضلة."
+  ],
+  "Saved legacy status:": [
+    "Ancien statut enregistré :",
+    "حالة المشاهدة السابقة:"
+  ],
+  "Choose a new status only if you want to change it.": [
+    "Choisissez un nouveau statut uniquement si vous souhaitez le modifier.",
+    "اختر حالة جديدة فقط إذا أردت تغييرها."
+  ],
+  "Enter your username": [
+    "Saisissez votre nom d’utilisateur",
+    "أدخل اسم المستخدم"
+  ],
+  "Enter your email": [
+    "Saisissez votre adresse e-mail",
+    "أدخل بريدك الإلكتروني"
+  ],
+  "Failed to load user data": [
+    "Impossible de charger les informations du compte",
+    "تعذّر تحميل معلومات الحساب"
+  ],
+  "Account updated successfully": [
+    "Compte mis à jour",
+    "تم تحديث الحساب"
+  ],
+  "Failed to update account": [
+    "Impossible de mettre à jour le compte",
+    "تعذّر تحديث الحساب"
+  ],
+  "Could not export your data": [
+    "Impossible d’exporter vos données",
+    "تعذّر تصدير بياناتك"
+  ],
+  "Not linked to TMDB yet.": [
+    "Pas encore lié à TMDB.",
+    "لم يُربط بـ TMDB بعد."
+  ],
+  "Editing your saved show": [
+    "Modification de votre série enregistrée",
+    "تعديل المسلسل المحفوظ"
+  ],
+  "Search TMDB for the correct series": [
+    "Rechercher la bonne série sur TMDB",
+    "البحث عن المسلسل الصحيح في TMDB"
+  ],
+  "Search TV series": [
+    "Rechercher une série",
+    "البحث عن مسلسل"
+  ],
+  "No saved position or logged episodes; nothing to carry over.": [
+    "Aucune position ni aucun épisode enregistré à conserver.",
+    "لا يوجد موضع توقف أو حلقات مسجلة لنقلها."
+  ],
+  "Confirm match": [
+    "Confirmer la correspondance",
+    "تأكيد المطابقة"
+  ],
+  "Saving…": [
+    "Enregistrement…",
+    "جارٍ الحفظ…"
+  ],
+  "Replace with": [
+    "Remplacer par",
+    "استبداله بـ"
+  ],
+  "Updated": [
+    "Mis à jour",
+    "آخر تحديث"
+  ],
+  "Movies updated": [
+    "Films mis à jour",
+    "آخر تحديث للأفلام"
+  ],
+  "Unwatched": [
+    "Non vus",
+    "لم تُشاهَد"
+  ],
+  "Episodes": [
+    "Épisodes",
+    "الحلقات"
+  ],
+  "No confirmed new episodes yet.": [
+    "Aucun nouvel épisode confirmé pour le moment.",
+    "لا توجد حلقات جديدة مؤكدة حتى الآن."
+  ],
+  "Nothing new airs today.": [
+    "Aucune nouveauté diffusée aujourd’hui.",
+    "لا توجد حلقات جديدة اليوم."
+  ],
+  "Nothing new this week.": [
+    "Aucune nouveauté cette semaine.",
+    "لا توجد حلقات جديدة هذا الأسبوع."
+  ],
+  "Nothing new this month.": [
+    "Aucune nouveauté ce mois-ci.",
+    "لا توجد حلقات جديدة هذا الشهر."
+  ],
+  "No season premieres scheduled.": [
+    "Aucun début de saison prévu.",
+    "لا توجد بدايات مواسم مجدولة."
+  ],
+  "No dated releases for this filter.": [
+    "Aucune sortie datée pour ce filtre.",
+    "لا توجد إصدارات بمواعيد مؤكدة لهذا الاختيار."
+  ],
+  "Showing saved movie releases.": [
+    "Affichage des sorties de films enregistrées.",
+    "نعرض مواعيد الأفلام المحفوظة."
+  ],
+  "Preparing TV releases…": [
+    "Chargement des sorties TV…",
+    "جارٍ تحميل مواعيد المسلسلات…"
+  ],
+  "Title not announced": [
+    "Titre non annoncé",
+    "العنوان غير معلن"
+  ],
+  "Between seasons": [
+    "Entre deux saisons",
+    "بين الموسمين"
+  ],
+  "Some TV sources are unavailable; showing the saved schedule.": [
+    "Certaines sources TV sont indisponibles ; le calendrier enregistré est affiché.",
+    "بعض مصادر المسلسلات غير متاحة؛ نعرض الجدول المحفوظ."
+  ],
+  "The TV schedule is taking longer than expected. Try again.": [
+    "Le calendrier TV prend plus de temps que prévu. Réessayez.",
+    "يستغرق تحميل جدول المسلسلات وقتًا أطول من المتوقع. حاول مجددًا."
+  ],
+  "TV releases could not be refreshed. Try again.": [
+    "Impossible d’actualiser les sorties TV. Réessayez.",
+    "تعذّر تحديث مواعيد المسلسلات. حاول مجددًا."
+  ],
+  "No shows yet": [
+    "Aucune série pour le moment",
+    "لا توجد مسلسلات بعد"
+  ],
+  "No shows found": [
+    "Aucune série trouvée",
+    "لم نعثر على مسلسلات"
+  ],
+  "No movies yet": [
+    "Aucun film pour le moment",
+    "لا توجد أفلام بعد"
+  ],
+  "No movies found": [
+    "Aucun film trouvé",
+    "لم نعثر على أفلام"
+  ],
+  "Start building your collection by adding your first show!": [
+    "Commencez votre collection en ajoutant une série !",
+    "ابدأ مجموعتك بإضافة مسلسلك الأول!"
+  ],
+  "Start building your collection by adding your first movie!": [
+    "Commencez votre collection en ajoutant un film !",
+    "ابدأ مجموعتك بإضافة فيلمك الأول!"
+  ],
+  "Try adjusting your search or filters to find what you're looking for.": [
+    "Modifiez votre recherche ou vos filtres pour trouver ce que vous cherchez.",
+    "غيّر البحث أو خيارات التصفية للعثور على ما تبحث عنه."
+  ],
+  "Could not load your tracking dashboard.": [
+    "Impossible de charger votre tableau de bord.",
+    "تعذّر تحميل الصفحة الرئيسية."
+  ],
+  "Adding…": [
+    "Ajout…",
+    "جارٍ الإضافة…"
+  ],
+  "Add": [
+    "Ajouter",
+    "إضافة"
+  ],
+  "Release details unconfirmed": [
+    "Détails de sortie non confirmés",
+    "تفاصيل الإصدار غير مؤكدة"
+  ],
+  "Could not add this movie. It may already be in your library.": [
+    "Impossible d’ajouter ce film. Il se trouve peut-être déjà dans votre bibliothèque.",
+    "تعذّرت إضافة الفيلم. قد يكون موجودًا بالفعل في مكتبتك."
+  ],
+  "Close": [
+    "Fermer",
+    "إغلاق"
+  ],
+  "Not linked to TMDB, so there is no reliable identity to look up on TVMaze.": [
+    "Cette série n’est pas liée à TMDB ; son identité ne peut donc pas être recherchée avec fiabilité sur TVMaze.",
+    "المسلسل غير مرتبط بـ TMDB، لذا لا تتوفر هوية موثوقة للبحث عنه في TVMaze."
+  ],
+  "TVMaze has no show with the TheTVDB or IMDb ID TMDB lists for this series, and no title match could be verified.": [
+    "Aucune série TVMaze ne possède l’identifiant TheTVDB ou IMDb indiqué par TMDB, et aucune correspondance par titre n’a pu être vérifiée.",
+    "لا يوجد في TVMaze مسلسل يحمل معرّف TheTVDB أو IMDb المسجل في TMDB، ولم نتمكن من تأكيد مطابقة بالعنوان."
+  ],
+  "TVMaze and TMDB disagree on this series’ TheTVDB or IMDb ID.": [
+    "Les identifiants TheTVDB ou IMDb de cette série diffèrent entre TVMaze et TMDB.",
+    "يختلف معرّف TheTVDB أو IMDb لهذا المسلسل بين TVMaze وTMDB."
+  ],
+  "Several TVMaze shows fit equally well; none was chosen.": [
+    "Plusieurs séries TVMaze correspondent aussi bien ; aucune n’a été choisie.",
+    "توجد عدة مسلسلات متطابقة بالقدر نفسه في TVMaze؛ لم نختر أيًا منها."
+  ],
+  "A TVMaze show has the same title, but its premiere date and description do not confirm it is the same series.": [
+    "Une série TVMaze porte le même titre, mais sa date de première et son synopsis ne confirment pas son identité.",
+    "يوجد مسلسل بالعنوان نفسه في TVMaze، لكن موعد عرضه الأول وملخصه لا يؤكدان أنه المسلسل نفسه."
+  ],
+  "Another show in your library resolves to the same TVMaze series.": [
+    "Une autre série de votre bibliothèque correspond à la même série TVMaze.",
+    "مسلسل آخر في مكتبتك مرتبط بالمسلسل نفسه في TVMaze."
+  ],
+  "The saved TVMaze link disagrees with the series TMDB identifies.": [
+    "Le lien TVMaze enregistré ne correspond pas à la série identifiée par TMDB.",
+    "رابط TVMaze المحفوظ لا يطابق المسلسل الذي حدده TMDB."
+  ],
+  "Updating...": [
+    "Mise à jour…",
+    "جارٍ التحديث…"
+  ],
+  "Update Account": [
+    "Mettre à jour le compte",
+    "تحديث الحساب"
+  ],
+  "Preparing export...": [
+    "Préparation de l’export…",
+    "جارٍ تجهيز التصدير…"
+  ],
+  "Export my data": [
+    "Exporter mes données",
+    "تصدير بياناتي"
+  ],
+  "This page could not be opened": [
+    "Impossible d’ouvrir cette page",
+    "تعذّر فتح هذه الصفحة"
+  ],
+  "Your library data is still saved. Try again or return to your home page.": [
+    "Les données de votre bibliothèque sont conservées. Réessayez ou revenez à l’accueil.",
+    "بيانات مكتبتك محفوظة. حاول مجددًا أو عُد إلى الصفحة الرئيسية."
+  ],
+  "Reload": [
+    "Recharger",
+    "إعادة التحميل"
+  ],
+  "Go to Home": [
+    "Retour à l’accueil",
+    "العودة إلى الرئيسية"
+  ]
+}

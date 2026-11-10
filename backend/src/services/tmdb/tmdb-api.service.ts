@@ -129,6 +129,11 @@ export class TMDBApiService implements TMDBService {
     return response.data.results || [];
   }
 
+  async getLocalizedOverview(kind: 'tv' | 'movie', id: number, language: 'ar' | 'fr-FR'): Promise<string | null> {
+    const response = await this.cached(`overview:${kind}:${id}:${language}`, () => this.get<{ overview?: string }>(`/${kind}/${id}`, { params: { language } }));
+    return response.data.overview?.trim() || null;
+  }
+
   async getMovieDetails(id: number): Promise<MovieDetails> {
     const response = await this.get<MovieDetails>(`/movie/${id}`, { params: { append_to_response: 'release_dates' } });
     return response.data;

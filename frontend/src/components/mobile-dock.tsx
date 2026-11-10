@@ -1,16 +1,19 @@
+import { useLanguage } from "@/i18n";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { CalendarDays, Film, House, Tv } from "lucide-react";
 import type { PointerEvent } from "react";
 
 const destinations = [
-  { to: "/", label: "Home", icon: House },
-  { to: "/shows", label: "Shows", icon: Tv },
-  { to: "/upcoming", label: "Upcoming", icon: CalendarDays },
-  { to: "/movies", label: "Movies", icon: Film },
-];
+  { to: "/", label: "home", icon: House },
+  { to: "/shows", label: "shows", icon: Tv },
+  { to: "/upcoming", label: "upcoming", icon: CalendarDays },
+  { to: "/movies", label: "movies", icon: Film },
+] as const;
 
 export default function MobileDock() {
+  const { t, language } = useLanguage();
+  const rtl = language === "ar";
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const active = Math.max(0, destinations.findIndex(({ to }) => to === pathname));
@@ -20,18 +23,19 @@ export default function MobileDock() {
   const gesture = useRef<number | null>(null);
 
   const position = (index: number) => {
-    if (bubble.current) bubble.current.style.transform = `translateX(${index * 100}%)`;
+    if (bubble.current) bubble.current.style.transform = `translateX(${(rtl ? 3 - index : index) * 100}%)`;
   };
   useLayoutEffect(() => {
     setHighlight(active);
     position(active);
-  }, [active]);
+  }, [active, rtl]);
 
   const update = (event: PointerEvent<HTMLElement>) => {
     const rect = dock.current!.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const valid = x >= 0 && x <= rect.width && event.clientY >= rect.top && event.clientY <= rect.bottom;
-    const index = Math.min(3, Math.max(0, Math.floor(x / (rect.width / 4))));
+    const physicalIndex = Math.min(3, Math.max(0, Math.floor(x / (rect.width / 4))));
+    const index = rtl ? 3 - physicalIndex : physicalIndex;
     if (bubble.current) {
       const left = Math.max(0, Math.min(rect.width * .75, x - rect.width / 8));
       bubble.current.style.transform = `translateX(${left / (rect.width / 4) * 100}%)`;
@@ -71,13 +75,13 @@ export default function MobileDock() {
     }
   };
 
-  return <nav ref={dock} aria-label="Main navigation" className="mobile-dock md:hidden"
+  return <nav ref={dock} dir={rtl ? "rtl" : "ltr"} aria-label={t("navigation")} className="mobile-dock md:hidden"
     onPointerDown={start} onPointerMove={move} onPointerUp={end}
     onPointerCancel={reset} onLostPointerCapture={() => { if (gesture.current !== null) reset(); }}>
-    <span ref={bubble} className="mobile-dock-bubble" aria-hidden="true" style={{ transform: `translateX(${active * 100}%)` }} />
+    <span ref={bubble} className="mobile-dock-bubble" aria-hidden="true" style={{ transform: `translateX(${(rtl ? 3 - active : active) * 100}%)` }} />
     {destinations.map(({ to, label, icon: Icon }, index) => <Link key={to} to={to}
       aria-current={active === index ? "page" : undefined} data-highlighted={highlight === index}
       onClick={(event) => { if (event.detail > 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) event.preventDefault(); }}
-      className="mobile-dock-tab"><Icon aria-hidden="true" /><span>{label}</span></Link>)}
+      className="mobile-dock-tab"><Icon aria-hidden="true" /><span dir="auto">{t(label)}</span></Link>)}
   </nav>;
 }

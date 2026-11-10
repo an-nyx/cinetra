@@ -1,3 +1,6 @@
+import { calendarRelative, calendarCount, episodeCount, localeFor, localizedEpisodeLine } from "@/i18n/calendar";
+import { coverageMessage, excludedEpisodesMessage } from "@/i18n/tracking";
+import { T, phrase, useLanguage } from "@/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { AlertTriangle, CalendarDays, ChevronDown, Info, RefreshCw, Tv } from "lucide-react";
@@ -11,7 +14,7 @@ import { filterMovieReleases } from "@/lib/movie-calendar";
 import UpcomingMovieCard from "@/components/upcoming-movie-card";
 import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
 import {
-  calendarFilters, calendarStats, dayHeading, episodeCode, eventEpisodeLine, filterEvents, groupByDay, groupReleaseEvents, relativeDay, timeLabel,
+  calendarFilters, calendarStats, dayHeading, episodeCode, filterEvents, groupByDay, groupReleaseEvents, timeLabel,
   type CalendarFilter, type ReleaseEvent,
 } from "@/lib/upcoming-calendar";
 
@@ -28,11 +31,12 @@ function Poster({ url, className }: { url: string | null; className: string }) {
 }
 
 function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: string) => void }) {
+  const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const grouped = event.episodes.length > 1;
   const single = event.episodes[0];
-  const time = timeLabel(event.timestamp);
-  const line = eventEpisodeLine(event);
+  const time = timeLabel(event.timestamp, localeFor(language));
+  const line = localizedEpisodeLine(language, event);
   return <article className="dash-card dash-row overflow-hidden">
     <div className="flex min-w-0 items-stretch">
       <button type="button" onClick={() => onOpen(event.showId)} aria-label={`Open ${event.showName}: ${line}${time ? `, ${time}` : ""}`} className="flex min-w-0 flex-1 items-center gap-3 p-2.5 text-left">
@@ -42,11 +46,11 @@ function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: 
             <span className="line-clamp-2 break-words text-[0.9rem] font-semibold leading-snug">{event.showName}</span>
           </span>
           <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-            {event.premiere && <span className="release-tag whitespace-nowrap">Premiere</span>}
+            {event.premiere && <span className="release-tag whitespace-nowrap"><T>Premiere</T></span>}
             <span className="min-w-0 break-words">{line}</span>
           </span>
           {!grouped && single.name && !/^Episode \d+$/i.test(single.name) && <span className="mt-0.5 block truncate text-xs text-foreground/75">{single.name}</span>}
-          {grouped && <span className="mt-0.5 block text-xs text-foreground/75">{plural(event.episodes.length, "episode")}</span>}
+          {grouped && <span className="mt-0.5 block text-xs text-foreground/75">{episodeCount(language, event.episodes.length)}</span>}
         </span>
         <span className="shrink-0 self-start pt-0.5 text-right">
           {time ? <span className="block text-xs font-semibold text-primary">{time}</span> : null}
@@ -60,14 +64,15 @@ function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: 
     {grouped && open && <ol className="border-t border-border/60 px-3 py-1.5 text-xs">
       {event.episodes.map(episode => <li key={episode.id} className="flex min-h-8 items-center gap-2 py-1">
         <span className="w-14 shrink-0 font-mono text-[11px] text-muted-foreground">{episodeCode(episode.season, episode.number)}</span>
-        <span className="min-w-0 flex-1 break-words">{episode.name || "Title not announced"}</span>
-        {episode.airTimestamp && episode.airTimestamp !== event.timestamp && <span className="shrink-0 text-muted-foreground">{timeLabel(episode.airTimestamp)}</span>}
+        <span className="min-w-0 flex-1 break-words">{episode.name || phrase(language, "Title not announced")}</span>
+        {episode.airTimestamp && episode.airTimestamp !== event.timestamp && <span className="shrink-0 text-muted-foreground">{timeLabel(episode.airTimestamp, localeFor(language))}</span>}
       </li>)}
     </ol>}
   </article>;
 }
 
 export default function UpcomingPage() {
+  const { language } = useLanguage();
   const { schedule, cached, building, loading, refreshing, error, refresh } = useUpcomingSchedule();
   const now = useNow();
   const [params] = useSearchParams();
@@ -93,84 +98,84 @@ export default function UpcomingPage() {
   const stats = calendarStats(events);
   const counts = useMemo(() => Object.fromEntries(calendarFilters.map(f => [f.id, filterEvents(events, f.id, now).length])) as Record<CalendarFilter, number>, [events, now]);
   const coverage = schedule?.coverage;
-  const updated = schedule ? new Date(schedule.generatedAt).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : null;
+  const updated = schedule ? new Date(schedule.generatedAt).toLocaleString(localeFor(language), { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : null;
 
   return <div className="mx-auto w-full min-w-0 max-w-3xl px-4 pb-4 pt-3 md:px-8 md:pt-6">
     <header className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight">Upcoming</h1>
-        <p className="text-xs text-muted-foreground">Episodes and collection releases, by date</p>
+        <h1 className="text-2xl font-semibold tracking-tight"><T>Upcoming</T></h1>
+        <p className="text-xs text-muted-foreground"><T>Episodes and collection releases, by date</T></p>
       </div>
-      <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={() => { refresh(); movies.retry(); }} disabled={refreshing} aria-label="Refresh schedules">
+      <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={() => { refresh(); movies.retry(); }} disabled={refreshing} aria-label={phrase(language, "Refresh schedules") }>
         <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
       </Button>
     </header>
 
-    {schedule && category !== "movies" && <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="Release statistics">
-      <span><strong className="font-semibold text-foreground">{stats.episodes}</strong> {stats.episodes === 1 ? "episode" : "episodes"}</span>
-      <span><strong className="font-semibold text-foreground">{stats.shows}</strong> {stats.shows === 1 ? "show" : "shows"}</span>
-      <span><strong className="font-semibold text-primary">{stats.premieres}</strong> {stats.premieres === 1 ? "premiere" : "premieres"}</span>
-      {updated && <span className="ml-auto">Updated {updated}</span>}
+    {schedule && category !== "movies" && <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label={phrase(language, "Release statistics") }>
+      <span>{calendarCount(language, "episode", stats.episodes)}</span>
+      <span>{calendarCount(language, "show", stats.shows)}</span>
+      <span className="text-primary">{calendarCount(language, "premiere", stats.premieres)}</span>
+      {updated && <span className="ml-auto"><T>Updated</T> {updated}</span>}
     </p>}
-    {cached && category !== "movies" && <p role="status" className="mt-2 text-xs text-muted-foreground">Showing saved TV releases while the schedule refreshes.</p>}
-    {movies.data && category !== "tv" && <p role="status" className="mt-2 text-xs text-muted-foreground">{movies.cached ? "Showing saved movie releases. " : ""}Movies updated {new Date(movies.data.generatedAt).toLocaleString()}.</p>}
+    {cached && category !== "movies" && <p role="status" className="mt-2 text-xs text-muted-foreground"><T>Showing saved TV releases while the schedule refreshes.</T></p>}
+    {movies.data && category !== "tv" && <p role="status" className="mt-2 text-xs text-muted-foreground">{movies.cached ? `${phrase(language, "Showing saved movie releases.")} ` : ""}<T>Movies updated</T> {new Date(movies.data.generatedAt).toLocaleString(localeFor(language))}.</p>}
     {schedule?.stale && category !== "movies" && <p role="status" className="mt-2 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-      <AlertTriangle className="mt-px size-3.5 shrink-0" />TVMaze could not be reached for some shows; their last saved schedule is shown and may be out of date.
+      <AlertTriangle className="mt-px size-3.5 shrink-0" /><T>TVMaze could not be reached for some shows; their last saved schedule is shown and may be out of date.</T>
     </p>}
 
-    <nav aria-label="Release categories" className="filter-rail mt-3">
-      {([['all', 'All'], ['tv', 'TV Shows'], ['movies', 'Movies']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={category === id} onClick={() => { setCategory(id); if (id === "movies" && filter === "premieres") setFilter("all"); }} className="upcoming-filter min-h-10 shrink-0 px-3.5 text-xs font-semibold">{label}</button>)}
+    <nav aria-label={phrase(language, "Release categories") } className="filter-rail mt-3">
+      {([['all', 'All'], ['tv', 'TV Shows'], ['movies', 'Movies']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={category === id} onClick={() => { setCategory(id); if (id === "movies" && filter === "premieres") setFilter("all"); }} className="upcoming-filter min-h-10 shrink-0 px-3.5 text-xs font-semibold">{phrase(language, label)}</button>)}
     </nav>
-    <nav aria-label="Upcoming filters" className="filter-rail mt-3">
+    <nav aria-label={phrase(language, "Upcoming filters") } className="filter-rail mt-3">
       {calendarFilters.filter(option => category !== "movies" || option.id !== "premieres").map(option => <button key={option.id} type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)} className="upcoming-filter min-h-10 shrink-0 whitespace-nowrap px-3.5 text-xs font-semibold">
-        {option.label}{schedule && category === "tv" && <span className="ml-1.5 opacity-70">{counts[option.id]}</span>}
+        {phrase(language, option.label)}{schedule && category === "tv" && <span className="ml-1.5 opacity-70">{counts[option.id]}</span>}
       </button>)}
     </nav>
 
-    {error && <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm"><span>{error}</span><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></div>}
+    {error && <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm"><span>{phrase(language, error)}</span><Button size="sm" variant="outline" onClick={refresh}><T>Retry</T></Button></div>}
 
-    {movies.error && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span>Movie releases could not be refreshed.</span><Button size="sm" variant="outline" onClick={movies.retry}>Retry movies</Button></div>}
-    {days.length > 0 && <section aria-label="Scheduled releases" className="mt-2">{days.map(({ day, events: dayEvents, movies: dayMovies }) => <section key={day} aria-labelledby={`day-${day}`} className="release-day-group">
-      <h2 id={`day-${day}`} className="release-day flex items-baseline justify-between text-[11px] font-bold tracking-[0.12em] text-muted-foreground"><span>{dayHeading(day)}</span>{relativeDay(day, now) && <span className="text-primary">{relativeDay(day, now)}</span>}</h2>
+    {movies.error && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span><T>Movie releases could not be refreshed.</T></span><Button size="sm" variant="outline" onClick={movies.retry}><T>Retry movies</T></Button></div>}
+    {days.length > 0 && <section aria-label={phrase(language, "Scheduled releases") } className="mt-2">{days.map(({ day, events: dayEvents, movies: dayMovies }) => <section key={day} aria-labelledby={`day-${day}`} className="release-day-group">
+      <h2 id={`day-${day}`} className="release-day flex items-baseline justify-between text-[11px] font-bold tracking-[0.12em] text-muted-foreground"><span>{dayHeading(day, localeFor(language))}</span>{calendarRelative(language, day, now) && <span className="text-primary">{calendarRelative(language, day, now)}</span>}</h2>
       <div className="space-y-2 pb-2">{dayEvents.map(event => <ReleaseCard key={event.key} event={event} onOpen={setSelectedShow} />)}{dayMovies.map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div>
     </section>)}</section>}
-    {category !== "tv" && filter === "all" && !!movies.data?.releases.some(movie => !movie.date) && <details className="dash-card group mt-4 px-3 py-1"><summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold">Upcoming Movies — Date TBA<ChevronDown className="ml-auto size-4" /></summary><p className="pb-2 text-xs text-muted-foreground">TMDB lists these collection members, but their release details are unconfirmed.</p><div className="space-y-2 pb-2">{movies.data.releases.filter(movie => !movie.date).map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div></details>}
-    {(loading || building) && category !== "movies" && <div role="status" className="dash-card mt-4 flex items-center justify-between gap-3 p-3 text-xs text-muted-foreground"><span>{building && building.total > 0 ? `Preparing TV releases… ${building.done} of ${building.total} shows checked` : "Preparing TV releases…"}</span><Button size="sm" variant="outline" onClick={refresh} disabled={refreshing}>Retry TV</Button></div>}
-    {movies.loading && !movies.data && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span>Preparing movie releases…</span><Button size="sm" variant="outline" onClick={movies.retry}>Retry movies</Button></div>}
-    {!days.length && !building && (category === "movies" || !loading) && (category === "tv" || movies.data) && !error && <div className="dash-card mt-4 px-4 py-6 text-center"><CalendarDays className="mx-auto size-7 text-primary" /><h2 className="mt-2 text-sm font-semibold">{category === "tv" ? emptyText[filter] : "No dated releases for this filter."}</h2><p className="mt-1 text-xs text-muted-foreground">Try another filter.</p></div>}
+    {category !== "tv" && filter === "all" && !!movies.data?.releases.some(movie => !movie.date) && <details className="dash-card group mt-4 px-3 py-1"><summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold"><T>Upcoming Movies — Date TBA</T><ChevronDown className="ml-auto size-4" /></summary><p className="pb-2 text-xs text-muted-foreground"><T>TMDB lists these collection members, but their release details are unconfirmed.</T></p><div className="space-y-2 pb-2">{movies.data.releases.filter(movie => !movie.date).map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div></details>}
+    {(loading || building) && category !== "movies" && <div role="status" className="dash-card mt-4 flex items-center justify-between gap-3 p-3 text-xs text-muted-foreground"><span>{building && building.total > 0 ? language === "ar" ? `جارٍ تحميل مواعيد المسلسلات… تم التحقق من ${building.done} من أصل ${building.total}` : language === "fr" ? `Chargement des sorties TV… ${building.done} séries vérifiées sur ${building.total}` : `Preparing TV releases… ${building.done} of ${building.total} shows checked` : phrase(language, "Preparing TV releases…")}</span><Button size="sm" variant="outline" onClick={refresh} disabled={refreshing}><T>Retry TV</T></Button></div>}
+    {movies.loading && !movies.data && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span><T>Preparing movie releases…</T></span><Button size="sm" variant="outline" onClick={movies.retry}><T>Retry movies</T></Button></div>}
+    {!days.length && !building && (category === "movies" || !loading) && (category === "tv" || movies.data) && !error && <div className="dash-card mt-4 px-4 py-6 text-center"><CalendarDays className="mx-auto size-7 text-primary" /><h2 className="mt-2 text-sm font-semibold">{phrase(language, category === "tv" ? emptyText[filter] : "No dated releases for this filter.")}</h2><p className="mt-1 text-xs text-muted-foreground"><T>Try another filter.</T></p></div>}
 
     {schedule && category !== "movies" && <>
       {schedule.returningTba.length > 0 && <details className="dash-card group mt-4 px-3 py-1">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-          Returning — Date TBA<span className="text-xs font-normal text-muted-foreground">{schedule.returningTba.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+          <T>Returning — Date TBA</T><span className="text-xs font-normal text-muted-foreground">{schedule.returningTba.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
         </summary>
-        <p className="pb-2 text-xs text-muted-foreground">TVMaze lists these shows as continuing, but no new episode has a confirmed date.</p>
+        <p className="pb-2 text-xs text-muted-foreground"><T>TVMaze lists these shows as continuing, but no new episode has a confirmed date.</T></p>
         <ul className="space-y-1 pb-2">{schedule.returningTba.map(show => <li key={show.showId}><button type="button" onClick={() => setSelectedShow(show.showId)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-1 py-1 text-left hover:bg-muted/40">
           <Poster url={show.posterURL} className="h-12 w-8" />
-          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{show.showName}</span><span className="block text-xs text-muted-foreground">{show.announcedEpisodes ? `${plural(show.announcedEpisodes, "episode")} announced, no date` : show.tvmazeStatus === "Running" ? "Between seasons" : show.tvmazeStatus}</span></span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">Date TBA</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{show.showName}</span><span className="block text-xs text-muted-foreground">{show.announcedEpisodes ? `${plural(show.announcedEpisodes, "episode")} announced, no date` : show.tvmazeStatus === "Running" ? phrase(language, "Between seasons") : show.tvmazeStatus}</span></span>
+          <span className="shrink-0 text-[11px] text-muted-foreground"><T>Date TBA</T></span>
         </button></li>)}</ul>
       </details>}
 
       {schedule.needsReview.length > 0 && <details className="dash-card group mt-3 px-3 py-1">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-          <AlertTriangle className="size-4 text-amber-400" />Schedule match needs review<span className="text-xs font-normal text-muted-foreground">{schedule.needsReview.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+          <AlertTriangle className="size-4 text-amber-400" /><T>Schedule match needs review</T><span className="text-xs font-normal text-muted-foreground">{schedule.needsReview.length}</span><ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
         </summary>
-        <p className="pb-2 text-xs text-muted-foreground">These shows could not be matched to TVMaze with certainty, so no dates are shown for them. Nothing was changed.</p>
+        <p className="pb-2 text-xs text-muted-foreground"><T>These shows could not be matched to TVMaze with certainty, so no dates are shown for them. Nothing was changed.</T></p>
         <ul className="space-y-1 pb-2">{schedule.needsReview.map(item => <li key={item.showId}><button type="button" onClick={() => setSelectedShow(item.showId)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-1 py-1 text-left hover:bg-muted/40">
           <Poster url={item.posterURL} className="h-12 w-8" />
-          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.showName}</span><span className="block text-xs leading-snug text-muted-foreground">{item.detail}</span></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.showName}</span><span className="block text-xs leading-snug text-muted-foreground">{phrase(language, item.detail)}</span></span>
         </button></li>)}</ul>
       </details>}
 
       {coverage && <details className="group mt-3 rounded-xl px-3 text-xs text-muted-foreground">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden"><Info className="size-3.5 text-primary" />Schedule source: TVMaze<ChevronDown className="ml-auto size-4 transition-transform group-open:rotate-180" /></summary>
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden"><Info className="size-3.5 text-primary" /><T>Schedule source: TVMaze</T><ChevronDown className="ml-auto size-4 transition-transform group-open:rotate-180" /></summary>
         <ul className="space-y-1 pb-3 leading-relaxed">
-          <li>{plural(coverage.evaluatedShows, "show")} checked · {coverage.verifiedShows} matched on TVMaze ({coverage.verifiedByExternalId} by TheTVDB/IMDb ID{coverage.verifiedByTitle ? `, ${coverage.verifiedByTitle} by title, premiere and synopsis` : ""}).</li>
-          {coverage.unresolvedShows > 0 && <li>{coverage.unresolvedShows} not matched with certainty (listed above).</li>}
-          {coverage.unavailableShows > 0 && <li>{coverage.unavailableShows} could not be checked right now.</li>}
-          <li>Only first-run episodes are listed: {coverage.excludedEpisodes.repeats} repeat{coverage.excludedEpisodes.repeats === 1 ? "" : "s"}, {coverage.excludedEpisodes.duplicates} duplicate{coverage.excludedEpisodes.duplicates === 1 ? "" : "s"} and {coverage.excludedEpisodes.specials} special{coverage.excludedEpisodes.specials === 1 ? "" : "s"} left out.</li>
-          <li>Times are shown in your time zone when TVMaze confirms them; otherwise only the date is shown.</li>
+          <li>{coverageMessage(language, coverage)}</li>
+          {coverage.unresolvedShows > 0 && <li>{language === "ar" ? `${coverage.unresolvedShows} لم تتأكد مطابقتها (أعلاه).` : language === "fr" ? `${coverage.unresolvedShows} correspondance(s) incertaine(s) (ci-dessus).` : `${coverage.unresolvedShows} not matched with certainty (listed above).`}</li>}
+          {coverage.unavailableShows > 0 && <li>{language === "ar" ? `تعذّر التحقق من ${coverage.unavailableShows} حاليًا.` : language === "fr" ? `${coverage.unavailableShows} impossible(s) à vérifier pour le moment.` : `${coverage.unavailableShows} could not be checked right now.`}</li>}
+          <li>{excludedEpisodesMessage(language, coverage.excludedEpisodes.repeats, coverage.excludedEpisodes.duplicates, coverage.excludedEpisodes.specials)}</li>
+          <li><T>Times are shown in your time zone when TVMaze confirms them; otherwise only the date is shown.</T></li>
         </ul>
       </details>}
     </>}

@@ -1,3 +1,4 @@
+import { T } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,14 +40,14 @@ export function LoginForm({ className, handleSubmit: onSubmit, ...props }: Login
       {...props}
     >
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Login to your account</h1>
+        <h1 className="text-2xl font-bold"><T>Login to your account</T></h1>
         <p className="text-muted-foreground text-sm text-balance">
-          Enter your email below to login to your account
+          <T>Enter your email below to login to your account</T>
         </p>
       </div>
       <div className="grid gap-6">
         <div className="grid gap-3">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email"><T>Email</T></Label>
           <Input
             id="email"
             autoComplete="email"
@@ -59,12 +60,12 @@ export function LoginForm({ className, handleSubmit: onSubmit, ...props }: Login
         </div>
         <div className="grid gap-3">
           <div className="flex items-center">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password"><T>Password</T></Label>
             <a
               href="#"
               className="ml-auto text-sm underline-offset-4 hover:underline"
             >
-              Forgot your password?
+              <T>Forgot your password?</T>
             </a>
           </div>
           <Input
@@ -77,13 +78,13 @@ export function LoginForm({ className, handleSubmit: onSubmit, ...props }: Login
           />
         </div>
         <Button type="submit" className="w-full">
-          Login
+          <T>Login</T>
         </Button>
       </div>
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
         <a href="/signup" className="underline underline-offset-4">
-          Sign up
+          <T>Sign up</T>
         </a>
       </div>
     </form>

@@ -39,6 +39,12 @@ services:
       TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN:-}
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       API_AUTHORIZATION: ${API_AUTHORIZATION:-}
+      # Web Push: optional; notifications stay off until all three VAPID values are set.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # The new-episode scheduler runs only when this is "enabled".
+      NOTIFICATIONS_SCHEDULER: ${NOTIFICATIONS_SCHEDULER:-disabled}
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
     depends_on:
       migrate:

@@ -1,3 +1,4 @@
+import { T } from "@/i18n";
 import { useEffect, useState } from "react";
 import { MovieService } from "@/services";
 import {
@@ -106,16 +107,16 @@ export default function AddMovieModal({
     <Dialog open={modalStatus} onOpenChange={(open) => { if (!open) closeModal(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a movie</DialogTitle>
+          <DialogTitle><T>Add a movie</T></DialogTitle>
           <DialogDescription>
-            Add the movie you watched and keep track of it.
+            <T>Add the movie you watched and keep track of it.</T>
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Search Section */}
           <div className="space-y-1">
             <Label htmlFor="searchInput" className="text-sm font-medium">
-              Search the movie you want to add
+              <T>Search the movie you want to add</T>
             </Label>
             <Input
               id="searchInput"
@@ -148,7 +149,7 @@ export default function AddMovieModal({
             <div className="flex gap-4 rounded-xl border bg-muted/40 p-3">
               <img src={movie.posterURL} alt="" className="h-28 w-[4.7rem] shrink-0 rounded-lg object-cover" />
               <div className="min-w-0">
-                <p className="mb-1 text-xs text-primary">Ready to add</p>
+                <p className="mb-1 text-xs text-primary"><T>Ready to add</T></p>
                 <h3 className="font-semibold">{movie.name}</h3>
                 <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{movie.overview}</p>
               </div>
@@ -162,9 +163,9 @@ export default function AddMovieModal({
               type="button"
               onClick={() => closeModal()}
             >
-              Cancel
+              <T>Cancel</T>
             </Button>
-            <Button type="submit" disabled={!movie.name}>Add to library</Button>
+            <Button type="submit" disabled={!movie.name}><T>Add to library</T></Button>
           </DialogFooter>
         </form>
       </DialogContent>

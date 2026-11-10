@@ -3,7 +3,10 @@ import { showModule } from '../../modules/show';
 import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.entity';
 import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming, previewRematch, applyRematch, RematchConflictError } from '../../services/episode-guide.service';
 
+import { TMDBApiService } from "../../services/tmdb/tmdb-api.service";
+
 const router = Router();
+const tmdb = new TMDBApiService();
 
 // Adding, editing or removing a show can change the schedule: refresh Upcoming (in the background) after success.
 router.use((req, res, next) => {
@@ -17,6 +20,17 @@ function guideError(res: Response, error: unknown) {
   if (error instanceof EpisodeGuideError) res.status(error.status).json({ message: error.message });
   else { console.error('Episode provider unavailable'); res.status(502).json({ message: 'Episode provider unavailable.' }); }
 }
+
+router.get('/:id/localized-overview', async (req: Request<{id: string}>, res: Response) => {
+  const language = req.query.language;
+  if (language !== 'ar' && language !== 'fr-FR') { res.status(400).json({ message: 'Unsupported language' }); return; }
+  try {
+    const item = await showModule.Queries.GetByIdQuery.execute(req.params.id, req.user.id);
+    if (!item) { res.sendStatus(404); return; }
+    if (!item.tmdbId) { res.json({ overview: null }); return; }
+    res.json({ overview: await tmdb.getLocalizedOverview('tv', item.tmdbId, language) });
+  } catch { res.status(502).json({ message: 'Localized overview unavailable' }); }
+});
 
 router.get("/search", async (req: Request, res: Response) => {
   const query = req.query.q as string;

@@ -1,3 +1,4 @@
+import { T, phrase, useLanguage } from "@/i18n";
 import { useEffect, useState } from "react";
 import { UserService } from "@/services";
 import { UserType } from "@/types";
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import NotificationSettings from "@/components/notification-settings";
 
 interface AccountModalProps {
   open: boolean;
@@ -20,6 +22,7 @@ interface AccountModalProps {
 }
 
 export default function AccountModal({ open, onOpenChange }: AccountModalProps) {
+  const { language } = useLanguage();
   const [user, setUser] = useState<UserType | null>(null);
   const [formData, setFormData] = useState({
     username: "",
@@ -48,7 +51,7 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
       setHasChanges(false);
     } catch (error) {
       console.error("Error fetching user data:", error);
-      toast.error("Failed to load user data");
+      toast.error(phrase(language, "Failed to load user data"));
     } finally {
       setIsLoading(false);
     }
@@ -86,10 +89,10 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
         email: updatedUser.email,
       });
       setHasChanges(false);
-      toast.success("Account updated successfully");
+      toast.success(phrase(language, "Account updated successfully"));
     } catch (error) {
       console.error("Error updating user data:", error);
-      toast.error("Failed to update account");
+      toast.error(phrase(language, "Failed to update account"));
     } finally {
       setIsSaving(false);
     }
@@ -105,7 +108,7 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
       anchor.download = `cinetra-export-${new Date().toISOString().slice(0, 10)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
-    } catch { toast.error("Could not export your data"); }
+    } catch { toast.error(phrase(language, "Could not export your data")); }
     finally { setIsExporting(false); }
   };
 
@@ -113,9 +116,9 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Account Settings</DialogTitle>
+          <DialogTitle><T>Account Settings</T></DialogTitle>
           <DialogDescription>
-            Manage your account information and preferences
+            <T>Manage your account information and preferences</T>
           </DialogDescription>
         </DialogHeader>
 
@@ -135,27 +138,27 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
           <>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username"><T>Username</T></Label>
                 <Input
                   id="username"
                   name="username"
                   type="text"
                   value={formData.username}
                   onChange={handleInputChange}
-                  placeholder="Enter your username"
+                  placeholder={phrase(language, "Enter your username")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email"><T>Email</T></Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="Enter your email"
+                  placeholder={phrase(language, "Enter your email")}
                   required
                 />
               </div>
@@ -165,12 +168,13 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
                 disabled={!hasChanges || isSaving}
                 className="w-full"
               >
-                {isSaving ? "Updating..." : "Update Account"}
+                {phrase(language, isSaving ? "Updating..." : "Update Account")}
               </Button>
             </form>
             <Button type="button" variant="outline" className="w-full" disabled={isExporting} onClick={exportData}>
-              {isExporting ? "Preparing export..." : "Export my data"}
+              {phrase(language, isExporting ? "Preparing export..." : "Export my data")}
             </Button>
+            <NotificationSettings />
           </>
         )}
       </DialogContent>

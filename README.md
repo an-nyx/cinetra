@@ -60,6 +60,8 @@ Before starting the backend, apply pending additive migrations with `cd backend 
 
 The current implementation and remaining work are tracked in [the improvement plan](docs/improvement-plan.md).
 
+New-episode push notifications (Web Push, including iPhone Home Screen apps) are described, with their production configuration, in [docs/push-notifications.md](docs/push-notifications.md). They stay off until VAPID keys are set and `NOTIFICATIONS_SCHEDULER=enabled`.
+
 ### Running the Application
 
 To run the application you need to run the following :
