@@ -29,6 +29,8 @@ interface MovieSearchResult {
 export interface MovieRelease { tmdbId: number; title: string; overview: string; posterURL: string | null; collectionId: number; collectionName: string; date: string | null; market: string | null; releaseType: string | null; inLibrary: boolean }
 export type MovieDiscovery = { status: "ready"; refreshing?: boolean; refreshError?: boolean; providerFailures?: number; releases: MovieRelease[]; years: Record<string, string>; verifiedMovies: number; unresolved: number; generatedAt: string } | { status: "building" };
 
+export interface MovieInfo { year: string | null; runtime: number | null; genres: string[]; trailerUrl: string | null }
+
 export interface MovieWatch { id: string; watchedAt: string }
 
 class MovieServiceClass extends ApiService {
@@ -44,6 +46,10 @@ class MovieServiceClass extends ApiService {
   async getMovieById(id: string): Promise<MovieType> {
     const response = await this.get<MovieType>(`/movie/${id}`);
     return response.data;
+  }
+
+  async getMovieInfo(id: string): Promise<MovieInfo | null> {
+    return (await this.get<MovieInfo | null>(`/movie/${id}/info`)).data;
   }
 
   async createMovie(data: CreateMovieData): Promise<MovieType> {
