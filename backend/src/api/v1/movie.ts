@@ -3,8 +3,22 @@ import { movieModule } from '../../modules/movie';
 import { CreateMovieDto, UpdateMovieDto } from '../../modules/movie/model/movie.entity';
 import { discoverMovies } from '../../services/movie-discovery.service';
 import { getMovieWatches, addMovieWatch } from '../../services/movie-watch.service';
+import { TMDBApiService } from '../../services/tmdb/tmdb-api.service';
+import { movieInfo } from '../../services/movie-info.model';
 
 const router = Router();
+
+const tmdb = new TMDBApiService();
+router.get('/:id/info', async (req: Request<{id: string}>, res: Response) => {
+  try {
+    const movie = await movieModule.Queries.GetByIdQuery.execute(req.params.id, req.user.id);
+    if (!movie) { res.status(404).json({ message: 'Movie not found' }); return; }
+    if (!movie.tmdbId) { res.json(null); return; }
+    const info = await tmdb.getMovieInfo(movie.tmdbId);
+    if (info.id !== movie.tmdbId) { res.status(502).json({ message: 'Movie information unavailable' }); return; }
+    res.json(movieInfo(info));
+  } catch { res.status(502).json({ message: 'Movie information unavailable' }); }
+});
 
 router.get('/:id/watches', async (req: Request<{id: string}>, res: Response) => {
   try {

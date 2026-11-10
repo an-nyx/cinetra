@@ -21,6 +21,7 @@ export type TMDBShowDetails = { name?: string; original_name?: string; overview?
 type SeasonDetails = { episodes: Array<{ episode_number: number; name: string; air_date: string | null; runtime: number | null; episode_type?: string }> };
 
 export type MovieDetails = { id: number; title?: string; overview?: string; poster_path?: string | null; release_date?: string | null; status?: string; belongs_to_collection?: { id: number; name: string } | null; release_dates?: { results?: Array<{ iso_3166_1: string; release_dates: Array<{ type: number; release_date: string }> }> } };
+export type MovieInfoResponse = { id: number; release_date?: string | null; runtime?: number | null; genres?: Array<{ name: string }>; videos?: { results?: Array<{ site?: string; type?: string; official?: boolean; key?: string }> } };
 export type MovieCollection = { id: number; name: string; parts?: Array<{ id: number; title?: string; release_date?: string | null }> };
 
 export class TMDBApiService implements TMDBService {
@@ -130,6 +131,11 @@ export class TMDBApiService implements TMDBService {
 
   async getMovieDetails(id: number): Promise<MovieDetails> {
     const response = await this.get<MovieDetails>(`/movie/${id}`, { params: { append_to_response: 'release_dates' } });
+    return response.data;
+  }
+
+  async getMovieInfo(id: number): Promise<MovieInfoResponse> {
+    const response = await this.cached(`movie-info:${id}`, () => this.get<MovieInfoResponse>(`/movie/${id}`, { params: { append_to_response: 'videos' } }));
     return response.data;
   }
 

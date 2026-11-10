@@ -1,7 +1,7 @@
 import { posterSrc } from "@/lib/poster";
 import { useEffect, useState } from "react";
 import { MovieService } from "@/services";
-import type { MovieWatch } from "@/services/movie.service";
+import type { MovieInfo, MovieWatch } from "@/services/movie.service";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +50,7 @@ export default function MovieModal({
     createdAt: "",
   });
   const [showFullOverview, setShowFullOverview] = useState(false);
+  const [info, setInfo] = useState<MovieInfo | null>(null);
   const [watches, setWatches] = useState<MovieWatch[]>([]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -64,19 +65,6 @@ export default function MovieModal({
       setMovie(updated);
       setMovies(current => current.map(item => item.id === updated.id ? updated : item));
     } catch { setTrackingError("Could not save movie details. Please try again."); }
-    finally { setSaving(false); }
-  };
-
-  const logWatch = async () => {
-    if (!selectedMovie) return;
-    setSaving(true);
-    setTrackingError("");
-    try {
-      const watch = await MovieService.addWatch(selectedMovie);
-      setWatches(current => [watch, ...current]);
-      setMovie(current => ({ ...current, status: "watched" }));
-      setMovies(current => current.map(item => item.id === selectedMovie ? { ...item, status: "watched" } : item));
-    } catch { setTrackingError("Could not log this viewing. Please try again."); }
     finally { setSaving(false); }
   };
 
@@ -109,6 +97,9 @@ export default function MovieModal({
   useEffect(() => {
     if (!selectedMovie) return;
     setShowFullOverview(false);
+    setInfo(null);
+    let active = true;
+    MovieService.getMovieInfo(selectedMovie).then(result => { if (active) setInfo(result); }).catch(() => {});
 
     const loadMovie = async () => {
       try {
@@ -122,6 +113,7 @@ export default function MovieModal({
     };
 
     loadMovie();
+    return () => { active = false; };
   }, [selectedMovie]);
 
   return (
@@ -158,7 +150,10 @@ export default function MovieModal({
             <Label htmlFor="movie-notes">Personal notes or review</Label>
             <Textarea className="min-h-11 h-11 resize-y focus:h-24" id="movie-notes" value={notes} onChange={event => setNotes(event.target.value)} onBlur={() => { if (notes !== (movie.notes || "")) saveMovie({ notes }); }} placeholder="Add your thoughts…" />
           </div>
-          <Button type="button" variant="outline" size="sm" disabled={saving} onClick={logWatch}>Log a viewing</Button>
+          {info && (info.year || info.runtime || info.genres.length > 0 || info.trailerUrl) && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {[info.year, info.runtime ? `${info.runtime} min` : null, info.genres.join(', ') || null].filter(Boolean).map((item, index) => <span key={index}>{index > 0 && <span aria-hidden="true" className="mr-2">·</span>}{item}</span>)}
+            {info.trailerUrl && <a href={info.trailerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-emerald-300 hover:underline">Watch trailer<span className="sr-only"> (opens in a new tab)</span></a>}
+          </div>}
           {watches.length > 0 && <p className="text-xs text-muted-foreground">Watched {watches.length} {watches.length === 1 ? "time" : "times"} · Last watched {formatDate(watches[0].watchedAt)}</p>}
           {trackingError && <p role="alert" className="text-xs text-destructive">{trackingError}</p>}
         </div>
