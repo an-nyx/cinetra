@@ -26,6 +26,7 @@ import { Plus, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { filterAndSortShows, personalStatusLabels, type LibraryFilters, type PersonalStatus } from "@/lib/show-library";
 
 type ListFiltersType = LibraryFilters;
+const watchingStatusOptions = ['watching', 'completed', 'dropped'] as const;
 
 export default function ShowsPage() {
   const [addShowModalStatus, setAddShowModalStatus] = useState<boolean>(false);
@@ -109,8 +110,8 @@ export default function ShowsPage() {
 
       <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-1.5 sm:hidden">
         <Select value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
-          <SelectTrigger aria-label="Filter watching status" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All watching statuses</SelectItem>{(['watching', 'completed', 'dropped', 'planned', 'paused', 'none'] as const).map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}</SelectContent>
+          <SelectTrigger aria-label="Filter watching status" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue>{filters.statusFilter ? personalStatusLabels[filters.statusFilter] : 'All watching statuses'}</SelectValue></SelectTrigger>
+          <SelectContent><SelectItem value="all">All watching statuses</SelectItem>{watchingStatusOptions.map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}</SelectContent>
         </Select>
         <Select value={filters.sortBy ?? 'dateNewest'} onValueChange={(value: NonNullable<ListFiltersType['sortBy']>) => setFilters({ ...filters, sortBy: value })}>
           <SelectTrigger aria-label="Sort library" className="h-10 w-full min-w-0 gap-1 px-1.5 text-xs [&_svg]:size-3"><SelectValue /></SelectTrigger>
@@ -155,11 +156,11 @@ export default function ShowsPage() {
 
           <Select key={`status-${key}`} name="statusFilter" value={filters.statusFilter ?? "all"} onValueChange={(value: PersonalStatus | "all") => setFilters({ ...filters, statusFilter: value === "all" ? undefined : value })}>
             <SelectTrigger aria-label="Filter watching status" className="hidden w-auto min-w-[190px] max-w-full sm:flex">
-              <SelectValue placeholder="All watching statuses" />
+              <SelectValue>{filters.statusFilter ? personalStatusLabels[filters.statusFilter] : 'All watching statuses'}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All watching statuses</SelectItem>
-              {(['watching', 'completed', 'dropped', 'planned', 'paused', 'none'] as const).map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}
+              {watchingStatusOptions.map(status => <SelectItem key={status} value={status}>{personalStatusLabels[status]}</SelectItem>)}
             </SelectContent>
           </Select>
 
