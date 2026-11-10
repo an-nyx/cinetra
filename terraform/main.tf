@@ -66,6 +66,13 @@ locals {
     JWT_SECRET        = coalesce(var.jwt_secret, random_password.jwt_secret.result)
     API_AUTHORIZATION = var.api_authorization
     DATABASE_URL      = coolify_database_postgresql.db.internal_db_url
+
+    # Web Push (new-episode notifications).
+    VAPID_PUBLIC_KEY               = var.vapid_public_key
+    VAPID_PRIVATE_KEY              = var.vapid_private_key
+    VAPID_SUBJECT                  = var.vapid_subject
+    NOTIFICATIONS_SCHEDULER        = var.notifications_scheduler
+    NOTIFICATIONS_INTERVAL_MINUTES = tostring(var.notifications_interval_minutes)
   }
 }
 

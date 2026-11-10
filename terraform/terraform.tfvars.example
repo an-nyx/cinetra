@@ -8,5 +8,11 @@ domain = "https://cinetra.example.com"
 
 api_authorization = "Bearer <tmdb-api-token>"
 
+# Web Push for new-episode notifications. Generate with `npm run vapid:generate` (backend).
+vapid_public_key  = "<url-safe-base64-public-key>"
+vapid_private_key = "<url-safe-base64-private-key>"
+vapid_subject     = "mailto:you@example.com"
+# Optional: notifications_scheduler = "enabled" (default), notifications_interval_minutes = 15
+
 # Optional: reuse the JWT secret from the old .env so users stay logged in.
 # jwt_secret = "<current-jwt-secret>"

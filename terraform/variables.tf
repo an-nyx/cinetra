@@ -71,6 +71,34 @@ variable "api_authorization" {
   sensitive   = true
 }
 
+variable "vapid_public_key" {
+  description = "VAPID public key for Web Push. Generate a pair with `npm run vapid:generate` (backend). Required: the backend refuses to start notifications without all three VAPID values."
+  type        = string
+}
+
+variable "vapid_private_key" {
+  description = "VAPID private key for Web Push. Server-side only; never expose it to the frontend."
+  type        = string
+  sensitive   = true
+}
+
+variable "vapid_subject" {
+  description = "VAPID subject, a mailto: or https: URL, e.g. mailto:you@example.com."
+  type        = string
+}
+
+variable "notifications_scheduler" {
+  description = "Set to 'enabled' to run the new-episode notifier inside the backend process; anything else keeps it off."
+  type        = string
+  default     = "enabled"
+}
+
+variable "notifications_interval_minutes" {
+  description = "How often the new-episode notifier runs, in minutes (minimum 5)."
+  type        = number
+  default     = 15
+}
+
 variable "jwt_secret" {
   description = "JWT signing secret. Set it to your current secret to keep existing sessions valid; leave null to generate one."
   type        = string
