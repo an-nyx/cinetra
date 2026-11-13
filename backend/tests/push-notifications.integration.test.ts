@@ -369,6 +369,26 @@ async function main() {
   assert.equal(created.json.registered, true);
   assert.ok(!created.text.includes(erinEndpoint) && !created.text.includes(erinBrowser.auth), 'endpoint and keys are not echoed back');
   assert.equal((await call('POST', '/subscriptions/status', E, { endpoint: erinEndpoint })).json.registered, true);
+  // Diagnostics: this account only, never the endpoint or keys; Alice's library explains every show.
+  assert.equal((await call('GET', '/diagnostics', null)).status, 401);
+  const erinDiag = await call('GET', '/diagnostics', E);
+  assert.equal(erinDiag.status, 200);
+  assert.deepEqual([erinDiag.json.devices.length, erinDiag.json.shows.total, erinDiag.json.deliveries.length], [1, 0, 0]);
+  assert.ok(!erinDiag.text.includes(erinEndpoint) && !erinDiag.text.includes(erinBrowser.auth) && !erinDiag.text.includes(vapid.privateKey), 'diagnostics never expose endpoints or keys');
+  assert.equal(typeof erinDiag.json.scheduler.enabled, 'boolean');
+  const { notificationDiagnostics } = await import('../src/services/notifications/notification-diagnostics.service');
+  const latestSilo = (await prisma.show.findFirst({ where: { name: 'Silo' }, orderBy: { createdAt: 'desc' } }))!;
+  const trackingBeforeDiag = await tracking();
+  const aliceDiag = await notificationDiagnostics(latestSilo.userId, { source, now: T('2026-11-10T12:00:00Z') });
+  assert.equal(await tracking(), trackingBeforeDiag, 'diagnostics never modify tracking data');
+  assert.equal(aliceDiag.shows.total, await prisma.show.count({ where: { userId: latestSilo.userId } }));
+  const siloDiag = aliceDiag.shows.items.find(i => i.showId === latestSilo.id)!;
+  assert.deepEqual([siloDiag.eligible, siloDiag.reason, siloDiag.tvmazeId], [true, null, 1001]);
+  assert.deepEqual([siloDiag.lastPremiere?.season, siloDiag.lastPremiere?.number, siloDiag.lastPremiere?.withinLookback], [3, 2, true]);
+  assert.ok(aliceDiag.shows.items.every(i => i.eligible === (i.reason === null)), 'every ineligible show names its reason');
+  assert.ok(aliceDiag.deliveries.length > 0 && aliceDiag.deliveries.every(d => typeof d.status === 'string'), "Alice's ledger is listed");
+  assert.ok(!JSON.stringify(aliceDiag).includes('/push/'), 'no endpoint in diagnostics');
+  console.log('✓ diagnostics: per-account eligibility, devices and ledger without endpoints or keys');
   // Another user can neither see, test, nor remove Erin's subscription.
   assert.equal((await call('POST', '/subscriptions/status', F, { endpoint: erinEndpoint })).json.registered, false);
   assert.equal((await call('POST', '/test', F, { endpoint: erinEndpoint })).status, 404);

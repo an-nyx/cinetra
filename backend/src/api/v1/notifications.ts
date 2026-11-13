@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { rateLimit } from "../../middlewares/rate-limit";
 import { classifySend, defaultSender, parseSubscription, publicVapidKey } from "../../services/notifications/push-sender";
 import { testPayload } from "../../services/notifications/episode-alerts.model";
+import { notificationDiagnostics } from "../../services/notifications/notification-diagnostics.service";
 import { countSubscriptions, deviceStatus, findOwnSubscription, getPreferences, removeSubscription, saveSubscription, updatePreferences } from "../../services/notifications/push-subscription.service";
 
 /** Mounted behind protectedRoute: every handler acts only on req.user's own preferences and subscriptions. */
@@ -26,6 +27,12 @@ router.use((_req, res, next) => { res.setHeader("Cache-Control", "no-store"); ne
 router.get("/config", (_req: Request, res: Response) => {
   const vapidPublicKey = publicVapidKey();
   res.json({ configured: !!vapidPublicKey, vapidPublicKey });
+});
+
+/** Why each saved show would or would not alert, this account's devices and its delivery ledger. Read-only. */
+router.get("/diagnostics", async (req: Request, res: Response) => {
+  try { res.json(await notificationDiagnostics(req.user.id)); }
+  catch (error) { fail(res, error); }
 });
 
 router.get("/preferences", async (req: Request, res: Response) => {
