@@ -116,6 +116,24 @@ test('push shows the episode notification with its icon, tag and link', async ()
   assert.deepEqual(JSON.parse(JSON.stringify(w.shown[0].options)), { body: 'Season 3, Episode 2 has premiered.', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2', data: { url: '/shows?show=s1' }, tag: 'episode-44778-3001' });
 });
 
+test('cinematic alert carries the show poster as the large image; the Cinetra icon and click link are unchanged', async () => {
+  const w = loadWorker();
+  await w.dispatch('push', pushEvent({ title: 'A new chapter of MobLand.', body: 'S02E09 just premiered. Your next episode awaits.', url: '/shows?show=s1', tag: 'episode-75026-1', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2', image: 'https://image.tmdb.org/t/p/w780/mob.jpg' }));
+  assert.deepEqual(JSON.parse(JSON.stringify(w.shown[0].options)), { body: 'S02E09 just premiered. Your next episode awaits.', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2', data: { url: '/shows?show=s1' }, image: 'https://image.tmdb.org/t/p/w780/mob.jpg', tag: 'episode-75026-1' });
+  await w.dispatch('push', pushEvent({ title: 't', image: 'https://static.tvmaze.com/uploads/images/medium_portrait/590/1475000.jpg' }));
+  assert.equal(w.shown[1].options.image, 'https://static.tvmaze.com/uploads/images/medium_portrait/590/1475000.jpg');
+});
+
+test('missing or unsafe artwork is dropped: text-only notification, never an unrelated image', async () => {
+  const w = loadWorker();
+  const bad = [undefined, '', 'http://image.tmdb.org/t/p/w780/a.jpg', 'https://evil.example/a.jpg', 'https://image.tmdb.org.evil.example/a.jpg', 'https://image.tmdb.org/t/p/w780/a.jpg?token=x',
+    'https://u:p@image.tmdb.org/a.jpg', 'https://image.tmdb.org:444/a.jpg', 'javascript:alert(1)', 'data:image/png;base64,AAAA', 42, 'https://image.tmdb.org/' + 'a'.repeat(600)];
+  for (const image of bad) await w.dispatch('push', pushEvent({ title: 'x', image }));
+  assert.equal(w.shown.length, bad.length, 'still shown (iOS requires a visible notification)');
+  assert.ok(w.shown.every(n => !('image' in n.options)), 'no image option at all');
+  assert.ok(w.shown.every(n => n.options.icon === '/icon-192.png?v=2'));
+});
+
 test('push is always shown, and unsafe links fall back to the home page', async () => {
   const w = loadWorker();
   await w.dispatch('push', pushEvent('"not an object"'));

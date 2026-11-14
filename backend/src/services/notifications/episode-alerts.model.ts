@@ -124,24 +124,136 @@ export function isEpisodeWatched(saved: SavedTracking, watches: { season: number
 /** Show scope "all except Dropped": Watching, Completed, Planned, Paused and shows without a status are eligible. */
 export const isShowEligible = (show: { status: string | null }) => show.status !== 'dropped';
 
-export type PushPayload = { title: string; body: string; url: string; tag: string; icon: string; badge: string };
+export type PushPayload = { title: string; body: string; url: string; tag: string; icon: string; badge: string; image?: string };
 export const NOTIFICATION_ICON = '/icon-192.png?v=2';
 /** Opens the show's details in the library. */
 export const showUrl = (showId: string) => `/shows?show=${encodeURIComponent(showId)}`;
 
 /**
- * The visible notification. Contains only the title, numbers and a same-origin link: no tokens, user IDs, emails or
- * provider claims (it never says where the episode can be streamed).
+ * What kind of release an episode is, used only to choose wording.
+ * - Premieres come from TVMaze's own numbering (episode 1 of a season), which the notifier already trusts.
+ * - Finales are only claimed when TMDB's catalog labels the same season/episode a finale *and* its air date agrees
+ *   with TVMaze's (see verifiedFinaleKind); anything uncertain is a regular episode.
  */
-export function episodePayload(input: { showName: string; showId: string; tvmazeShowId: number; tvmazeEpisodeId: number; season: number; number: number }): PushPayload {
-  const name = input.showName.trim().slice(0, 120) || 'a show in your library';
+export type EpisodeKind = 'series_premiere' | 'season_premiere' | 'season_finale' | 'midseason_finale' | 'regular';
+
+export function premiereKind(season: number, number: number): EpisodeKind {
+  if (number !== 1) return 'regular';
+  return season === 1 ? 'series_premiere' : 'season_premiere';
+}
+
+/**
+ * A finale label from TMDB, trusted only when TMDB's episode at the same season/number aired within a few days of
+ * the TVMaze premiere instant (guards against the two providers numbering seasons differently). Premieres win.
+ */
+export function verifiedFinaleKind(tmdb: { episodeType: string | null | undefined; airDate: string | null | undefined } | null, premieredAt: Date): EpisodeKind | null {
+  if (!tmdb?.episodeType || !tmdb.airDate || !/^\d{4}-\d{2}-\d{2}$/.test(tmdb.airDate)) return null;
+  const aired = Date.parse(`${tmdb.airDate}T00:00:00Z`);
+  // TVMaze's conservative instant is at most ~1.5 days after the listed date; TMDB dates can lead by a day (time zones).
+  const lead = premieredAt.getTime() - aired;
+  if (lead < -2 * 86_400_000 || lead > 4 * 86_400_000) return null;
+  if (tmdb.episodeType === 'finale') return 'season_finale';
+  if (tmdb.episodeType === 'mid_season') return 'midseason_finale';
+  return null;
+}
+
+/** S02E09 (at least two digits each; long-running numbering like S2026E225 stays as is). */
+export const episodeCode = (season: number, number: number) => `S${String(season).padStart(2, '0')}E${String(number).padStart(2, '0')}`;
+
+/** Titles longer than this are shown on their own; the event moves to the body (Lock Screen titles are one line). */
+export const COMPACT_TITLE_AFTER = 44;
+const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`);
+/** "The X season finale" without doubling an article the show title already starts with ("The Bear season finale"). */
+const theShow = (name: string) => (/^the\s/i.test(name) ? name : `The ${name}`);
+const label: Record<EpisodeKind, string> = {
+  series_premiere: 'Series premiere', season_premiere: 'Season premiere', season_finale: 'Season finale', midseason_finale: 'Midseason finale', regular: 'New episode',
+};
+
+/**
+ * Cinematic wording for a release. Deterministic (the same episode always reads the same way), short enough for a
+ * Lock Screen, no emojis, no plot details and no claims about where to watch. The show title is never altered,
+ * only trimmed when it exceeds 120 characters.
+ */
+export function episodeCopy(input: { showName: string; season: number; number: number; kind: EpisodeKind; tvmazeEpisodeId: number }): { title: string; body: string } {
+  const name = input.showName.trim().slice(0, 120) || 'A show in your library';
+  const code = episodeCode(input.season, input.number);
+  const templates: Record<EpisodeKind, { title: string; body: string }> = {
+    series_premiere: { title: sentence(`${name} has arrived`), body: `The story begins. ${code} has premiered.` },
+    season_premiere: { title: sentence(`${name} is back`), body: `A new season begins. ${code} has premiered.` },
+    season_finale: { title: `${theShow(name)} season finale is here.`, body: `${code} has premiered. Time for the final chapter.` },
+    midseason_finale: { title: `${theShow(name)} midseason finale is here.`, body: `${code} has premiered before the midseason break.` },
+    // Two alternating phrasings so a weekly show does not read identically every week.
+    regular: input.tvmazeEpisodeId % 2 === 0
+      ? { title: sentence(`A new chapter of ${name}`), body: `${code} just premiered. Your next episode awaits.` }
+      : { title: sentence(`${name} continues`), body: `${code} just premiered. Your next episode awaits.` },
+  };
+  const chosen = templates[input.kind];
+  if (chosen.title.length <= COMPACT_TITLE_AFTER) return chosen;
+  const compactBody: Record<EpisodeKind, string> = {
+    series_premiere: `Series premiere · ${code} has premiered. The story begins.`,
+    season_premiere: `Season premiere · ${code} has premiered. A new season begins.`,
+    season_finale: `Season finale · ${code} has premiered. Time for the final chapter.`,
+    midseason_finale: `Midseason finale · ${code} has premiered before the break.`,
+    regular: `${label.regular} · ${code} just premiered. Your next episode awaits.`,
+  };
+  return { title: name, body: compactBody[input.kind] };
+}
+
+// Public artwork hosts Cinetra already stores posters from. Anything else is dropped rather than displayed.
+const ARTWORK = [
+  { host: 'image.tmdb.org', path: /^\/t\/p\/[a-z0-9]+\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/ },
+  { host: 'static.tvmaze.com', path: /^\/uploads\/images\/[a-z_]+\/\d+\/\d+\.(jpg|jpeg|png|webp)$/ },
+];
+/**
+ * The saved show's own poster as a notification image, or undefined. Only clean HTTPS URLs on the known artwork
+ * hosts, with no query, fragment or credentials (nothing private can ride along). Large originals are swapped for
+ * the provider's mid-size rendition, which loads quickly on a phone.
+ */
+export function notificationImage(posterURL: string | null | undefined): string | undefined {
+  if (!posterURL || posterURL.length > 500) return undefined;
+  let url: URL;
+  try { url = new URL(posterURL); } catch { return undefined; }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || url.search || url.hash) return undefined;
+  const rule = ARTWORK.find(a => a.host === url.hostname);
+  if (!rule || !rule.path.test(url.pathname)) return undefined;
+  if (url.hostname === 'image.tmdb.org') url.pathname = url.pathname.replace(/^\/t\/p\/[a-z0-9]+\//, '/t/p/w780/');
+  else url.pathname = url.pathname.replace(/^\/uploads\/images\/original_untouched\//, '/uploads/images/medium_portrait/');
+  return url.toString();
+}
+
+/**
+ * The visible notification. Contains only wording, numbers, a same-origin link and (when the saved show has one) its
+ * public poster URL: no tokens, user IDs, emails or provider claims (it never says where the episode can be streamed).
+ */
+export function episodePayload(input: { showName: string; showId: string; tvmazeShowId: number; tvmazeEpisodeId: number; season: number; number: number; kind?: EpisodeKind; posterURL?: string | null }): PushPayload {
+  const kind = input.kind ?? premiereKind(input.season, input.number);
+  const { title, body } = episodeCopy({ showName: input.showName, season: input.season, number: input.number, kind, tvmazeEpisodeId: input.tvmazeEpisodeId });
+  const image = notificationImage(input.posterURL);
   return {
-    title: `New episode of ${name}`,
-    body: `Season ${input.season}, Episode ${input.number} has premiered.`,
+    title, body,
     url: showUrl(input.showId),
     // The same tag replaces, rather than stacks, a notification the device already shows for this episode.
     tag: `episode-${input.tvmazeShowId}-${input.tvmazeEpisodeId}`,
     icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON,
+    ...(image ? { image } : {}),
+  };
+}
+
+/**
+ * A clearly labelled preview of the episode-alert style for one of the user's own shows, sent only from the
+ * explicit preview button to the requesting device. Never written to the delivery ledger.
+ */
+export function previewPayload(input: { showName: string; showId: string; season: number; number: number; posterURL?: string | null }): PushPayload {
+  const kind = premiereKind(input.season, input.number);
+  const copy = episodeCopy({ showName: input.showName, season: input.season, number: input.number, kind, tvmazeEpisodeId: 0 });
+  const image = notificationImage(input.posterURL);
+  return {
+    title: `Preview · ${copy.title}`,
+    body: `${copy.body} This is how new episodes will look.`,
+    url: showUrl(input.showId),
+    tag: `cinetra-preview-${Date.now()}`,
+    icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON,
+    ...(image ? { image } : {}),
   };
 }
 

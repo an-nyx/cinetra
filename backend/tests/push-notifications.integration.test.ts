@@ -105,7 +105,12 @@ const mockSender = {
     return status === null ? { statusCode: null, error: 'timeout' } : { statusCode: status };
   },
 };
-const sentTo = (endpoint: string) => sent.filter(s => s.endpoint === endpoint).map(s => s.body.replace(' has premiered.', '') + ' · ' + s.title.replace('New episode of ', ''));
+// "Season 3, Episode 2 · Silo" from any of the notification templates (name from the title, numbers from the body).
+const nameFromTitle = (title: string) => {
+  for (const re of [/^A new chapter of (.+)\.$/, /^(.+) continues\.$/, /^(.+) is back\.$/, /^(.+) has arrived\.$/, /^The (.+) (?:midseason|season) finale is here\.$/, /^(.+) (?:midseason|season) finale is here\.$/]) { const m = re.exec(title); if (m) return m[1]; }
+  return title;
+};
+const sentTo = (endpoint: string) => sent.filter(s => s.endpoint === endpoint).map(s => { const m = /S(\d+)E(\d+)/.exec(s.body)!; return `Season ${Number(m[1])}, Episode ${Number(m[2])} · ${nameFromTitle(s.title)}`; });
 
 const T = (iso: string) => new Date(iso);
 const keysFor = () => { const k = browserKeys(); return { p256dh: k.p256dh, auth: k.auth }; };
@@ -186,7 +191,8 @@ async function main() {
     'Season 3, Episode 2 · Silo',
   ]);
   assert.equal(sent.length, 3, 'Bob (Dropped) and Carol (switched off) get nothing');
-  assert.deepEqual(sent.find(s => s.title === 'New episode of Silo'), { endpoint: PHONE, title: 'New episode of Silo', body: 'Season 3, Episode 2 has premiered.', url: `/shows?show=${silo.id}`, topic: 'ep5002' });
+  assert.deepEqual(sent.find(s => s.url === `/shows?show=${silo.id}`), { endpoint: PHONE, title: 'A new chapter of Silo.', body: 'S03E02 just premiered. Your next episode awaits.', url: `/shows?show=${silo.id}`, topic: 'ep5002' });
+  assert.ok(sent.some(s => s.title === 'Finished Then Renewed is back.' && s.body === 'A new season begins. S02E01 has premiered.'), 'season premiere wording from TVMaze numbering');
   assert.equal(r.beforeOptIn, 1, 'no backlog from before opt-in');
   assert.equal(r.alreadyWatched, 3, 'checkpoint S2E3, checkpoint S3E0 and an explicit record');
   assert.equal(r.unverifiedShows, 4, 'weak match, stored-link conflict and both shared-identity twins');
@@ -215,7 +221,7 @@ async function main() {
   sendDelayMs = 40;
   const reports = await Promise.all(Array.from({ length: 5 }, () => runEpisodeNotifications({ sender: mockSender, source, now: T('2026-11-10T21:00:00Z') })));
   sendDelayMs = 0;
-  assert.equal(sent.filter(s => s.body.startsWith('Season 3, Episode 3')).length, 1);
+  assert.equal(sent.filter(s => s.body.startsWith('S03E03')).length, 1);
   assert.equal(reports.reduce((n, x) => n + x.delivered, 0), 1);
   assert.equal(reports.reduce((n, x) => n + x.ledgerCreated, 0), 1, 'the unique key admits one ledger row');
   console.log('✓ five concurrent workers delivered S3E3 exactly once');
@@ -325,7 +331,7 @@ async function main() {
   r = await run(T('2026-11-10T12:00:00Z'), webPushSender(vapidConfig()!));
   assert.equal(r.delivered, 1);
   assert.equal(pushService.received.length, 1);
-  assert.deepEqual(pushService.received[0].payload, { title: 'New episode of Silo', body: 'Season 3, Episode 2 has premiered.', url: `/shows?show=${danaSilo.id}`, tag: 'episode-1001-5002', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2' });
+  assert.deepEqual(pushService.received[0].payload, { title: 'A new chapter of Silo.', body: 'S03E02 just premiered. Your next episode awaits.', url: `/shows?show=${danaSilo.id}`, tag: 'episode-1001-5002', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2' });
   assert.equal(pushService.received[0].headers.topic, 'ep5002');
   assert.equal(pushService.received[0].headers.urgency, 'high', 'scheduled sends use high urgency, like the test button');
   console.log('✓ real encrypted push decrypted:', JSON.stringify(pushService.received[0].payload));
@@ -359,6 +365,42 @@ async function main() {
   assert.equal(r.delivered, 0);
   assert.equal(pushService.received.length, 1, 'no duplicate after the header fallback');
   console.log('✓ HTTP 400 on an optional header: one spec-minimal retry delivers once and names the reason');
+
+  // ===== 9c. Cinematic wording and posters through the real encrypted path =====
+  const receivedBefore9c = pushService.received.splice(0);
+  const ivy = await user('ivy');
+  const ivyBrowser = browserKeys();
+  pushService.browsers.set('/push/ivy', ivyBrowser);
+  await saveSubscription(ivy.id, { endpoint: `${pushService.origin}/push/ivy`, p256dh: ivyBrowser.p256dh, auth: ivyBrowser.auth }, null, T('2026-11-13T00:00:00Z'));
+  const mob = await show(ivy.id, 'MobLand', { tmdbId: 247718, status: 'watching', seasonsWatched: 2, episodesWatched: 8, posterURL: 'https://image.tmdb.org/t/p/w500/mobland.jpg' });
+  const tulsa = await show(ivy.id, 'Tulsa King', { tmdbId: 153312, status: 'watching', seasonsWatched: 4, episodesWatched: 4, posterURL: 'https://static.tvmaze.com/uploads/images/original_untouched/590/1475000.jpg' });
+  const bare = await show(ivy.id, 'No Artwork Show', { tmdbId: 900001, status: 'watching', seasonsWatched: 1, episodesWatched: 0, posterURL: null });
+  const sneaky = await show(ivy.id, 'Sneaky Poster', { tmdbId: 900002, status: 'watching', seasonsWatched: 1, episodesWatched: 0, posterURL: 'https://image.tmdb.org/t/p/w500/x.jpg?auth=secret' });
+  verified(247718, 7501); verified(153312, 7502); verified(900001, 7503); verified(900002, 7504);
+  const webShow = (id: number): TVMazeShow => ({ id, name: `TVMaze ${id}`, status: 'Running', network: null, webChannel: { name: 'Web', country: null } });
+  schedules.set(7501, { show: webShow(7501), episodes: [dateOnly(75019, 2, 9, '2026-11-13')] });   // counted 2026-11-14T12:00Z
+  schedules.set(7502, { show: webShow(7502), episodes: [dateOnly(75025, 4, 5, '2026-11-13')] });
+  schedules.set(7503, { show: tvShow(7503), episodes: [timed(75031, 1, 1, '2026-11-14T02:00:00Z')] });
+  schedules.set(7504, { show: tvShow(7504), episodes: [timed(75041, 1, 1, '2026-11-14T02:00:00Z')] });
+  // TMDB says Tulsa King S4E5 is the season finale, aired 13 Nov: consistent with TVMaze, so the finale wording is used.
+  const tmdbInfo = new Map<string, { episodeType: string; airDate: string }>([['153312:4:5', { episodeType: 'finale', airDate: '2026-11-13' }], ['247718:2:9', { episodeType: 'finale', airDate: '2025-03-01' }]]);
+  const richSource = { ...source, episodeInfo: async (sh: { tmdbId: number }, season: number, number: number) => tmdbInfo.get(`${sh.tmdbId}:${season}:${number}`) ?? null };
+  const before9c = await tracking();
+  r = await runEpisodeNotifications({ sender: webPushSender(vapidConfig()!), source: richSource, now: T('2026-11-14T12:05:00Z') });
+  assert.equal(await tracking(), before9c, 'tracking untouched');
+  assert.equal(r.delivered, 4);
+  const byUrl = (id: string) => pushService.received.find(x => x.payload.url === `/shows?show=${id}`)!.payload;
+  assert.deepEqual(byUrl(mob.id), { title: 'MobLand continues.', body: 'S02E09 just premiered. Your next episode awaits.', url: `/shows?show=${mob.id}`, tag: 'episode-7501-75019', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2', image: 'https://image.tmdb.org/t/p/w780/mobland.jpg' },
+    'regular episode; a TMDB "finale" from another year is not trusted');
+  assert.deepEqual([byUrl(tulsa.id).title, byUrl(tulsa.id).body, byUrl(tulsa.id).image], ['The Tulsa King season finale is here.', 'S04E05 has premiered. Time for the final chapter.', 'https://static.tvmaze.com/uploads/images/medium_portrait/590/1475000.jpg'], 'verified finale with its own poster');
+  assert.deepEqual([byUrl(bare.id).title, 'image' in byUrl(bare.id)], ['No Artwork Show has arrived.', false], 'series premiere; missing artwork is text-only');
+  assert.equal('image' in byUrl(sneaky.id), false, 'a poster URL carrying a query string is never sent');
+  assert.equal(new Set(pushService.received.map(x => x.payload.image).filter(Boolean)).size, 2, 'each show its own poster, never another show’s');
+  // The Apple 400 workaround still applies to the new payloads, and nothing is ever sent twice.
+  r = await runEpisodeNotifications({ sender: webPushSender(vapidConfig()!), source: richSource, now: T('2026-11-14T12:20:00Z') });
+  assert.equal(r.delivered, 0); assert.equal(pushService.received.length, 4, 'no duplicates');
+  pushService.received.splice(0, pushService.received.length, ...receivedBefore9c);   // later sections count from here
+  console.log('✓ cinematic wording: premiere, regular and TMDB-verified finale; each show its own poster; missing or unsafe artwork omitted');
   r = await run(T('2026-11-10T12:30:00Z'), webPushSender(vapidConfig()!));
   assert.equal(pushService.received.length, 1, 'no second real push');
 
@@ -449,6 +491,30 @@ async function main() {
   const frankTest = await call('POST', '/test', F, { endpoint: erinEndpoint });
   assert.equal(frankTest.status, 410);
   assert.equal(await prisma.pushSubscription.count({ where: { userId: frank.id } }), 0);
+  // Preview: labelled, the requesting user's own show and poster, this device only, never in the ledger.
+  const hana = await user('hana'); const H = token(hana.id);
+  const hanaBrowser = browserKeys();
+  pushService.browsers.set('/push/hana', hanaBrowser);
+  const hanaEndpoint = `${pushService.origin}/push/hana`;
+  await call('POST', '/subscriptions', H, { subscription: { endpoint: hanaEndpoint, keys: { p256dh: hanaBrowser.p256dh, auth: hanaBrowser.auth } } });
+  assert.equal((await call('POST', '/test', H, { endpoint: hanaEndpoint, preview: true })).status, 409, 'no shows yet: nothing to preview');
+  await show(hana.id, 'Dropped One', { tmdbId: 800001, status: 'dropped', posterURL: 'https://image.tmdb.org/t/p/w500/dropped.jpg' });
+  const hanaShow = await show(hana.id, 'MobLand', { tmdbId: 247718, status: 'watching', seasonsWatched: 2, episodesWatched: 8, posterURL: 'https://image.tmdb.org/t/p/w500/hana-mob.jpg' });
+  const ledgerBefore = await prisma.notificationDelivery.count();
+  const trackingBeforePreview = await tracking();
+  const received = pushService.received.length;
+  const pv = await call('POST', '/test', H, { endpoint: hanaEndpoint, preview: true });
+  assert.equal(pv.status, 200);
+  assert.deepEqual(pv.json.preview, { title: 'Preview · A new chapter of MobLand.', body: 'S02E09 just premiered. Your next episode awaits. This is how new episodes will look.', image: true });
+  const pvPush = pushService.received.at(-1)!;
+  assert.equal(pushService.received.length, received + 1); assert.equal(pvPush.path, '/push/hana', 'only the requesting device');
+  assert.equal(pvPush.payload.image, 'https://image.tmdb.org/t/p/w780/hana-mob.jpg', 'her own show’s poster, not a dropped show’s');
+  assert.equal(pvPush.payload.url, `/shows?show=${hanaShow.id}`);
+  assert.ok(String(pvPush.payload.tag).startsWith('cinetra-preview-'));
+  assert.equal(await prisma.notificationDelivery.count(), ledgerBefore, 'previews never touch the delivery ledger');
+  assert.equal(await tracking(), trackingBeforePreview, 'previews never touch tracking');
+  assert.equal((await call('POST', '/test', F, { endpoint: hanaEndpoint, preview: true })).status, 404, 'nobody else can preview to this device');
+  console.log('✓ preview: labelled, own show and poster, this device only, ledger and tracking untouched');
   console.log('✓ API: authentication, per-user isolation, validation, unsubscribe and rate limits');
 
   server.close(); fakePush.close();

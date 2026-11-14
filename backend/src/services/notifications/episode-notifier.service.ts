@@ -17,9 +17,9 @@ import { prisma } from '../../database/prisma';
 import type { Prisma } from '../../../generated/prisma/client';
 import { checkForUpdates, getSchedule } from '../tvmaze/tvmaze.service';
 import type { IdentityResult, TVMazeEpisode, TVMazeShow } from '../tvmaze/tvmaze-schedule.model';
-import { resolveShowIdentity } from '../episode-guide.service';
+import { resolveShowIdentity, tmdbEpisodeInfo } from '../episode-guide.service';
 import { mapLimit } from '../swr-cache';
-import { EPISODE_PREMIERE_EVENT, NOTIFY_LOOKBACK_MS, episodePayload, isEpisodeWatched, isShowEligible, scheduleTimeZone, selectPremieredEpisodes, type PremiereExclusions } from './episode-alerts.model';
+import { EPISODE_PREMIERE_EVENT, NOTIFY_LOOKBACK_MS, episodePayload, isEpisodeWatched, isShowEligible, premiereKind, scheduleTimeZone, selectPremieredEpisodes, verifiedFinaleKind, type EpisodeKind, type PremiereExclusions } from './episode-alerts.model';
 import { classifySend, type PushSender } from './push-sender';
 
 /** Where identities and episode lists come from. The default reuses Cinetra's cached TVMaze matching and schedules. */
@@ -28,12 +28,35 @@ export type ScheduleSource = {
   schedule(tvmazeId: number): Promise<{ show: TVMazeShow; episodes: TVMazeEpisode[] }>;
   /** Re-read shows that TVMaze reports as changed (one request, rate-limited); failures are ignored. */
   refreshChanged(): Promise<void>;
+  /** TMDB's episode label and air date (wording only: finale or not). Optional; absent means "regular". */
+  episodeInfo?(show: { name: string; tmdbId: number }, season: number, number: number): Promise<{ episodeType: string | null; airDate: string | null } | null>;
 };
 export const tvmazeScheduleSource: ScheduleSource = {
   resolve: show => resolveShowIdentity(show.tmdbId, show),
   schedule: id => getSchedule(id),
   refreshChanged: () => checkForUpdates(30 * 60_000),
+  episodeInfo: (show, season, number) => tmdbEpisodeInfo(show, season, number),
 };
+
+/** How long wording may wait for TMDB's episode label before the alert goes out as a regular episode. */
+const EPISODE_INFO_TIMEOUT_MS = 4000;
+/**
+ * Wording only, never eligibility: premieres from TVMaze numbering; finales only when TMDB agrees (see
+ * verifiedFinaleKind). Any lookup failure or timeout falls back to the plain kind, so delivery is never held up.
+ */
+async function episodeKind(source: ScheduleSource, show: { name: string; tmdbId: number | null }, delivery: { season: number; episode: number; premieredAt: Date }): Promise<EpisodeKind> {
+  const premiere = premiereKind(delivery.season, delivery.episode);
+  if (premiere !== 'regular' || !source.episodeInfo || show.tmdbId === null) return premiere;
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    const info = await Promise.race([
+      source.episodeInfo({ name: show.name, tmdbId: show.tmdbId }, delivery.season, delivery.episode),
+      new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), EPISODE_INFO_TIMEOUT_MS); }),
+    ]);
+    return verifiedFinaleKind(info, delivery.premieredAt) ?? 'regular';
+  } catch { return 'regular'; }
+  finally { clearTimeout(timer); }
+}
 
 /** A "sending" claim older than this belongs to a worker that died mid-send. */
 export const CLAIM_TIMEOUT_MS = 10 * 60_000;
@@ -154,7 +177,7 @@ const dueDeliveries = (now: Date, take: number) => prisma.notificationDelivery.f
 async function stillWanted(delivery: Due) {
   if (delivery.subscription.userId !== delivery.userId) return null;
   const [show, preference, watches] = await Promise.all([
-    prisma.show.findFirst({ where: { id: delivery.showId, userId: delivery.userId }, select: { name: true, status: true, seasonsWatched: true, episodesWatched: true } }),
+    prisma.show.findFirst({ where: { id: delivery.showId, userId: delivery.userId }, select: { name: true, status: true, seasonsWatched: true, episodesWatched: true, tmdbId: true, posterURL: true } }),
     prisma.notificationPreference.findUnique({ where: { userId: delivery.userId }, select: { newEpisodes: true } }),
     prisma.episodeWatch.findMany({ where: { showId: delivery.showId, season: delivery.season, episode: delivery.episode }, select: { season: true, episode: true } }),
   ]);
@@ -163,7 +186,7 @@ async function stillWanted(delivery: Due) {
   return show;
 }
 
-async function deliver(delivery: Due, now: Date, sender: PushSender, report: RunReport) {
+async function deliver(delivery: Due, now: Date, sender: PushSender, source: ScheduleSource, report: RunReport) {
   const show = await stillWanted(delivery);
   if (!show) {
     const skipped = await prisma.notificationDelivery.updateMany({ where: { id: delivery.id, status: delivery.status, attempts: delivery.attempts }, data: { status: 'skipped', lastError: 'No longer relevant (watched, dropped, removed or switched off)' } });
@@ -178,7 +201,8 @@ async function deliver(delivery: Due, now: Date, sender: PushSender, report: Run
   });
   if (claim.count !== 1) { report.lostClaims++; return; }
 
-  const payload = episodePayload({ showName: show.name, showId: delivery.showId, tvmazeShowId: delivery.tvmazeShowId, tvmazeEpisodeId: delivery.tvmazeEpisodeId, season: delivery.season, number: delivery.episode });
+  const kind = await episodeKind(source, show, delivery);
+  const payload = episodePayload({ showName: show.name, showId: delivery.showId, tvmazeShowId: delivery.tvmazeShowId, tvmazeEpisodeId: delivery.tvmazeEpisodeId, season: delivery.season, number: delivery.episode, kind, posterURL: show.posterURL });
   let result: Awaited<ReturnType<PushSender['send']>>;
   let deliveredNote: string | null = null;
   try {
@@ -236,6 +260,6 @@ export async function runEpisodeNotifications(options: RunOptions): Promise<RunR
   report.expired = recovered.expired;
   await discover(now, source, report);
   const due = await dueDeliveries(now, options.maxSends ?? 500);
-  await mapLimit(due, options.concurrency ?? 4, delivery => deliver(delivery, now, options.sender, report));
+  await mapLimit(due, options.concurrency ?? 4, delivery => deliver(delivery, now, options.sender, source, report));
   return report;
 }

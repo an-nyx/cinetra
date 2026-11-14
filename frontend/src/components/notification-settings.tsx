@@ -1,4 +1,4 @@
-import { Activity, Bell, BellOff, Loader2, Send, Share, SquarePlus } from "lucide-react";
+import { Activity, Bell, BellOff, Clapperboard, Loader2, Send, Share, SquarePlus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
@@ -110,9 +110,9 @@ export default function NotificationSettings() {
   const active = push.device === "active" && push.permission === "granted";
   const newEpisodes = push.preferences?.newEpisodes ?? true;
 
-  const test = async () => {
+  const test = async (preview = false) => {
     setTestResult(null);
-    setTestResult(await push.sendTest());
+    setTestResult(await push.sendTest(preview));
   };
   const loadDiagnostics = async () => {
     setDiagnostics({ loading: true, data: null, error: null });
@@ -156,6 +156,9 @@ export default function NotificationSettings() {
         )}
         <Button type="button" variant="outline" size="sm" disabled={!active || !!push.busy} onClick={() => void test()} className="gap-1.5">
           {push.busy === "test" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}Send test notification
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={!active || !!push.busy} onClick={() => void test(true)} className="gap-1.5">
+          {push.busy === "preview" ? <Loader2 className="size-4 animate-spin" /> : <Clapperboard className="size-4" />}Preview episode alert
         </Button>
       </div>
 

@@ -15,6 +15,19 @@ function safePath(value) {
     return url.origin === self.location.origin ? url.pathname + url.search + url.hash : DEFAULT_URL;
   } catch { return DEFAULT_URL; }
 }
+/**
+ * A show poster for browsers that display large notification images (Chrome and Edge on Android, Windows, ChromeOS
+ * and Linux). Safari on iPhone, iPad and Mac and Firefox ignore the option, and the Cinetra icon stays as is.
+ * Only plain HTTPS URLs on the public artwork hosts Cinetra stores posters from are used.
+ */
+const ARTWORK_HOSTS = ["image.tmdb.org", "static.tvmaze.com"];
+function safeImage(value) {
+  if (typeof value !== "string" || value.length > 500) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ARTWORK_HOSTS.includes(url.hostname) && !url.username && !url.password && !url.port && !url.search && !url.hash ? url.href : null;
+  } catch { return null; }
+}
 const text = (value, fallback, max) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback);
 
 self.addEventListener("install", () => { self.skipWaiting(); });
@@ -31,6 +44,8 @@ self.addEventListener("push", (event) => {
     badge: safePath(data.badge) === DEFAULT_URL ? ICON : safePath(data.badge),
     data: { url: safePath(data.url) },
   };
+  const image = safeImage(data.image);
+  if (image) options.image = image;
   // The same tag replaces an older notification for the same episode instead of stacking a duplicate.
   if (typeof data.tag === "string" && data.tag) options.tag = data.tag.slice(0, 100);
   event.waitUntil(self.registration.showNotification(title, options));

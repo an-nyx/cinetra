@@ -1,5 +1,6 @@
+import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-import { episodePayload, isEpisodeWatched, isShowEligible, premiereInstant, scheduleTimeZone, selectPremieredEpisodes, testPayload, zonedMidnight } from '../src/services/notifications/episode-alerts.model';
+import { COMPACT_TITLE_AFTER, episodeCode, episodeCopy, episodePayload, isEpisodeWatched, isShowEligible, notificationImage, premiereInstant, premiereKind, previewPayload, scheduleTimeZone, selectPremieredEpisodes, testPayload, verifiedFinaleKind, zonedMidnight } from '../src/services/notifications/episode-alerts.model';
 import { classifySend, parseSubscription, vapidConfig } from '../src/services/notifications/push-sender';
 import type { TVMazeEpisode } from '../src/services/tvmaze/tvmaze-schedule.model';
 import webpush from 'web-push';
@@ -81,7 +82,71 @@ assert.equal(isShowEligible({ status: 'dropped' }), false);
 
 // --- Payload ----------------------------------------------------------------------------------------------------
 const payload = episodePayload({ showName: 'Silo', showId: 'c0ffee00-0000-4000-8000-000000000001', tvmazeShowId: 44778, tvmazeEpisodeId: 3001, season: 3, number: 2 });
-assert.deepEqual(payload, { title: 'New episode of Silo', body: 'Season 3, Episode 2 has premiered.', url: '/shows?show=c0ffee00-0000-4000-8000-000000000001', tag: 'episode-44778-3001', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2' });
+assert.deepEqual(payload, { title: 'Silo continues.', body: 'S03E02 just premiered. Your next episode awaits.', url: '/shows?show=c0ffee00-0000-4000-8000-000000000001', tag: 'episode-44778-3001', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2' });
+
+// --- Cinematic wording -------------------------------------------------------------------------------------------
+const copy = (showName: string, season: number, number: number, kind = premiereKind(season, number), tvmazeEpisodeId = 2) => episodeCopy({ showName, season, number, kind, tvmazeEpisodeId });
+assert.deepEqual(copy('MobLand', 2, 9), { title: 'A new chapter of MobLand.', body: 'S02E09 just premiered. Your next episode awaits.' }, 'regular weekly episode');
+assert.deepEqual(copy('Tulsa King', 4, 5, 'regular', 3), { title: 'Tulsa King continues.', body: 'S04E05 just premiered. Your next episode awaits.' }, 'alternate regular phrasing');
+assert.deepEqual(copy('MobLand', 2, 9), copy('MobLand', 2, 9), 'deterministic for the same episode');
+assert.deepEqual(copy('MobLand', 2, 1), { title: 'MobLand is back.', body: 'A new season begins. S02E01 has premiered.' }, 'season premiere');
+assert.deepEqual(copy('Severance', 1, 1), { title: 'Severance has arrived.', body: 'The story begins. S01E01 has premiered.' }, 'series premiere');
+assert.deepEqual(copy('MobLand', 2, 10, 'season_finale'), { title: 'The MobLand season finale is here.', body: 'S02E10 has premiered. Time for the final chapter.' });
+assert.equal(copy('The Bear', 4, 10, 'season_finale').title, 'The Bear season finale is here.', 'no doubled article');
+assert.equal(copy('the office', 9, 23, 'season_finale').title, 'the office season finale is here.', 'title case is never altered');
+assert.equal(copy('MobLand', 2, 5, 'midseason_finale').title, 'The MobLand midseason finale is here.');
+assert.equal(copy('Jeopardy!', 42, 1).title, 'Jeopardy! is back.', 'no extra period after punctuation');
+assert.equal(copy('Mr. Robot', 2, 1).title, 'Mr. Robot is back.');
+assert.equal(copy('Days of Our Lives', 2026, 225).body, 'S2026E225 just premiered. Your next episode awaits.');
+assert.equal(episodeCode(3, 5), 'S03E05');
+assert.equal(copy('You', 5, 1).title, 'You is back.', 'very short title');
+// Long titles: the title stays intact and alone on the one-line Lock Screen title; the event moves to the body.
+const rings = 'The Lord of the Rings: The Rings of Power';
+assert.deepEqual(copy(rings, 3, 5, 'regular', 3682721), { title: rings, body: 'New episode · S03E05 just premiered. Your next episode awaits.' });
+assert.deepEqual(copy(rings, 3, 1), { title: rings, body: 'Season premiere · S03E01 has premiered. A new season begins.' });
+assert.equal(copy(rings, 3, 8, 'season_finale').title, rings);
+for (const kind of ['regular', 'season_premiere', 'series_premiere', 'season_finale', 'midseason_finale'] as const) {
+  for (const name of ['X', 'MobLand', 'The Gilded Age', rings, 'A'.repeat(200)]) {
+    const c = copy(name, 2, 3, kind);
+    assert.ok(c.title.length <= Math.max(COMPACT_TITLE_AFTER, 120), `${kind}/${name.length}: title fits`);
+    assert.ok(c.title.includes(name.slice(0, 120)), 'show title appears unchanged');
+    assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(c.title + c.body), 'no emojis');
+    assert.ok(!/stream|netflix|prime|hbo|watch on|available on/i.test(c.title + c.body), 'no availability claims');
+  }
+}
+assert.equal(copy('   ', 1, 2).title.includes('A show in your library'), true, 'blank names fall back');
+
+// --- Finales are claimed only when TMDB agrees -------------------------------------------------------------------
+const premieredAt = new Date('2026-11-14T12:00:00Z');   // date-only listing for 13 Nov, counted the next day
+assert.equal(verifiedFinaleKind({ episodeType: 'finale', airDate: '2026-11-13' }, premieredAt), 'season_finale');
+assert.equal(verifiedFinaleKind({ episodeType: 'mid_season', airDate: '2026-11-13' }, premieredAt), 'midseason_finale');
+assert.equal(verifiedFinaleKind({ episodeType: 'standard', airDate: '2026-11-13' }, premieredAt), null);
+assert.equal(verifiedFinaleKind({ episodeType: 'finale', airDate: '2026-10-01' }, premieredAt), null, 'different numbering: dates disagree');
+assert.equal(verifiedFinaleKind({ episodeType: 'finale', airDate: '2026-11-20' }, premieredAt), null, 'TMDB date far later');
+assert.equal(verifiedFinaleKind({ episodeType: 'finale', airDate: null }, premieredAt), null, 'undated');
+assert.equal(verifiedFinaleKind(null, premieredAt), null, 'unknown to TMDB');
+assert.equal(premiereKind(2, 1), 'season_premiere'); assert.equal(premiereKind(1, 1), 'series_premiere'); assert.equal(premiereKind(2, 2), 'regular');
+
+// --- Posters: the saved show's own public artwork only -----------------------------------------------------------
+assert.equal(notificationImage('https://image.tmdb.org/t/p/w500/abc123.jpg'), 'https://image.tmdb.org/t/p/w780/abc123.jpg');
+assert.equal(notificationImage('https://static.tvmaze.com/uploads/images/original_untouched/501/1253519.jpg'), 'https://static.tvmaze.com/uploads/images/medium_portrait/501/1253519.jpg');
+assert.equal(notificationImage('https://static.tvmaze.com/uploads/images/medium_portrait/631/1577677.jpg'), 'https://static.tvmaze.com/uploads/images/medium_portrait/631/1577677.jpg');
+for (const bad of [null, undefined, '', 'http://image.tmdb.org/t/p/w500/a.jpg', 'https://evil.example/t/p/w500/a.jpg', 'https://image.tmdb.org.evil.example/t/p/w500/a.jpg',
+  'https://image.tmdb.org/t/p/w500/a.jpg?token=secret', 'https://image.tmdb.org/t/p/w500/a.jpg#x', 'https://user:pw@image.tmdb.org/t/p/w500/a.jpg',
+  'https://image.tmdb.org:8443/t/p/w500/a.jpg', 'https://image.tmdb.org/t/p/w500/../../a.jpg', 'https://via.placeholder.com/300x450?text=No+Image', 'javascript:alert(1)', 'not a url']) {
+  assert.equal(notificationImage(bad), undefined, `rejected: ${bad}`);
+}
+const withPoster = episodePayload({ showName: 'MobLand', showId: 's1', tvmazeShowId: 75026, tvmazeEpisodeId: 4, season: 2, number: 9, posterURL: 'https://image.tmdb.org/t/p/w500/mob.jpg' });
+assert.equal(withPoster.image, 'https://image.tmdb.org/t/p/w780/mob.jpg', 'each show carries its own poster');
+assert.equal(withPoster.icon, '/icon-192.png?v=2', 'the Cinetra icon is unchanged');
+assert.equal('image' in episodePayload({ showName: 'MobLand', showId: 's1', tvmazeShowId: 75026, tvmazeEpisodeId: 4, season: 2, number: 9, posterURL: null }), false, 'missing artwork: no image key, text-only');
+assert.ok(new TextEncoder().encode(JSON.stringify(episodePayload({ showName: 'A'.repeat(500), showId: crypto.randomUUID(), tvmazeShowId: 1, tvmazeEpisodeId: 1, season: 2026, number: 225, posterURL: 'https://image.tmdb.org/t/p/w500/' + 'a'.repeat(60) + '.jpg' }))).length < 3000, 'payload stays far under the 4 KB push limit');
+
+// --- Preview: labelled, the user's own show, never an episode tag ------------------------------------------------
+const pv = previewPayload({ showName: 'MobLand', showId: 's1', season: 2, number: 9, posterURL: 'https://image.tmdb.org/t/p/w500/mob.jpg' });
+assert.ok(pv.title.startsWith('Preview · ') && pv.body.endsWith('This is how new episodes will look.'), 'previews are distinguishable from real alerts');
+assert.ok(pv.tag.startsWith('cinetra-preview-') && !pv.tag.startsWith('episode-'), 'a preview can never replace a real episode alert');
+assert.equal(pv.url, '/shows?show=s1'); assert.equal(pv.image, 'https://image.tmdb.org/t/p/w780/mob.jpg');
 assert.ok(!/token|bearer|auth|@|streaming|netflix/i.test(JSON.stringify(payload)), 'no credentials, emails or availability claims');
 assert.ok(!/token|bearer|@/i.test(JSON.stringify(testPayload())));
 

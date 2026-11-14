@@ -66,6 +66,23 @@ export async function recordDeliverySuccess(subscriptionId: string) {
   await prisma.pushSubscription.updateMany({ where: { id: subscriptionId }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
 }
 
+/**
+ * A show of this user's for the preview notification: the most recently updated show that alerts would cover (not
+ * Dropped), preferring one with a poster. Its "next" episode follows the saved position. Read-only.
+ */
+export async function previewShow(userId: string) {
+  const shows = await prisma.show.findMany({
+    where: { userId, OR: [{ status: null }, { status: { not: 'dropped' } }] },
+    orderBy: { updatedAt: 'desc' }, take: 25,
+    select: { id: true, name: true, posterURL: true, seasonsWatched: true, episodesWatched: true },
+  });
+  const show = shows.find(s => !!s.posterURL) ?? shows[0];
+  if (!show) return null;
+  const season = Math.max(1, show.seasonsWatched);
+  const number = show.seasonsWatched >= 1 ? Math.max(1, show.episodesWatched + 1) : 1;
+  return { showId: show.id, showName: show.name, posterURL: show.posterURL, season, number };
+}
+
 export async function countSubscriptions(userId: string) {
   return prisma.pushSubscription.count({ where: { userId } });
 }

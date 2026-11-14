@@ -37,6 +37,16 @@ async function catalogFor(show: { name: string; tmdbId: number | null }): Promis
   });
 }
 
+/**
+ * TMDB's label and air date for one episode, from the cached catalog (warmed hourly for every linked show), for
+ * notification wording only. Null when TMDB has no such episode or the catalog is unavailable.
+ */
+export async function tmdbEpisodeInfo(show: { name: string; tmdbId: number }, season: number, number: number): Promise<{ episodeType: string | null; airDate: string | null } | null> {
+  const catalog = await catalogFor(show);
+  const episode = catalog.episodes.find(e => e.season === season && e.number === number);
+  return episode ? { episodeType: episode.episodeType ?? null, airDate: episode.airDate ?? null } : null;
+}
+
 async function load(showId: string, userId: string) {
   const show = await prisma.show.findFirst({ where: { id: showId, userId } });
   if (!show) throw new EpisodeGuideError(404, 'Show not found');

@@ -21,7 +21,7 @@ export function usePushNotifications() {
   const [serverConfigured, setServerConfigured] = useState<boolean | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<null | "enable" | "disable" | "test" | "preference">(null);
+  const [busy, setBusy] = useState<null | "enable" | "disable" | "test" | "preview" | "preference">(null);
 
   const currentSubscription = useCallback(async () => {
     const registration = await registerServiceWorker();
@@ -93,13 +93,15 @@ export function usePushNotifications() {
     } finally { setBusy(null); }
   }, [busy, currentSubscription]);
 
-  const sendTest = useCallback(async () => {
+  /** The plain test, or (preview) a labelled example of an episode alert for one of your shows. This device only. */
+  const sendTest = useCallback(async (preview = false) => {
     if (busy) return { ok: false, message: "Busy" };
-    setBusy("test");
+    setBusy(preview ? "preview" : "test");
     try {
       const subscription = await currentSubscription();
       if (!subscription) { setDevice("inactive"); return { ok: false, message: "This device is not subscribed." }; }
-      await NotificationService.sendTest(subscription.endpoint);
+      const result = await NotificationService.sendTest(subscription.endpoint, preview);
+      if (preview && result.preview) return { ok: true, message: `Preview sent: “${result.preview.title}”${result.preview.image ? " (with the show’s poster where this device supports images)" : ""}.` };
       return { ok: true, message: "Test notification sent." };
     } catch (failure) {
       const status = (failure as { response?: { status?: number } })?.response?.status;

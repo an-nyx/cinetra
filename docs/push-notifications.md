@@ -35,6 +35,23 @@ Terraform deployment they come from `vapid_public_key`, `vapid_private_key`, `va
    three times; other 4xx is `failed`; no answer or another 5xx is `uncertain` and never re-sent (a missed alert is
    preferred over a duplicate). Queued alerts older than 72 hours expire.
 
+## Wording and show posters
+
+Alerts use short, deterministic templates chosen by the kind of release: a season or series premiere (episode 1 by
+TVMaze's own numbering), a season or midseason finale (only when TMDB's cached catalog labels the same episode a
+finale and its air date agrees with TVMaze's; otherwise it reads as a regular episode), or a regular episode. Show
+titles are never altered; titles too long for a one-line Lock Screen title stand alone, with the event in the body.
+Alerts never contain plot details or claims about where an episode can be watched.
+
+When the saved show has a poster on TMDB (`image.tmdb.org`) or TVMaze (`static.tvmaze.com`), the alert carries it
+as the notification `image`. Browsers that support large notification images (Chrome and Edge on Android, Windows,
+ChromeOS and Linux) show it; Safari on iPhone, iPad and Mac, and Firefox, ignore it and show the text with the
+Cinetra icon. Tapping any alert opens the show's details, poster included. Posters with query strings, other hosts
+or non-HTTPS URLs are never sent.
+
+**Preview episode alert** in the notification settings sends a clearly labelled example ("Preview · …") for one of
+your own shows to this device only. Previews never touch the delivery ledger or your tracking.
+
 ## Is it working? Operational diagnostics
 
 - `GET /api/v1/health` (public, counts and timestamps only) now has a `notifications` section: whether the

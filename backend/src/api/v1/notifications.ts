@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import { rateLimit } from "../../middlewares/rate-limit";
 import { classifySend, defaultSender, parseSubscription, publicVapidKey } from "../../services/notifications/push-sender";
-import { testPayload } from "../../services/notifications/episode-alerts.model";
+import { previewPayload, testPayload } from "../../services/notifications/episode-alerts.model";
 import { notificationDiagnostics } from "../../services/notifications/notification-diagnostics.service";
-import { countSubscriptions, deviceStatus, findOwnSubscription, getPreferences, recordDeliverySuccess, removeSubscription, saveSubscription, updatePreferences } from "../../services/notifications/push-subscription.service";
+import { countSubscriptions, deviceStatus, findOwnSubscription, getPreferences, previewShow, recordDeliverySuccess, removeSubscription, saveSubscription, updatePreferences } from "../../services/notifications/push-subscription.service";
 
 /** Mounted behind protectedRoute: every handler acts only on req.user's own preferences and subscriptions. */
 const router = Router();
@@ -72,20 +72,28 @@ router.delete("/subscriptions", writes, async (req: Request, res: Response) => {
   catch (error) { fail(res, error); }
 });
 
-// Explicit button press only; this device only.
+// Explicit button press only; this device only. `preview: true` sends a labelled example of the episode-alert style
+// for one of the user's own shows (with its poster where supported). Neither touches the delivery ledger.
 router.post("/test", tests, async (req: Request, res: Response) => {
   const endpoint = endpointOf(req.body);
   if (!endpoint) { res.status(400).json({ message: "Missing endpoint." }); return; }
+  const preview = req.body?.preview === true;
   try {
     const sender = defaultSender();
     if (!sender) { res.status(503).json({ message: "Push notifications are not configured on this server." }); return; }
     const subscription = await findOwnSubscription(req.user.id, endpoint);
     if (!subscription) { res.status(404).json({ message: "This device is not subscribed." }); return; }
-    const outcome = classifySend(await sender.send(subscription, testPayload(), { ttlSeconds: 300, urgency: "high" }));
+    let payload = testPayload();
+    if (preview) {
+      const show = await previewShow(req.user.id);
+      if (!show) { res.status(409).json({ message: "Add a show to your library to preview episode alerts." }); return; }
+      payload = previewPayload(show);
+    }
+    const outcome = classifySend(await sender.send(subscription, payload, { ttlSeconds: 300, urgency: "high" }));
     if (outcome === "gone") { await removeSubscription(req.user.id, endpoint); res.status(410).json({ message: "This device's subscription has expired. Enable notifications again." }); return; }
     if (outcome !== "delivered") { res.status(502).json({ message: "The push service did not accept the test notification." }); return; }
     await recordDeliverySuccess(subscription.id);
-    res.json({ sent: true });
+    res.json({ sent: true, ...(preview ? { preview: { title: payload.title, body: payload.body, image: !!payload.image } } : {}) });
   } catch (error) { fail(res, error); }
 });
 

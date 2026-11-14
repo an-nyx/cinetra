@@ -46,8 +46,8 @@ class NotificationServiceClass extends ApiService {
   async getDiagnostics(): Promise<NotificationDiagnostics> {
     return (await this.api.get("/notifications/diagnostics", { timeout: 90_000 })).data;
   }
-  async sendTest(endpoint: string): Promise<void> {
-    await this.api.post("/notifications/test", { endpoint });
+  async sendTest(endpoint: string, preview = false): Promise<{ sent: boolean; preview?: { title: string; body: string; image: boolean } }> {
+    return (await this.api.post("/notifications/test", { endpoint, ...(preview ? { preview: true } : {}) })).data;
   }
 }
 export const NotificationService = new NotificationServiceClass();
