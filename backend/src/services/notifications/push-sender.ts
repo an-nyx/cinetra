@@ -72,11 +72,22 @@ export function webPushSender(config: VapidConfig, timeoutMs = 15_000, agent: Ag
         return { statusCode: response.statusCode };
       } catch (error) {
         const statusCode = (error as { statusCode?: unknown })?.statusCode;
-        // Never include the endpoint or response body (it can echo identifiers); the status is enough.
-        return typeof statusCode === 'number' ? { statusCode, error: `HTTP ${statusCode}` } : { statusCode: null, error: 'No response from push service' };
+        // Never include the endpoint or the raw response body (it can echo identifiers). The push service's short
+        // `reason` code (e.g. Apple's "BadUrgency") is extracted alone: it names the cause without carrying data.
+        const reason = pushRejectionReason((error as { body?: unknown })?.body);
+        return typeof statusCode === 'number'
+          ? { statusCode, error: `HTTP ${statusCode}${reason ? ` ${reason}` : ''}` }
+          : { statusCode: null, error: 'No response from push service' };
       }
     },
   };
+}
+
+/** The service's machine-readable rejection code from an error body, e.g. {"reason":"BadUrgency"}. Nothing else. */
+export function pushRejectionReason(body: unknown): string | null {
+  if (typeof body !== 'string' || body.length > 2048) return null;
+  const match = /"reason"\s*:\s*"([A-Za-z0-9_-]{1,40})"/.exec(body);
+  return match ? match[1] : null;
 }
 
 /** The configured sender, or null when VAPID keys are not set. */

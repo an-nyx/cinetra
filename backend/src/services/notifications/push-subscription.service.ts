@@ -61,6 +61,11 @@ export async function removeSubscription(userId: string, endpoint: string): Prom
   return result.count > 0;
 }
 
+/** A push the device's service accepted (e.g. the test button): record it so diagnostics show the device works. */
+export async function recordDeliverySuccess(subscriptionId: string) {
+  await prisma.pushSubscription.updateMany({ where: { id: subscriptionId }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
+}
+
 export async function countSubscriptions(userId: string) {
   return prisma.pushSubscription.count({ where: { userId } });
 }

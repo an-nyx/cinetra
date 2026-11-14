@@ -3,7 +3,7 @@ import { rateLimit } from "../../middlewares/rate-limit";
 import { classifySend, defaultSender, parseSubscription, publicVapidKey } from "../../services/notifications/push-sender";
 import { testPayload } from "../../services/notifications/episode-alerts.model";
 import { notificationDiagnostics } from "../../services/notifications/notification-diagnostics.service";
-import { countSubscriptions, deviceStatus, findOwnSubscription, getPreferences, removeSubscription, saveSubscription, updatePreferences } from "../../services/notifications/push-subscription.service";
+import { countSubscriptions, deviceStatus, findOwnSubscription, getPreferences, recordDeliverySuccess, removeSubscription, saveSubscription, updatePreferences } from "../../services/notifications/push-subscription.service";
 
 /** Mounted behind protectedRoute: every handler acts only on req.user's own preferences and subscriptions. */
 const router = Router();
@@ -84,6 +84,7 @@ router.post("/test", tests, async (req: Request, res: Response) => {
     const outcome = classifySend(await sender.send(subscription, testPayload(), { ttlSeconds: 300, urgency: "high" }));
     if (outcome === "gone") { await removeSubscription(req.user.id, endpoint); res.status(410).json({ message: "This device's subscription has expired. Enable notifications again." }); return; }
     if (outcome !== "delivered") { res.status(502).json({ message: "The push service did not accept the test notification." }); return; }
+    await recordDeliverySuccess(subscription.id);
     res.json({ sent: true });
   } catch (error) { fail(res, error); }
 });

@@ -180,15 +180,28 @@ async function deliver(delivery: Due, now: Date, sender: PushSender, report: Run
 
   const payload = episodePayload({ showName: show.name, showId: delivery.showId, tvmazeShowId: delivery.tvmazeShowId, tvmazeEpisodeId: delivery.tvmazeEpisodeId, season: delivery.season, number: delivery.episode });
   let result: Awaited<ReturnType<PushSender['send']>>;
+  let deliveredNote: string | null = null;
   try {
-    // Topic lets the push service replace (not stack) a message for the same episode still waiting for an offline device.
-    result = await sender.send(delivery.subscription, payload, { ttlSeconds: PUSH_TTL_SECONDS, topic: `ep${delivery.tvmazeEpisodeId}`.slice(0, 32), urgency: 'normal' });
+    // Topic lets the push service replace (not stack) a message for the same episode still waiting for an offline
+    // device. Urgency is "high", like the test notification: Apple's push service has been seen rejecting
+    // "Urgency: normal" with 400 BadUrgency (WebKit bug 247128) although the value is standard.
+    result = await sender.send(delivery.subscription, payload, { ttlSeconds: PUSH_TTL_SECONDS, topic: `ep${delivery.tvmazeEpisodeId}`.slice(0, 32), urgency: 'high' });
+    if (result.statusCode === 400) {
+      // The service named the request itself bad, so nothing was accepted or delivered. Some services reject
+      // optional headers they should support (Apple: BadUrgency/BadWebPushTopic); one spec-minimal retry without
+      // them tells a transient header rejection apart from a genuinely bad request. Never repeated on its own.
+      const firstError = result.error ?? 'HTTP 400';
+      const fallback = await sender.send(delivery.subscription, payload, { ttlSeconds: PUSH_TTL_SECONDS, urgency: 'high' });
+      if (classifySend(fallback) === 'delivered') deliveredNote = `First attempt rejected (${firstError}); delivered without the Topic header`;
+      else fallback.error = `${firstError}; retry without optional headers: ${fallback.error ?? `HTTP ${fallback.statusCode}`}`;
+      result = fallback;
+    }
   } catch { result = { statusCode: null, error: 'Push sender failed' }; }
   const outcome = classifySend(result);
   const mine = { id: delivery.id, claimToken, status: 'sending' };
   const attempts = delivery.attempts + 1;
   if (outcome === 'delivered') {
-    await prisma.notificationDelivery.updateMany({ where: mine, data: { status: 'sent', sentAt: new Date(), claimToken: null, lastError: null } });
+    await prisma.notificationDelivery.updateMany({ where: mine, data: { status: 'sent', sentAt: new Date(), claimToken: null, lastError: deliveredNote } });
     await prisma.pushSubscription.updateMany({ where: { id: delivery.subscriptionId }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
     report.delivered++;
   } else if (outcome === 'gone') {

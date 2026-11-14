@@ -47,7 +47,7 @@ function decrypt(body: Buffer, browser: Browser) {
   assert.equal(padded[end], 2, 'last-record padding delimiter');
   return JSON.parse(padded.subarray(0, end).toString('utf8'));
 }
-const pushService = { received: [] as { path: string; payload: Record<string, unknown>; headers: http.IncomingHttpHeaders }[], browsers: new Map<string, Browser>(), status: new Map<string, number>(), origin: '' };
+const pushService = { received: [] as { path: string; payload: Record<string, unknown>; headers: http.IncomingHttpHeaders }[], browsers: new Map<string, Browser>(), status: new Map<string, number>(), origin: '', rejectTopic: new Set<string>() };
 // Throwaway self-signed certificate for 127.0.0.1 (web-push always uses HTTPS; TLS verification stays on).
 const certDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cinetra-push-test-'));
 execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes', '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', path.join(certDir, 'key.pem'), '-out', path.join(certDir, 'cert.pem')], { stdio: 'ignore' });
@@ -70,6 +70,8 @@ const fakePush = https.createServer(tls, (req, res) => {
     assert.equal(claims.aud, pushService.origin); assert.equal(claims.sub, 'mailto:push-test@example.invalid');
     assert.equal(req.headers['content-encoding'], 'aes128gcm');
     assert.ok(Number(req.headers.ttl) > 0);
+    // Apple-style picky path: a request carrying the (standard, optional) Topic header is rejected with a named reason.
+    if (pushService.rejectTopic.has(path) && req.headers.topic) { res.writeHead(400, { 'content-type': 'application/json' }).end('{"reason":"BadWebPushTopic"}'); return; }
     pushService.received.push({ path, payload: decrypt(Buffer.concat(chunks), browser), headers: req.headers });
     res.writeHead(pushService.status.get(path) ?? 201).end();
   });
@@ -112,7 +114,7 @@ async function main() {
   const { prisma } = await import('../src/database/prisma');
   const { runEpisodeNotifications } = await import('../src/services/notifications/episode-notifier.service');
   const { saveSubscription } = await import('../src/services/notifications/push-subscription.service');
-  const { webPushSender, vapidConfig, useTransportAgent } = await import('../src/services/notifications/push-sender');
+  const { webPushSender, vapidConfig, useTransportAgent, pushRejectionReason } = await import('../src/services/notifications/push-sender');
   const reset = () => prisma.$executeRawUnsafe('TRUNCATE "NotificationDelivery", "PushSubscription", "NotificationPreference", "EpisodeWatch", "MovieWatch", "Movie", "Show", "User" CASCADE');
   await reset();
 
@@ -239,7 +241,7 @@ async function main() {
   scripted.set(PHONE, [503]);     // explicit "try later": retried with back-off
   scripted.set(LAPTOP, [410]);    // expired subscription: removed
   scripted.set(TABLET, [null]);   // timeout: uncertain, never re-sent
-  scripted.set(WATCH, [400]);     // permanent failure
+  scripted.set(WATCH, [400, 400]); // permanent failure: a genuinely bad request also fails the spec-minimal retry
   schedules.get(1001)!.episodes.push(timed(5005, 3, 5, '2026-11-11T02:00:00Z'));
   r = await run(T('2026-11-11T03:00:00Z'));
   assert.deepEqual([r.delivered, r.retry, r.gone, r.uncertain, r.failed], [0, 1, 1, 1, 1]);
@@ -325,7 +327,38 @@ async function main() {
   assert.equal(pushService.received.length, 1);
   assert.deepEqual(pushService.received[0].payload, { title: 'New episode of Silo', body: 'Season 3, Episode 2 has premiered.', url: `/shows?show=${danaSilo.id}`, tag: 'episode-1001-5002', icon: '/icon-192.png?v=2', badge: '/icon-192.png?v=2' });
   assert.equal(pushService.received[0].headers.topic, 'ep5002');
+  assert.equal(pushService.received[0].headers.urgency, 'high', 'scheduled sends use high urgency, like the test button');
   console.log('✓ real encrypted push decrypted:', JSON.stringify(pushService.received[0].payload));
+
+  // ===== 9b. A push service that rejects an optional header with HTTP 400 (Apple: BadUrgency/BadWebPushTopic) =====
+  // Production evidence 2026-11: Apple accepted the test push but answered 400 to every scheduled push. A 400 means
+  // nothing was accepted, so the notifier retries once without optional headers and records the named reason.
+  assert.equal(pushRejectionReason('{"reason":"BadWebPushTopic"}'), 'BadWebPushTopic');
+  assert.equal(pushRejectionReason('{"error":"nope"}'), null);
+  assert.equal(pushRejectionReason('x'.repeat(3000)), null, 'oversized bodies are ignored');
+  pushService.received.length = 0;
+  const gina = await user('gina');
+  await show(gina.id, 'Silo', { tmdbId: 125988, status: 'watching', seasonsWatched: 3, episodesWatched: 1 });
+  const ginaBrowser = browserKeys();
+  pushService.browsers.set('/push/gina', ginaBrowser);
+  pushService.rejectTopic.add('/push/gina');
+  await saveSubscription(gina.id, { endpoint: `${pushService.origin}/push/gina`, p256dh: ginaBrowser.p256dh, auth: ginaBrowser.auth }, null, T('2026-11-10T00:00:00Z'));
+  r = await run(T('2026-11-10T12:00:00Z'), webPushSender(vapidConfig()!));
+  assert.deepEqual([r.delivered, r.failed, r.retry], [1, 0, 0], 'delivered despite the 400 on the first attempt');
+  assert.equal(pushService.received.length, 1, 'exactly one push came through');
+  assert.equal(pushService.received[0].path, '/push/gina');
+  assert.equal(pushService.received[0].headers.topic, undefined, 'the accepted retry carries no Topic header');
+  assert.equal(pushService.received[0].headers.urgency, 'high');
+  const ginaRow = (await prisma.notificationDelivery.findFirst({ where: { userId: gina.id } }))!;
+  assert.equal(ginaRow.status, 'sent');
+  assert.equal(ginaRow.attempts, 1, 'one claim, one attempt');
+  assert.match(ginaRow.lastError!, /HTTP 400 BadWebPushTopic/);
+  assert.match(ginaRow.lastError!, /delivered without the Topic header/);
+  // Dedup intact: another pass sends nothing again.
+  r = await run(T('2026-11-10T12:15:00Z'), webPushSender(vapidConfig()!));
+  assert.equal(r.delivered, 0);
+  assert.equal(pushService.received.length, 1, 'no duplicate after the header fallback');
+  console.log('✓ HTTP 400 on an optional header: one spec-minimal retry delivers once and names the reason');
   r = await run(T('2026-11-10T12:30:00Z'), webPushSender(vapidConfig()!));
   assert.equal(pushService.received.length, 1, 'no second real push');
 
@@ -399,6 +432,7 @@ async function main() {
   const test = await call('POST', '/test', E, { endpoint: erinEndpoint });
   assert.deepEqual([test.status, test.json], [200, { sent: true }]);
   assert.equal(pushService.received.at(-1)!.payload.title, 'Cinetra notifications are on');
+  assert.ok((await call('POST', '/subscriptions/status', E, { endpoint: erinEndpoint })).json.lastSuccessAt, 'a successful test is recorded as a delivery on the device');
   assert.equal((await call('POST', '/test', E, { endpoint: erinEndpoint })).status, 200);
   assert.equal((await call('POST', '/test', E, { endpoint: erinEndpoint })).status, 200);
   assert.equal((await call('POST', '/test', E, { endpoint: erinEndpoint })).status, 429);
