@@ -87,6 +87,11 @@ export interface TrackingSummary {
   error?: string | null;
 }
 
+/** An automatic personal-status change made by the server after a watch action. */
+export type StatusChange = { from: "watching" | "completed"; to: "watching" | "completed"; reason: string };
+/** One show in the read-only automatic-status preview. */
+export type StatusPreviewRow = { showId: string; name: string; status: string | null; automatic: StatusChange | null; retroactive: StatusChange | null; completion: string; reopen: string; ambiguous: boolean };
+
 class ShowServiceClass extends ApiService {
   async getLibraryTracking(): Promise<TrackingSummary[]> {
     const response = await this.get<TrackingSummary[]>("/show/tracking");
@@ -154,12 +159,20 @@ class ShowServiceClass extends ApiService {
     return response.data;
   }
 
-  async setEpisodeWatched(id: string, season: number, episode: number, watched: boolean): Promise<void> {
-    await this.put(`/show/${id}/episodes/${season}/${episode}`, { watched });
+  /** Read-only: how automatic Watching/Completed statuses see each show. Changes nothing. */
+  async getStatusPreview(): Promise<{ generatedAt: string; shows: StatusPreviewRow[] }> {
+    return (await this.api.get("/show/status-preview", { timeout: 120_000 })).data;
   }
 
-  async markSeasonWatched(id: string, season: number): Promise<void> {
-    await this.post(`/show/${id}/seasons/${season}/watched`);
+  /** Returns the automatic status change this action caused (Watching <-> Completed), if any. */
+  async setEpisodeWatched(id: string, season: number, episode: number, watched: boolean): Promise<StatusChange | null> {
+    const response = await this.put<{ statusChange?: StatusChange | null }>(`/show/${id}/episodes/${season}/${episode}`, { watched });
+    return response.data?.statusChange ?? null;
+  }
+
+  async markSeasonWatched(id: string, season: number): Promise<StatusChange | null> {
+    const response = await this.post<{ statusChange?: StatusChange | null }>(`/show/${id}/seasons/${season}/watched`);
+    return response.data?.statusChange ?? null;
   }
 
   async toggleFavorite(id: string, favorite: boolean): Promise<ShowType> {

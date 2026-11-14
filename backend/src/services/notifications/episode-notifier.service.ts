@@ -102,12 +102,15 @@ async function discover(now: Date, source: ScheduleSource, report: RunReport) {
   report.devices = subscriptions.filter(s => !optedOut.has(s.userId)).length;
   if (!users.length) return;
 
-  const [shows, watches] = await Promise.all([
+  const [shows, watches, unwatches] = await Promise.all([
     prisma.show.findMany({ where: { userId: { in: users } }, select: { id: true, userId: true, name: true, overview: true, status: true, tmdbId: true, tvmazeId: true, seasonsWatched: true, episodesWatched: true } }),
     prisma.episodeWatch.findMany({ where: { show: { userId: { in: users } } }, select: { showId: true, season: true, episode: true } }),
+    prisma.episodeUnwatch.findMany({ where: { show: { userId: { in: users } } }, select: { showId: true, season: true, episode: true } }),
   ]);
   const watchesByShow = new Map<string, { season: number; episode: number }[]>();
   for (const w of watches) watchesByShow.set(w.showId, [...(watchesByShow.get(w.showId) || []), w]);
+  const unwatchesByShow = new Map<string, { season: number; episode: number }[]>();
+  for (const u of unwatches) unwatchesByShow.set(u.showId, [...(unwatchesByShow.get(u.showId) || []), u]);
 
   // Only shows with a stored TMDB identity (canonical) that are not Dropped. Completed shows stay eligible.
   const eligible = shows.filter((s): s is typeof s & { tmdbId: number } => isShowEligible(s) && s.tmdbId !== null);
@@ -148,7 +151,7 @@ async function discover(now: Date, source: ScheduleSource, report: RunReport) {
     const tvmazeShowId = identities.get(show.id)!;
     for (const episode of schedules.get(tvmazeShowId) || []) {
       report.premiered++;
-      if (isEpisodeWatched(show, watchesByShow.get(show.id) || [], episode.season, episode.number)) { report.alreadyWatched++; continue; }
+      if (isEpisodeWatched(show, watchesByShow.get(show.id) || [], episode.season, episode.number, unwatchesByShow.get(show.id) || [])) { report.alreadyWatched++; continue; }
       for (const sub of subsByUser.get(show.userId) || []) {
         // Never announce what premiered before this device opted in: enabling alerts sends no backlog.
         if (episode.premieredAt.getTime() < sub.notifyFrom.getTime()) { report.beforeOptIn++; continue; }
@@ -176,13 +179,14 @@ const dueDeliveries = (now: Date, take: number) => prisma.notificationDelivery.f
 /** Re-read tracking right before sending: the user may have watched, dropped or removed the show, or opted out. */
 async function stillWanted(delivery: Due) {
   if (delivery.subscription.userId !== delivery.userId) return null;
-  const [show, preference, watches] = await Promise.all([
+  const [show, preference, watches, unwatches] = await Promise.all([
     prisma.show.findFirst({ where: { id: delivery.showId, userId: delivery.userId }, select: { name: true, status: true, seasonsWatched: true, episodesWatched: true, tmdbId: true, posterURL: true } }),
     prisma.notificationPreference.findUnique({ where: { userId: delivery.userId }, select: { newEpisodes: true } }),
     prisma.episodeWatch.findMany({ where: { showId: delivery.showId, season: delivery.season, episode: delivery.episode }, select: { season: true, episode: true } }),
+    prisma.episodeUnwatch.findMany({ where: { showId: delivery.showId, season: delivery.season, episode: delivery.episode }, select: { season: true, episode: true } }),
   ]);
   if (!show || !isShowEligible(show) || preference?.newEpisodes === false) return null;
-  if (isEpisodeWatched(show, watches, delivery.season, delivery.episode)) return null;
+  if (isEpisodeWatched(show, watches, delivery.season, delivery.episode, unwatches)) return null;
   return show;
 }
 

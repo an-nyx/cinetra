@@ -4,6 +4,7 @@ import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.enti
 import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming, previewRematch, applyRematch, RematchConflictError } from '../../services/episode-guide.service';
 
 import { TMDBApiService } from "../../services/tmdb/tmdb-api.service";
+import { isVerifiedComplete, reconcileAfterAction, statusPreview } from "../../services/show-status.service";
 
 const router = Router();
 const tmdb = new TMDBApiService();
@@ -41,6 +42,12 @@ router.get("/search", async (req: Request, res: Response) => {
   } catch (error) {
     res.status(502).json({ message: "TMDB search unavailable. Check the API credential." });
   }
+});
+
+/** Read-only: how automatic Watching/Completed statuses see each of your shows. Changes nothing. */
+router.get("/status-preview", async (req: Request, res: Response) => {
+  try { res.setHeader('Cache-Control', 'no-store'); res.json({ generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
+  catch (error) { console.error('Status preview failed:', error instanceof Error ? error.name : 'unknown error'); res.status(500).json({ message: 'Status preview unavailable' }); }
 });
 
 router.get("/tracking", async (req: Request, res: Response) => {
@@ -86,13 +93,24 @@ router.get("/:id/episodes", async (req: Request<{id: string}>, res: Response) =>
   catch (error) { guideError(res, error); }
 });
 
+// After every watch action the personal status is re-evaluated (Watching <-> Completed only; see show-status.model).
+// The response carries the summary as it is after any automatic change, plus that change, if one happened.
 router.put("/:id/episodes/:season/:episode", async (req: Request<{id: string; season: string; episode: string}>, res: Response) => {
-  try { res.json(await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched)); }
+  try {
+    const wasComplete = req.body?.watched === false ? await isVerifiedComplete(req.params.id, req.user.id) : false;
+    await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched);
+    const statusChange = await reconcileAfterAction(req.params.id, req.user.id, { wasComplete });
+    res.json({ ...(await getTrackingSummary(req.params.id, req.user.id)), statusChange });
+  }
   catch (error) { guideError(res, error); }
 });
 
 router.post("/:id/seasons/:season/watched", async (req: Request<{id: string; season: string}>, res: Response) => {
-  try { res.json(await setSeasonWatched(req.params.id, req.user.id, Number(req.params.season))); }
+  try {
+    await setSeasonWatched(req.params.id, req.user.id, Number(req.params.season));
+    const statusChange = await reconcileAfterAction(req.params.id, req.user.id);
+    res.json({ ...(await getTrackingSummary(req.params.id, req.user.id)), statusChange });
+  }
   catch (error) { guideError(res, error); }
 });
 

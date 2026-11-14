@@ -133,6 +133,13 @@ export function resolveIdentity(input: IdentityInput): Promise<IdentityResult> {
   });
 }
 
+/** Tests only: forget cached identities and schedules so changed provider data is read again. */
+export function resetTvmazeCachesForTests() {
+  for (const key of scheduleCache.keys()) scheduleCache.delete(key);
+  for (const key of identityCache.keys()) identityCache.delete(key);
+  failedRefresh.clear(); lastUpdatesCheck = Date.now();
+}
+
 export function tvmazeCacheStats() {
   return { identities: identityCache.size, schedules: scheduleCache.size, staleSchedules: failedRefresh.size, requests: requestCount, lastUpdatesCheck: lastUpdatesCheck ? new Date(lastUpdatesCheck).toISOString() : null };
 }

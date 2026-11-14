@@ -114,8 +114,10 @@ export type SavedTracking = { seasonsWatched: number; episodesWatched: number };
  * Invalid positions (negative, or a season-0 position with episodes) cover nothing, as in the tracking model.
  * Explicit watched-episode records always count.
  */
-export function isEpisodeWatched(saved: SavedTracking, watches: { season: number; episode: number }[], season: number, number: number): boolean {
+export function isEpisodeWatched(saved: SavedTracking, watches: { season: number; episode: number }[], season: number, number: number, unwatched: { season: number; episode: number }[] = []): boolean {
   if (watches.some(w => w.season === season && w.episode === number)) return true;
+  // Explicitly unwatched although the saved position covers it.
+  if (unwatched.some(u => u.season === season && u.episode === number)) return false;
   const { seasonsWatched: s, episodesWatched: e } = saved;
   if (!Number.isInteger(s) || !Number.isInteger(e) || s < 1 || e < 0) return false;
   return season < s || (season === s && number <= e);

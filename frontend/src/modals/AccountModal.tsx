@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import NotificationSettings from "@/components/notification-settings";
+import ShowStatusPreview from "@/components/show-status-preview";
 
 interface AccountModalProps {
   open: boolean;
@@ -175,6 +176,7 @@ export default function AccountModal({ open, onOpenChange }: AccountModalProps) 
               {phrase(language, isExporting ? "Preparing export..." : "Export my data")}
             </Button>
             <NotificationSettings />
+            <ShowStatusPreview />
           </>
         )}
       </DialogContent>

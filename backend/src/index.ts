@@ -6,6 +6,7 @@ import morgan from "morgan";
 import apiRoutes from "./api/v1";
 import { warmCaches } from "./services/episode-guide.service";
 import { startNotificationScheduler } from "./services/notifications/notification-scheduler";
+import { startShowStatusMonitor } from "./services/show-status.service";
 
 const app = express();
 
@@ -43,4 +44,6 @@ app.listen(port, () => {
   }
   // New-episode push notifications: off unless NOTIFICATIONS_SCHEDULER=enabled and VAPID keys are set.
   startNotificationScheduler();
+  // Automatic Watching <-> Completed statuses: completed shows reopen when a verified new episode premieres.
+  startShowStatusMonitor();
 });

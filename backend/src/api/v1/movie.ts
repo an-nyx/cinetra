@@ -141,7 +141,7 @@ router.put("/:id", async (req: Request<{id: string}, {}, UpdateMovieDto>, res: R
     return;
   }
   if (movieData.tmdbId !== undefined && (!Number.isInteger(movieData.tmdbId) || movieData.tmdbId <= 0) ||
-    movieData.status !== undefined && movieData.status !== null && !['watchlist', 'watched'].includes(movieData.status) ||
+    movieData.status !== undefined && movieData.status !== null && !['watchlist', 'watched', 'dropped'].includes(movieData.status) ||
     movieData.rating !== undefined && movieData.rating !== null && (!Number.isInteger(movieData.rating) || movieData.rating < 1 || movieData.rating > 10)) {
     res.status(400).json({ message: 'Invalid movie update' }); return;
   }

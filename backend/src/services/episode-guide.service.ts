@@ -2,7 +2,8 @@ import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 import { type EpisodeMetadata } from './legacy-progress.model';
-import { buildTrackingSummary, catalogFromTMDB, checkpointAfterWatch, mergeShowEpisodes, type Catalog, type Checkpoint, type MetadataFailure } from './tracking-summary.model';
+import { buildTrackingSummary, catalogFromTMDB, mergeShowEpisodes, toBroadcastStatus, type Catalog, type MetadataFailure, type UnwatchRecord } from './tracking-summary.model';
+import { calculateLegacyCoverage, calculateTrackingProgress, episodeKey } from './legacy-progress.model';
 import { TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb/tmdb-auth';
 import { checkForUpdates, getSchedule, resolveIdentity, tvmazeCacheStats } from './tvmaze/tvmaze.service';
 import { selectScheduledEpisodes } from './tvmaze/tvmaze-schedule.model';
@@ -47,12 +48,25 @@ export async function tmdbEpisodeInfo(show: { name: string; tmdbId: number }, se
   return episode ? { episodeType: episode.episodeType ?? null, airDate: episode.airDate ?? null } : null;
 }
 
+const unwatchesOf = (showId: string) => prisma.episodeUnwatch.findMany({ where: { showId }, select: { season: true, episode: true } });
+
 async function load(showId: string, userId: string) {
   const show = await prisma.show.findFirst({ where: { id: showId, userId } });
   if (!show) throw new EpisodeGuideError(404, 'Show not found');
-  const [catalog, watches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } })]);
-  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today());
-  return { show, catalog, episodes, watches, legacy };
+  const [catalog, watches, unwatches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(showId)]);
+  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today(), unwatches);
+  return { show, catalog, episodes, watches, unwatches, legacy };
+}
+
+/**
+ * The merged per-episode watch state and progress verdict for one show, as every page sees it. Used by automatic
+ * status management. Throws when TMDB episode data cannot be loaded (the caller then changes nothing).
+ */
+export async function trackingState(show: ShowRow) {
+  const [catalog, watches, unwatches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(show.id)]);
+  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today(), unwatches);
+  const progress = calculateTrackingProgress(episodes, catalog, legacy.needsReview, toBroadcastStatus(catalog.broadcastStatus), catalog.inProduction, catalog.nextEpisodeAnnounced, today(), true);
+  return { catalog, episodes, watches, progress, today: today() };
 }
 
 /** Distinguish a missing association from authentication, not-found and transient TMDB failures. */
@@ -65,8 +79,8 @@ export function classifyMetadataFailure(error: unknown): MetadataFailure {
   return 'tmdb_unavailable';
 }
 
-type ShowRow = NonNullable<Awaited<ReturnType<typeof prisma.show.findFirst>>>;
-async function summarize(show: ShowRow, watches: { season: number; episode: number; watchedAt: Date }[]) {
+export type ShowRow = NonNullable<Awaited<ReturnType<typeof prisma.show.findFirst>>>;
+async function summarize(show: ShowRow, watches: { season: number; episode: number; watchedAt: Date }[], unwatches: UnwatchRecord[] = []) {
   let catalog: Catalog | null = null;
   let metadataError: string | null = null;
   let metadataFailure: MetadataFailure | null = null;
@@ -75,26 +89,29 @@ async function summarize(show: ShowRow, watches: { season: number; episode: numb
     metadataError = error instanceof Error ? error.message : 'TMDB metadata unavailable';
     metadataFailure = classifyMetadataFailure(error);
   }
-  return buildTrackingSummary(show, catalog, metadataError, watches, today(), metadataFailure);
+  return buildTrackingSummary(show, catalog, metadataError, watches, today(), metadataFailure, unwatches);
 }
 
 export async function getTrackingSummary(showId: string, userId: string) {
   const show = await prisma.show.findFirst({ where: { id: showId, userId } });
   if (!show) throw new EpisodeGuideError(404, 'Show not found');
-  const watches = await prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } });
-  return summarize(show, watches);
+  const [watches, unwatches] = await Promise.all([prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(showId)]);
+  return summarize(show, watches, unwatches);
 }
 
 /** Every show's summary: two database queries for the whole library, and at most 12 catalogs loading at once. */
 export async function getLibraryTracking(userId: string) {
-  const [shows, watches] = await Promise.all([
+  const [shows, watches, unwatches] = await Promise.all([
     prisma.show.findMany({ where: { userId } }),
     prisma.episodeWatch.findMany({ where: { show: { userId } }, select: { showId: true, season: true, episode: true, watchedAt: true } }),
+    prisma.episodeUnwatch.findMany({ where: { show: { userId } }, select: { showId: true, season: true, episode: true } }),
   ]);
   const byShow = new Map<string, { season: number; episode: number; watchedAt: Date }[]>();
   for (const w of watches) byShow.set(w.showId, [...(byShow.get(w.showId) || []), { season: w.season, episode: w.episode, watchedAt: w.watchedAt }]);
+  const unwatchedByShow = new Map<string, UnwatchRecord[]>();
+  for (const u of unwatches) unwatchedByShow.set(u.showId, [...(unwatchedByShow.get(u.showId) || []), { season: u.season, episode: u.episode }]);
   return mapLimit(shows, 12, async show => {
-    try { return { ...(await summarize(show, byShow.get(show.id) || [])), error: null }; }
+    try { return { ...(await summarize(show, byShow.get(show.id) || [], unwatchedByShow.get(show.id) || [])), error: null }; }
     catch (error) { return { showId: show.id, error: error instanceof Error ? error.message : 'Episode guide unavailable' }; }
   });
 }
@@ -205,6 +222,9 @@ export async function getUpcomingReleases(userId: string, options: { refresh?: b
   return { status: 'building', progress: { ...(buildProgress.get(userId) || { done: 0, total: 0 }) } };
 }
 
+/** Drop one series' cached TMDB catalog so the next read reloads it (provider data changed; also used by tests). */
+export function invalidateCatalog(tmdbId: number) { catalogCache.delete(`tmdb:${tmdbId}`); }
+
 /** The library changed (show added, removed or re-linked): the next request gets the current list and rebuilds it. */
 export function invalidateUpcoming(userId: string) {
   upcomingCache.delete(userId);
@@ -258,11 +278,18 @@ export async function getEpisodeGuide(showId: string, userId: string, season: nu
   return { seasons: catalog.seasons, season, episodes: episodes.filter(e => e.season === season), watched: watches };
 }
 
-/** Move the saved checkpoint only if it is still what was read; a concurrent edit is never overwritten. */
-async function moveCheckpoint(tx: Pick<typeof prisma, 'show'>, show: { id: string; seasonsWatched: number; episodesWatched: number }, to: Checkpoint) {
-  await tx.show.updateMany({ where: { id: show.id, seasonsWatched: show.seasonsWatched, episodesWatched: show.episodesWatched }, data: to });
-}
+/** Whether the show's legacy saved position covers an episode (ignoring unwatch records). */
+const positionCovers = (show: { seasonsWatched: number; episodesWatched: number }, catalog: Catalog, season: number, episode: number) =>
+  (show.seasonsWatched > 0 || show.episodesWatched > 0) && calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today()).covered.has(episodeKey(season, episode));
 
+/**
+ * Mark one episode watched or not watched.
+ *
+ * The legacy saved position (seasonsWatched/episodesWatched) is never rewritten here. Episodes it covers are unwatched
+ * with an EpisodeUnwatch record, and watching such an episode again removes that record, which restores exactly the
+ * previous state. Other episodes use individual EpisodeWatch records, as before. Each change runs in a transaction
+ * that locks the show row, so concurrent taps cannot interleave.
+ */
 export async function setEpisodeWatched(showId: string, userId: string, season: number, episode: number, watched: boolean) {
   if (!validNumber(season, 1) || !validNumber(episode, 1) || typeof watched !== 'boolean') throw new EpisodeGuideError(400, 'Invalid episode update');
   const { catalog } = await load(showId, userId);
@@ -270,49 +297,42 @@ export async function setEpisodeWatched(showId: string, userId: string, season: 
   if (!found) throw new EpisodeGuideError(404, 'Episode not found');
   if (watched && (!found.airDate || found.airDate > today())) throw new EpisodeGuideError(400, 'Episode has not aired');
   await prisma.$transaction(async tx => {
-    // Serialize episode changes with saved-position edits for this show.
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
     const show = await tx.show.findFirst({ where: { id: showId, userId } });
     if (!show) throw new EpisodeGuideError(404, 'Show not found');
-    const watches = await tx.episodeWatch.findMany({ where: { showId } });
-    const existing = watches.find(w => w.season === season && w.episode === episode);
-    const merged = mergeShowEpisodes(show, catalog, watches, today()).episodes.find(e => e.season === season && e.number === episode);
+    const [explicit, unwatch] = await Promise.all([
+      tx.episodeWatch.findUnique({ where: { showId_season_episode: { showId, season, episode } } }),
+      tx.episodeUnwatch.findUnique({ where: { showId_season_episode: { showId, season, episode } } }),
+    ]);
+    const covered = positionCovers(show, catalog, season, episode);
     if (watched) {
-      if (existing || merged?.watched) return;
-      const forward = checkpointAfterWatch(show, catalog, [...watches, { season, episode }], today());
-      await tx.episodeWatch.create({ data: { showId, season, episode, ...(forward ? {
-        checkpointBeforeSeason: show.seasonsWatched, checkpointBeforeEpisode: show.episodesWatched,
-        checkpointAfterSeason: forward.seasonsWatched, checkpointAfterEpisode: forward.episodesWatched,
-      } : {}) } });
-      if (forward) await tx.show.update({ where: { id: showId }, data: forward });
+      if (explicit || (covered && !unwatch)) return;                       // already watched
+      if (unwatch) await tx.episodeUnwatch.delete({ where: { id: unwatch.id } });
+      if (!covered) await tx.episodeWatch.create({ data: { showId, season, episode } });
     } else {
-      if (!existing) {
-        if (merged?.watched) throw new EpisodeGuideError(409, 'This episode is covered by the saved position. Use Edit progress to correct it.');
-        return;
-      }
-      const canUndo = existing.checkpointBeforeSeason !== null && existing.checkpointBeforeEpisode !== null &&
-        show.seasonsWatched === existing.checkpointAfterSeason && show.episodesWatched === existing.checkpointAfterEpisode;
-      if (canUndo) await tx.show.update({ where: { id: showId }, data: { seasonsWatched: existing.checkpointBeforeSeason!, episodesWatched: existing.checkpointBeforeEpisode! } });
-      else if (merged?.watchSource === 'both') {
-        // The individual record can be removed, but the independent saved position still covers it.
-        // Older undo links are no longer safe after removing an episode under that position.
-        await tx.episodeWatch.updateMany({ where: { showId }, data: { checkpointBeforeSeason: null, checkpointBeforeEpisode: null, checkpointAfterSeason: null, checkpointAfterEpisode: null } });
-      }
-      await tx.episodeWatch.delete({ where: { id: existing.id } });
+      if (explicit) await tx.episodeWatch.delete({ where: { id: explicit.id } });
+      if (covered && !unwatch) await tx.episodeUnwatch.create({ data: { showId, season, episode } });
     }
   });
   return getTrackingSummary(showId, userId);
 }
 
+/** Mark every released, not yet watched regular episode of one season watched (same rules as single episodes). */
 export async function setSeasonWatched(showId: string, userId: string, season: number) {
   if (!validNumber(season, 1)) throw new EpisodeGuideError(400, 'Invalid season');
-  const { show, catalog, episodes, watches } = await load(showId, userId);
+  const { catalog } = await load(showId, userId);
   if (!catalog.seasons.some(s => s.number === season)) throw new EpisodeGuideError(404, 'Season not found');
-  const aired = episodes.filter(e => e.season === season && e.airDate && e.airDate <= today() && !e.watched);
   await prisma.$transaction(async tx => {
-    await tx.episodeWatch.createMany({ data: aired.map(e => ({ showId, season, episode: e.number })), skipDuplicates: true });
-    const forward = checkpointAfterWatch(show, catalog, [...watches, ...aired.map(e => ({ season, episode: e.number }))], today());
-    if (forward) await moveCheckpoint(tx, show, forward);
+    await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
+    const show = await tx.show.findFirst({ where: { id: showId, userId } });
+    if (!show) throw new EpisodeGuideError(404, 'Show not found');
+    const [watches, unwatches] = await Promise.all([tx.episodeWatch.findMany({ where: { showId } }), tx.episodeUnwatch.findMany({ where: { showId, season } })]);
+    const merged = mergeShowEpisodes(show, catalog, watches, today(), unwatches).episodes;
+    const aired = merged.filter(e => e.season === season && e.number > 0 && !!e.airDate && e.airDate <= today() && !e.watched);
+    const restore = aired.filter(e => positionCovers(show, catalog, season, e.number)).map(e => e.number);
+    const create = aired.filter(e => !restore.includes(e.number)).map(e => ({ showId, season, episode: e.number }));
+    if (restore.length) await tx.episodeUnwatch.deleteMany({ where: { showId, season, episode: { in: restore } } });
+    if (create.length) await tx.episodeWatch.createMany({ data: create, skipDuplicates: true });
   });
   return getTrackingSummary(showId, userId);
 }

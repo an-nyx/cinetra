@@ -32,12 +32,13 @@ const EPISODE_WINDOW_DAYS = 30;
 export async function notificationDiagnostics(userId: string, options: { source?: ScheduleSource; now?: Date } = {}) {
   const now = options.now ?? new Date();
   const source = options.source ?? tvmazeScheduleSource;
-  const [preferences, subscriptions, shows, watches, deliveries] = await Promise.all([
+  const [preferences, subscriptions, shows, watches, deliveries, unwatches] = await Promise.all([
     getPreferences(userId),
     prisma.pushSubscription.findMany({ where: { userId }, orderBy: { createdAt: 'asc' }, select: { id: true, userAgent: true, notifyFrom: true, createdAt: true, updatedAt: true, lastSuccessAt: true, lastFailureAt: true, failureCount: true } }),
     prisma.show.findMany({ where: { userId }, orderBy: { name: 'asc' }, select: { id: true, name: true, overview: true, status: true, tmdbId: true, tvmazeId: true, seasonsWatched: true, episodesWatched: true } }),
     prisma.episodeWatch.findMany({ where: { show: { userId } }, select: { showId: true, season: true, episode: true } }),
     prisma.notificationDelivery.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+    prisma.episodeUnwatch.findMany({ where: { show: { userId } }, select: { showId: true, season: true, episode: true } }),
   ]);
   const watchesByShow = new Map<string, { season: number; episode: number }[]>();
   for (const w of watches) watchesByShow.set(w.showId, [...(watchesByShow.get(w.showId) || []), w]);
@@ -81,7 +82,7 @@ export async function notificationDiagnostics(userId: string, options: { source?
       ...base, eligible: true, reason: null, detail: null, tvmazeId: identity.tvmazeId, tvmazeStatus: schedule.show.status ?? null, timeZone, stale: schedule.stale ?? false,
       lastPremiere: last ? {
         season: last.season, number: last.number, airdate: raw?.airdate ?? null, premieredAt: last.premieredAt.toISOString(), timing: last.timing,
-        watched: isEpisodeWatched(show, watchesByShow.get(show.id) || [], last.season, last.number),
+        watched: isEpisodeWatched(show, watchesByShow.get(show.id) || [], last.season, last.number, unwatches.filter(u => u.showId === show.id)),
         withinLookback: now.getTime() - last.premieredAt.getTime() <= NOTIFY_LOOKBACK_MS,
       } : null,
       nextEpisode: upcoming ? { season: upcoming.e.season!, number: upcoming.e.number!, airdate: upcoming.e.airdate ?? null, airtime: upcoming.e.airtime || null, airstamp: upcoming.e.airstamp ?? null, premieresAt: upcoming.at!.toISOString() } : null,

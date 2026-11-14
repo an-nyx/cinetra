@@ -14,7 +14,7 @@ interface UpdateMovieData {
   overview?: string;
   posterURL?: string;
   favorite?: boolean;
-  status?: "watchlist" | "watched" | null;
+  status?: "watchlist" | "watched" | "dropped" | null;
   rating?: number | null;
   notes?: string | null;
 }

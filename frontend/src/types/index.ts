@@ -22,7 +22,7 @@ export interface MovieType {
     posterURL?: string;
     favorite: boolean;
     tmdbId?: number | null;
-    status?: "watchlist" | "watched" | null;
+    status?: "watchlist" | "watched" | "dropped" | null;
     rating?: number | null;
     notes?: string | null;
     userId: string;

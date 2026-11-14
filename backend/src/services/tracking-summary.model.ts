@@ -17,6 +17,8 @@ export type Catalog = Omit<EpisodeCatalog, 'episodes'> & {
 };
 export type TrackedShow = { id: string; name: string; posterURL: string | null; status: string | null; completed: boolean; seasonsWatched: number; episodesWatched: number; completedMonitorFrom?: Date | null };
 export type WatchRecord = { season: number; episode: number; watchedAt: Date };
+/** An episode explicitly marked not watched although the legacy saved position covers it (see EpisodeUnwatch). */
+export type UnwatchRecord = { season: number; episode: number };
 
 /** Map TMDB's broadcast status onto the tracking model. Unrecognised values stay "unknown" rather than being guessed. */
 export function toBroadcastStatus(status: string | null | undefined): BroadcastStatus {
@@ -146,12 +148,16 @@ export function checkpointAfterUnwatch(show: TrackedShow, catalog: Catalog, seas
   return season === 1 ? { seasonsWatched: 0, episodesWatched: 0 } : { seasonsWatched: season, episodesWatched: 0 };
 }
 
-/** Saved position plus explicit records, merged per episode. A show without a saved position contributes no coverage. */
-export function mergeShowEpisodes(show: TrackedShow, catalog: Catalog | null, watches: WatchRecord[], today: string) {
+/**
+ * Saved position plus explicit records, merged per episode. A show without a saved position contributes no coverage.
+ * An unwatch record removes one episode from the saved position's coverage without changing the position itself.
+ */
+export function mergeShowEpisodes(show: TrackedShow, catalog: Catalog | null, watches: WatchRecord[], today: string, unwatched: UnwatchRecord[] = []) {
   const watchMap = new Map(watches.map(w => [episodeKey(w.season, w.episode), w.watchedAt]));
   const hasSavedPosition = show.seasonsWatched > 0 || show.episodesWatched > 0;
   const computed = calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today);
-  const legacy = hasSavedPosition ? computed : { ...computed, covered: new Set<string>() };
+  const excluded = new Set(unwatched.map(u => episodeKey(u.season, u.episode)));
+  const legacy = hasSavedPosition ? { ...computed, covered: new Set([...computed.covered].filter(key => !excluded.has(key))) } : { ...computed, covered: new Set<string>() };
   const episodes = mergeEpisodeWatchState((catalog?.episodes || []).map(e => ({ ...e, watchedAt: watchMap.get(episodeKey(e.season, e.number)) || null })), watches, legacy);
   return { hasSavedPosition, legacy, episodes };
 }
@@ -160,8 +166,8 @@ export function mergeShowEpisodes(show: TrackedShow, catalog: Catalog | null, wa
  * The tracking summary every page reads (Shows, Home, Continue watching, Details). Pure: no database or provider access.
  * The personal status is reported as-is and never used as evidence of completion.
  */
-export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null, metadataError: string | null, watches: WatchRecord[], today: string, metadataFailure: MetadataFailure | null = null) {
-  const { hasSavedPosition, legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today);
+export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null, metadataError: string | null, watches: WatchRecord[], today: string, metadataFailure: MetadataFailure | null = null, unwatched: UnwatchRecord[] = []) {
+  const { hasSavedPosition, legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today, unwatched);
   episodes.sort((a, b) => a.season - b.season || a.number - b.number);
   const upcoming = episodes.filter(e => e.airDate && e.airDate > today).sort((a, b) => a.airDate!.localeCompare(b.airDate!));
   const last = [...episodes].filter(e => e.watchedAt).sort((a, b) => b.watchedAt!.getTime() - a.watchedAt!.getTime())[0] || null;
@@ -171,10 +177,12 @@ export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null,
   const { releasedEpisodes: released, remainingEpisodes: remaining, finalSeason, finalityConfirmed, fullyWatched } = progress;
   const watched = released.length - remaining.length;
   const manualCompleted = show.status === 'completed' || (!show.status && show.completed);
+  // Completed means every released episode is watched (the series may continue), so the note only flags real gaps:
+  // released episodes not confirmed as watched, or episode data that cannot be loaded at all.
   const statusProgressNote = manualCompleted && !fullyWatched
     ? metadataError || !catalog ? 'Your personal status is Completed. TMDB episode data is unavailable, so completion cannot be verified.'
       : remaining.length ? `Your personal status is Completed, but ${remaining.length} released episode${remaining.length === 1 ? '' : 's'} are not confirmed as watched. Your status has not been changed.`
-        : 'Your personal status is Completed, but available metadata does not verify completion. Your status has not been changed.'
+        : null
     : null;
   // A stored last-update boundary is a conservative upper bound for the time the personal status was set.
   // A missing boundary or incomplete metadata is ambiguous and must not produce a new-season claim.

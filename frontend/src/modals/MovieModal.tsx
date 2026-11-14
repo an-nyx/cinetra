@@ -61,7 +61,7 @@ export default function MovieModal({
   const [saving, setSaving] = useState(false);
   const [trackingError, setTrackingError] = useState("");
 
-  const saveMovie = async (changes: { status?: "watchlist" | "watched" | null; rating?: number | null; notes?: string }) => {
+  const saveMovie = async (changes: { status?: "watchlist" | "watched" | "dropped" | null; rating?: number | null; notes?: string }) => {
     if (!selectedMovie) return;
     setSaving(true);
     setTrackingError("");
@@ -139,8 +139,14 @@ export default function MovieModal({
           <div className="space-y-1">
             <div role="group" aria-label={phrase(language, "Movie status")} className="space-y-0">
               <div className="flex min-h-11 items-center justify-between text-sm"><span><T>Status</T></span>{movie.status && <button type="button" disabled={saving} onClick={() => saveMovie({ status: null })} className="min-h-11 px-2 text-xs text-muted-foreground"><T>Clear status</T></button>}</div>
-              <div className="flex gap-2">
-                {(['watchlist', 'watched'] as const).map(status => <button key={status} type="button" disabled={saving} aria-pressed={movie.status === status} onClick={() => saveMovie({ status })} className={`min-h-11 flex-1 rounded-full border px-4 text-sm font-medium ${movie.status === status ? 'border-emerald-300/50 bg-emerald-300/15 text-emerald-200' : 'border-white/20 bg-background text-foreground'}`}>{phrase(language, status === 'watchlist' ? 'Watchlist' : 'Watched')}</button>)}
+              <div className="grid grid-cols-3 gap-2">
+                {(['watchlist', 'watched', 'dropped'] as const).map(status => {
+                  const selected = movie.status === status;
+                  // Dropped reads as a quiet muted red, never as an alarm: the movie stays in the library.
+                  const tone = !selected ? 'border-white/20 bg-background text-foreground'
+                    : status === 'dropped' ? 'border-rose-300/40 bg-rose-400/10 text-rose-200' : 'border-emerald-300/50 bg-emerald-300/15 text-emerald-200';
+                  return <button key={status} type="button" disabled={saving} aria-pressed={selected} onClick={() => saveMovie({ status })} className={`min-h-11 min-w-0 truncate rounded-full border px-2 text-sm font-medium sm:px-4 ${tone}`}>{phrase(language, status === 'watchlist' ? 'Watchlist' : status === 'watched' ? 'Watched' : 'Dropped')}</button>;
+                })}
               </div>
             </div>
             <div role="group" aria-label={phrase(language, "Movie rating")} className="space-y-0">

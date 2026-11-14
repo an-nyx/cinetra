@@ -75,6 +75,10 @@ assert.equal(isEpisodeWatched({ seasonsWatched: 0, episodesWatched: 5 }, none, 1
 assert.equal(isEpisodeWatched({ seasonsWatched: -1, episodesWatched: 0 }, none, 1, 1), false);
 assert.equal(isEpisodeWatched({ seasonsWatched: 0, episodesWatched: 0 }, [{ season: 4, episode: 2 }], 4, 2), true);
 assert.equal(isEpisodeWatched({ seasonsWatched: 2, episodesWatched: 3 }, [{ season: 2, episode: 7 }], 2, 7), true);
+// An unwatch record overrides the saved position for that one episode only; explicit records still win.
+assert.equal(isEpisodeWatched({ seasonsWatched: 2, episodesWatched: 3 }, [], 1, 4, [{ season: 1, episode: 4 }]), false);
+assert.equal(isEpisodeWatched({ seasonsWatched: 2, episodesWatched: 3 }, [], 1, 5, [{ season: 1, episode: 4 }]), true);
+assert.equal(isEpisodeWatched({ seasonsWatched: 2, episodesWatched: 3 }, [{ season: 1, episode: 4 }], 1, 4, [{ season: 1, episode: 4 }]), true);
 
 // --- Eligibility: all except Dropped ----------------------------------------------------------------------------
 for (const status of ['watching', 'completed', 'planned', 'paused', null]) assert.equal(isShowEligible({ status }), true, String(status));

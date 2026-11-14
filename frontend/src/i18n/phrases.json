@@ -1174,5 +1174,73 @@
   "Go to Home": [
     "Retour à l’accueil",
     "العودة إلى الرئيسية"
+  ],
+  "Filter by status": [
+    "Filtrer par statut",
+    "التصفية حسب الحالة"
+  ],
+  "All statuses": [
+    "Tous les statuts",
+    "كل الحالات"
+  ],
+  "No status": [
+    "Sans statut",
+    "بدون حالة"
+  ],
+  "Marked Completed automatically: every released episode is watched.": [
+    "Marqué Terminé automatiquement : tous les épisodes sortis sont vus.",
+    "تم تعيينه كمكتمل تلقائيًا: شاهدت كل الحلقات المعروضة."
+  ],
+  "Back to Watching automatically.": [
+    "Repassé en cours automatiquement.",
+    "عاد إلى قيد المشاهدة تلقائيًا."
+  ],
+  "Episode counts unavailable; your watched episodes are kept.": [
+    "Nombre d’épisodes indisponible ; vos épisodes vus sont conservés.",
+    "عدد الحلقات غير متاح؛ الحلقات التي شاهدتها محفوظة."
+  ],
+  "Review earlier saved progress": [
+    "Vérifier la progression enregistrée",
+    "مراجعة التقدم المحفوظ سابقًا"
+  ],
+  "It does not fit the available TMDB episode list, so progress cannot be counted. Correct it once here; afterwards, track episodes one by one.": [
+    "Elle ne correspond pas à la liste d’épisodes TMDB, la progression ne peut donc pas être calculée. Corrigez-la une fois ici, puis suivez les épisodes un par un.",
+    "لا يطابق قائمة حلقات TMDB المتاحة، لذا لا يمكن حساب التقدم. صحّحه مرة واحدة هنا، ثم تابع الحلقات واحدة تلو الأخرى."
+  ],
+  "Review": [
+    "Vérifier",
+    "مراجعة"
+  ],
+  "Linked to the new series. Your earlier saved progress was kept unchanged; it does not fit this series, so please review it below.": [
+    "Lié à la nouvelle série. Votre progression enregistrée est conservée telle quelle ; elle ne correspond pas à cette série, vérifiez-la ci-dessous.",
+    "تم الربط بالمسلسل الجديد. احتُفظ بتقدمك المحفوظ دون تغيير؛ لا يطابق هذا المسلسل، لذا راجعه أدناه."
+  ],
+  "Not started · no watched episodes yet.": [
+    "Pas commencé · aucun épisode vu.",
+    "لم يبدأ · لا توجد حلقات مشاهدة بعد."
+  ],
+  "Episode guide unavailable. Your watched episodes are kept.": [
+    "Guide des épisodes indisponible. Vos épisodes vus sont conservés.",
+    "دليل الحلقات غير متاح. الحلقات التي شاهدتها محفوظة."
+  ],
+  "Earlier progress, no watch dates": [
+    "Progression antérieure, sans dates",
+    "تقدم سابق، بدون تواريخ مشاهدة"
+  ],
+  "Episodes from your earlier saved progress count as watched; they have no individual watch dates.": [
+    "Les épisodes de votre progression antérieure comptent comme vus ; ils n’ont pas de date de visionnage.",
+    "حلقات تقدمك المحفوظ سابقًا تُحتسب مشاهَدة؛ ليس لها تواريخ مشاهدة فردية."
+  ],
+  "Mark not watched": [
+    "Marquer non vu",
+    "تعيين كغير مشاهَدة"
+  ],
+  "From earlier progress": [
+    "Progression antérieure",
+    "من التقدم السابق"
+  ],
+  "No verified episode guide is available for this show. Your watched episodes are kept.": [
+    "Aucun guide d’épisodes vérifié pour cette série. Vos épisodes vus sont conservés.",
+    "لا يتوفر دليل حلقات موثّق لهذا المسلسل. الحلقات التي شاهدتها محفوظة."
   ]
 }

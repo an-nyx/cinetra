@@ -23,10 +23,16 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
 import { MovieType } from "@/types/index.ts";
+import { MOVIE_STATUS_FILTERS, movieStatusCounts, movieStatusOf, type MovieStatusFilter } from "@/lib/movie-library";
 import { Plus, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
+
+type StatusFilter = MovieStatusFilter;
+const STATUS_FILTERS = MOVIE_STATUS_FILTERS;
+const statusLabel: Record<StatusFilter, string> = { watchlist: "Watchlist", watched: "Watched", dropped: "Dropped", none: "No status" };
 
 interface ListFiltersType {
   favoriteFilter?: "favorite" | "notFavorite";
+  statusFilter?: StatusFilter;
   sortBy?: "nameAsc" | "nameDesc" | "dateNewest" | "dateOldest" | "updatedNewest" | "updatedOldest";
 }
 
@@ -125,13 +131,33 @@ export default function MoviesPage() {
             </SelectContent>
           </Select>
 
-          {filters.favoriteFilter && (
+          <Select
+            key={`status-${key}`}
+            name="statusFilter"
+            value={filters.statusFilter ?? ""}
+            onValueChange={(value: StatusFilter) => setFilters({ ...filters, statusFilter: value })}
+          >
+            <SelectTrigger aria-label={phrase(language, "Filter by status")} className="w-auto min-w-[130px]">
+              <SelectValue placeholder={phrase(language, "All statuses")} />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTERS.map(status => (
+                <SelectItem key={status} value={status}>
+                  <span className={status === "dropped" ? "text-rose-300" : undefined}>{phrase(language, statusLabel[status])}</span>
+                  <span className="ml-1 text-muted-foreground tabular-nums">{movieStatusCounts(movies)[status]}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(filters.favoriteFilter || filters.statusFilter) && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setFilters({
                   favoriteFilter: undefined,
+                  statusFilter: undefined,
                   sortBy: filters.sortBy,
                 });
                 setKey(+new Date());
@@ -171,6 +197,8 @@ export default function MoviesPage() {
       {(() => {
         const filteredMovies = movies?.filter((movie) => {
           if (!movie.name.toLowerCase().includes(search)) return false;
+
+          if (filters.statusFilter && movieStatusOf(movie) !== filters.statusFilter) return false;
 
           if (filters.favoriteFilter === "favorite" && movie.favorite !== true)
             return false;

@@ -11,7 +11,7 @@ router.get('/export', protectedRoute, async (req: Request, res: Response) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { id: true, username: true, email: true, createdAt: true, updatedAt: true,
-        Show: { include: { episodeWatches: true } }, Movie: { include: { watches: true } } },
+        Show: { include: { episodeWatches: true, episodeUnwatches: true } }, Movie: { include: { watches: true } } },
     });
     if (!user) { res.status(404).json({ message: 'User not found' }); return; }
     res.setHeader('Cache-Control', 'no-store');
