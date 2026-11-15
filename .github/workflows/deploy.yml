@@ -50,7 +50,11 @@ jobs:
         pnpm prisma migrate deploy
         pnpm build
         pnpm test:tracking
-        pnpm test:episode-toggle
+        pnpm exec ts-node tests/episode-toggle.integration.test.ts
+        docker exec ${{ job.services.postgres.id }} createdb -U postgres cinetra_episode_toggle_test_20261109
+        export DATABASE_URL=postgresql://postgres:status-test@127.0.0.1:55439/cinetra_episode_toggle_test_20261109
+        pnpm prisma migrate deploy
+        pnpm exec ts-node tests/movie-status.integration.test.ts
         docker exec ${{ job.services.postgres.id }} createdb -U postgres cinetra_push_test_20261110
         export DATABASE_URL=postgresql://postgres:status-test@127.0.0.1:55439/cinetra_push_test_20261110
         pnpm prisma migrate deploy
