@@ -26,8 +26,8 @@ of local implementation. Provider outages, missing identities, season numbering
 conflicts, incomplete canonical lists and checkpoint conflicts require review or
 a later retry, with current status preserved.
 
-Only after the user approves the preview may a separate authorized operation set
-the flag to `true`. Then all historical Watching and Completed rows (including the
+Only after the user approves the preview may a separate authorized release remove
+the Dockerfile startup pin and set the runtime flag to `true`. Then all historical Watching and Completed rows (including the
 legacy completed flag) are eligible regardless of their completion/watch dates.
 Proposals are reevaluated with current provider evidence and watch coverage at
 execution time; a preview is not a frozen write plan. Turning the flag off stops
@@ -51,7 +51,9 @@ It stubs TMDB and TVMaze, exercising real tracking, HTTP authentication, databas
 transactions, historical gaps, legacy-only completion, EpisodeUnwatch exceptions,
 manual edits, concurrent changes, disabled writes and read-only preview behavior.
 
-The release workflow sets and verifies the runtime flag as `false` before deployment.
+The preview image pins the runtime flag to `false` at Node startup; the release
+workflow verifies the exact live value after deployment without modifying Coolify
+environment settings (the deployment token has deploy-only access).
 The live health response exposes `showStatus.automaticWritesEnabled: false` and
 `showStatus.running: false`; disabled episode reconciliation returns immediately,
 and the writer independently refuses writes. Web Push uses its existing scheduler.

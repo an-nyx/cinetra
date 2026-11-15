@@ -76,7 +76,7 @@ export async function reconcileAfterAction(showId: string, userId: string) {
 
 export type MonitorReport = { startedAt: string; checked: number; reopened: number; completed: number; unchanged: number; unavailable: number; durationMs: number };
 let monitorStatus: { running: boolean; intervalMinutes: number | null; lastRun: MonitorReport | null; lastError: string | null } = { running: false, intervalMinutes: null, lastRun: null, lastError: null };
-export const showStatusMonitorStatus = () => ({ ...structuredClone(monitorStatus), automaticWritesEnabled: automaticStatusWritesEnabled() });
+export const showStatusMonitorStatus = () => ({ ...structuredClone(monitorStatus), automaticWritesEnabled: automaticStatusWritesEnabled(), automaticWritesConfigured: process.env.TV_STATUS_RECONCILIATION_ENABLED ?? null });
 
 /** All managed shows are reevaluated regardless of watch or completion dates. Writes require activation. */
 export async function runShowStatusMonitor(now = new Date()): Promise<MonitorReport> {

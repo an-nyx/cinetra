@@ -13,6 +13,7 @@ jobs:
 
     - name: Deploy status review with automatic writes disabled
       env:
+        CINETRA_URL: https://cinetra.aniskh.com
         COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
         COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
         COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
