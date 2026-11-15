@@ -20,6 +20,13 @@ const catalogCache = new SWRCache<Catalog>({ freshMs: 60 * 60_000, staleMs: 24 *
 // Upcoming per user: fresh for 5 minutes, then served stale (up to 6 hours) while it rebuilds in the background.
 const upcomingCache = new SWRCache<UpcomingResponse>({ freshMs: 5 * 60_000, staleMs: 6 * 60 * 60_000, retryMs: 60_000, maxEntries: 200 });
 
+/** Preserve a manual completion assertion before the first tracking record can erase its provenance. */
+export async function protectUnrecordedCompletion(tx: Pick<typeof prisma, 'show' | 'episodeWatch' | 'episodeUnwatch'>, show: ShowRow) {
+  if (show.statusAutomationProtected || (show.status || (show.completed ? 'completed' : null)) !== 'completed' || show.seasonsWatched !== 0 || show.episodesWatched !== 0) return;
+  const [watches, unwatches] = await Promise.all([tx.episodeWatch.count({ where: { showId: show.id, season: { gt: 0 }, episode: { gt: 0 } } }), tx.episodeUnwatch.count({ where: { showId: show.id, season: { gt: 0 }, episode: { gt: 0 } } })]);
+  if (!watches && !unwatches) await tx.show.update({ where: { id: show.id }, data: { statusAutomationProtected: true } });
+}
+
 export class EpisodeGuideError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -303,6 +310,7 @@ export async function setEpisodeWatched(showId: string, userId: string, season: 
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
     const show = await tx.show.findFirst({ where: { id: showId, userId } });
     if (!show) throw new EpisodeGuideError(404, 'Show not found');
+    await protectUnrecordedCompletion(tx, show);
     const [explicit, unwatch] = await Promise.all([
       tx.episodeWatch.findUnique({ where: { showId_season_episode: { showId, season, episode } } }),
       tx.episodeUnwatch.findUnique({ where: { showId_season_episode: { showId, season, episode } } }),
@@ -329,6 +337,7 @@ export async function setSeasonWatched(showId: string, userId: string, season: n
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
     const show = await tx.show.findFirst({ where: { id: showId, userId } });
     if (!show) throw new EpisodeGuideError(404, 'Show not found');
+    await protectUnrecordedCompletion(tx, show);
     const [watches, unwatches] = await Promise.all([tx.episodeWatch.findMany({ where: { showId } }), tx.episodeUnwatch.findMany({ where: { showId, season } })]);
     const merged = mergeShowEpisodes(show, catalog, watches, today(), unwatches).episodes;
     const aired = merged.filter(e => e.season === season && e.number > 0 && !!e.airDate && e.airDate <= today() && !e.watched);

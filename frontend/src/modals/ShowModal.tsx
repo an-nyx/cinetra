@@ -100,7 +100,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
     catch { setError('Could not load this season.'); }
     finally { setBusy(false); }
   };
-  const updateStatus = async (status: NonNullable<ShowType['status']>) => {
+  const updateStatus = async (status: 'watching' | 'completed' | 'dropped') => {
     if (!selectedShow) return;
     setStatusNotice(null);
     await act(async () => {

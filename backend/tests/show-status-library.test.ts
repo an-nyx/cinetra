@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { libraryStatusTarget, libraryWritesEnabled } from '../src/services/show-status-library.model';
+const show={id:'outside-old-six',userId:'any-account',tmdbId:123,tvmazeId:null,completed:false};
+for(const status of ['watching','completed'])assert.ok(libraryStatusTarget({...show,status}));
+assert.equal(libraryStatusTarget({...show,status:'dropped',completed:true}),null);
+assert.equal(libraryStatusTarget({...show,status:null}),null);
+assert.equal(libraryStatusTarget({...show,status:'watching',tmdbId:null}),null);
+delete process.env.TV_STATUS_RECONCILIATION_MODE;
+process.env.TV_STATUS_RECONCILIATION_ENABLED='true';assert.equal(libraryWritesEnabled(),false,'old scoped activation settings cannot activate full-library writes');
+process.env.TV_STATUS_RECONCILIATION_MODE='full-library';process.env.TV_STATUS_RECONCILIATION_ENABLED='false';assert.equal(libraryWritesEnabled(),false);
+console.log('Full-library eligibility and activation gate tests passed');

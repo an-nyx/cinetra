@@ -1,3 +1,4 @@
+import { protectUnrecordedCompletion } from '../../../services/episode-guide.service';
 import { ShowRepository } from "../model/show.repository";
 import { Show, CreateShowDto, UpdateShowDto } from "../model/show.entity";
 import { prisma } from '../../../database/prisma';
@@ -58,6 +59,7 @@ export class ShowPrismaRepository implements ShowRepository {
       if (showData.seasonsWatched !== undefined || showData.episodesWatched !== undefined) {
         await tx.episodeWatch.updateMany({ where: { showId }, data: { checkpointBeforeSeason: null, checkpointBeforeEpisode: null, checkpointAfterSeason: null, checkpointAfterEpisode: null } });
       }
+      await protectUnrecordedCompletion(tx, result);
       return result;
     });
 

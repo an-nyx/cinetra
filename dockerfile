@@ -35,8 +35,9 @@ RUN pnpm build
 
 COPY --from=frontend-builder /frontend/dist ./dist/ui
 
-# Default off. Runtime activation also requires an explicit account/show/provider scope.
+# Review only by default. Full-library writes require separate explicit activation.
 ENV TV_STATUS_RECONCILIATION_ENABLED=false
+ENV TV_STATUS_RECONCILIATION_MODE=review
 
 # Apply pending Prisma migrations before starting (replaces the compose "migrate" service).
 CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]

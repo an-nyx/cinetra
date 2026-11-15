@@ -13,12 +13,11 @@ const label = (status: string | null) => status === "completed" ? "Completed" : 
 export default function ShowStatusPreview() {
   const [dates, setDates] = useState<Record<string, string>>({});
   const [baselines, setBaselines] = useState<Record<string, string>>({});
-  const [enrolledCount, setEnrolledCount] = useState(0);
   const [writesEnabled, setWritesEnabled] = useState<boolean | null>(null);
   const [state, setState] = useState<{ loading: boolean; rows: StatusPreviewRow[] | null; error: string | null }>({ loading: false, rows: null, error: null });
   const load = async (confirmed = baselines) => {
     setState({ loading: true, rows: null, error: null });
-    try { const result = await ShowService.getStatusPreview(confirmed); setWritesEnabled(result.automaticWritesEnabled); setEnrolledCount(result.automationEnrolledCount ?? 0); setState({ loading: false, rows: result.shows, error: null }); }
+    try { const result = await ShowService.getStatusPreview(confirmed); setWritesEnabled(result.automaticWritesEnabled); setState({ loading: false, rows: result.shows, error: null }); }
     catch { setState({ loading: false, rows: null, error: "The preview is unavailable right now." }); }
   };
   const rows = state.rows || [];
@@ -55,9 +54,9 @@ export default function ShowStatusPreview() {
         <div className="flex items-center gap-2"><ListChecks className="size-4 text-primary" aria-hidden="true" /><h3 id="status-preview-title" className="text-sm font-semibold">Automatic TV statuses</h3></div>
         <Button type="button" variant="ghost" size="sm" disabled={state.loading} onClick={() => void load()} className="gap-1.5">{state.loading && <Loader2 className="size-4 animate-spin" />}{state.rows ? "Refresh" : "Review"}</Button>
       </div>
-      <p className="text-xs text-muted-foreground">Proposed corrections use verified episodes and effective watch coverage. Legacy Completed shows without regular tracking are protected; unrecorded viewing does not mean unwatched. Proposals awaiting activation require approval. Dropped, Paused and Planned are never changed. This review only reads your library.</p>
+      <p className="text-xs text-muted-foreground">Proposed corrections use verified episodes and effective watch coverage. Legacy Completed shows without regular tracking are protected; unrecorded viewing does not mean unwatched. Proposals awaiting activation require approval. Dropped is never changed. This review only reads your library.</p>
       {writesEnabled === false && <p role="status" className="text-xs font-medium">Automatic status changes are disabled. Reviewing does not change your library.</p>}
-      {writesEnabled === true && <p role="status" className="text-xs font-medium">Automatic status changes are enabled for {enrolledCount} approved shows in your library. Other shows remain outside automation. This review only reads your library.</p>}
+      {writesEnabled === true && <p role="status" className="text-xs font-medium">Automatic status changes are enabled for eligible Watching and Completed shows. Legacy manual completions remain protected. This review only reads your library.</p>}
       {state.error && <p role="status" className="text-xs text-destructive">{state.error}</p>}
       {state.rows && <div className="space-y-3 text-xs">
         <div><p className="font-medium">Will change automatically ({automatic.length})</p>{automatic.length ? list(automatic, r => `${label(r.status)} → ${label(r.automatic!.to)} (${r.automatic!.reason})`) : <p className="text-muted-foreground">Nothing right now.</p>}</div>

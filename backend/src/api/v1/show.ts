@@ -1,5 +1,3 @@
-import { applyStatusActivation, prepareStatusActivation, StatusActivationConflict } from '../../services/show-status-activation.service';
-import { scopeDigest, statusScope } from '../../services/show-status-scope.model';
 import { Router, Request, Response } from "express";
 import { showModule } from '../../modules/show';
 import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.entity';
@@ -48,26 +46,12 @@ router.get("/search", async (req: Request, res: Response) => {
 
 /** Read-only: how automatic Watching/Completed statuses see each of your shows. Changes nothing. */
 router.get("/status-preview", async (req: Request, res: Response) => {
-  try { res.setHeader('Cache-Control', 'no-store'); res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), automationEnrolledCount: statusScope()?.userId === req.user.id ? statusScope()!.targets.length : 0, generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
+  try { res.setHeader('Cache-Control', 'no-store'); res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), automationMode: 'full-library', generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
   catch (error) { console.error('Status preview failed:', error instanceof Error ? error.name : 'unknown error'); res.status(500).json({ message: 'Status preview unavailable' }); }
 });
 
-/** Fresh, read-only preflight. The approved account and deployment-held manifest define the scope. */
-router.get('/status-activation', async (req: Request, res: Response) => {
-  if (statusScope()?.userId !== req.user.id) { res.sendStatus(403); return; }
-  try {
-    const digest = scopeDigest()!;
-    const result = await prepareStatusActivation(req.user.id, digest);
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ approvalSha256: digest, alreadyApplied: result.alreadyApplied, shows: result.rows.map((s,i) => ({ id: s.id, name: s.name, status: s.status, released: result.evaluations[i]?.released, watched: result.evaluations[i]?.watched, unwatched: result.evaluations[i]?.unwatched })) });
-  } catch (error) { res.status(error instanceof StatusActivationConflict ? 409 : 503).json({ message: error instanceof StatusActivationConflict ? error.message : 'Fresh activation verification unavailable' }); }
-});
-router.post('/status-activation', async (req: Request, res: Response) => {
-  if (statusScope()?.userId !== req.user.id) { res.sendStatus(403); return; }
-  if (typeof req.body?.approvalSha256 !== 'string') { res.sendStatus(400); return; }
-  try { res.setHeader('Cache-Control', 'no-store'); res.json(await applyStatusActivation(req.user.id, req.body.approvalSha256)); invalidateUpcoming(req.user.id); }
-  catch (error) { res.status(error instanceof StatusActivationConflict ? 409 : 503).json({ message: error instanceof StatusActivationConflict ? error.message : 'Fresh activation verification unavailable; no batch committed' }); }
-});
+// The old six-show correction operation is retired; manually corrected statuses are never replayed.
+router.all('/status-activation', (_req, res) => { res.status(410).json({ message: 'Six-show activation retired. Use the read-only full-library review.' }); });
 
 /** Optional user-confirmed baselines affect this read-only preview only; nothing is persisted. */
 router.post('/status-preview', async (req: Request, res: Response) => {
@@ -80,7 +64,7 @@ router.post('/status-preview', async (req: Request, res: Response) => {
   }
   try {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), automationEnrolledCount: statusScope()?.userId === req.user.id ? statusScope()!.targets.length : 0, generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id, new Date(), baselines) });
+    res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), automationMode: 'full-library', generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id, new Date(), baselines) });
   } catch { res.status(500).json({ message: 'Status preview unavailable' }); }
 });
 
@@ -189,7 +173,7 @@ router.put("/:id", async (req: Request<{id: string}, {}, UpdateShowDto>, res: Re
     const value = showData[key as 'seasonsWatched' | 'episodesWatched'];
     return value !== undefined && (!Number.isInteger(value) || value < 0);
   }) || showData.tmdbId !== undefined && (!Number.isInteger(showData.tmdbId) || showData.tmdbId <= 0) ||
-    showData.status !== undefined && showData.status !== null && !['watching', 'completed', 'planned', 'paused', 'dropped'].includes(showData.status)) {
+    showData.status !== undefined && showData.status !== null && !['watching', 'completed', 'dropped'].includes(showData.status)) {
     res.status(400).json({ message: 'Invalid show update' }); return;
   }
   const allowed: UpdateShowDto = {
