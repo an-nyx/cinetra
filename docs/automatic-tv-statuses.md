@@ -100,7 +100,7 @@ the account-scoped batch endpoint. Production also pins the exact approved manif
 fingerprint in code, so a different scope fails closed. `GET /api/v1/show/status-activation` performs a fresh read-only preflight.
 `POST` with its `approvalSha256` rechecks all six, locks all rows, compares approved
 revisions/checkpoints/history, and atomically updates status fields only. Any conflict
-aborts the entire batch. A repeated completed batch writes nothing. No baseline is
+aborts the entire batch. An already-Watching enrolled row is reverified and preserved without a write; the remaining approved corrections are still atomic. A repeated completed batch writes nothing. No baseline is
 saved, and there is no general-purpose status reconciliation write endpoint.
 
 Routine pushes preserve an already active approved scope; they cannot replace it silently.

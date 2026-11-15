@@ -24,13 +24,16 @@ export async function prepareStatusActivation(userId: string, digest: string) {
     if (show.seasonsWatched !== initial.seasonsWatched || show.episodesWatched !== initial.episodesWatched || historyDigest(watches, unwatches) !== initial.historySha256) throw new StatusActivationConflict('Reviewed viewing history changed; refresh the approval plan');
   }
   if (rows.every(s => s.status === 'watching' && !s.completed)) return { alreadyApplied: true as const, rows, evaluations: [] };
-  if (rows.some(s => !matchesInitial(s))) throw new StatusActivationConflict('Reviewed show revision or status changed; no rows updated');
+  if (rows.some(s => !(s.status === 'watching' && !s.completed) && !matchesInitial(s))) throw new StatusActivationConflict('Reviewed show revision or status changed; no rows updated');
   const evaluations = [];
   for (const show of rows) {
     const evaluation = await evaluateShow(show, { fresh: true });
     const target = scopedTarget(show)!;
     const initial = target.initial!;
-    if (!evaluation?.fresh || evaluation.evidenceIssue || evaluation.legacyCompletion || evaluation.resolvedTvmazeId !== target.tvmazeId || evaluation.transition?.from !== 'completed' || evaluation.transition?.to !== 'watching' || evaluation.released !== initial.released || evaluation.watched !== initial.watched || stableJSON(evaluation.unwatched) !== stableJSON(initial.unwatched)) throw new StatusActivationConflict(`Fresh episode verification changed for ${show.name}; no rows updated`);
+    const correctDirection = show.status === 'watching' && !show.completed
+      ? evaluation?.reopen.reopen === true
+      : evaluation?.transition?.from === 'completed' && evaluation.transition.to === 'watching';
+    if (!evaluation?.fresh || !correctDirection || evaluation.evidenceIssue || evaluation.legacyCompletion || evaluation.resolvedTvmazeId !== target.tvmazeId || evaluation.released !== initial.released || evaluation.watched !== initial.watched || stableJSON(evaluation.unwatched) !== stableJSON(initial.unwatched)) throw new StatusActivationConflict(`Fresh episode verification changed for ${show.name}; no rows updated`);
     evaluations.push(evaluation);
   }
   return { alreadyApplied: false as const, rows, evaluations };
@@ -51,12 +54,13 @@ export async function applyStatusActivation(userId: string, digest: string) {
       const show = await tx.show.findFirst({ where: { id: evaluated.id, userId } });
       const target = show && scopedTarget(show);
       const [watches, unwatches] = await Promise.all([tx.episodeWatch.findMany({ where: { showId: evaluated.id } }), tx.episodeUnwatch.findMany({ where: { showId: evaluated.id } })]);
-      if (!show || !target || !matchesInitial(show) || show.seasonsWatched !== target.initial!.seasonsWatched || show.episodesWatched !== target.initial!.episodesWatched || historyDigest(watches, unwatches) !== target.initial!.historySha256 || Date.now() - prepared.evaluations[i].evaluatedAt > 120_000) throw new StatusActivationConflict('Concurrent change detected; entire batch rolled back');
+      if (!show || !target || show.status !== evaluated.status || show.completed !== evaluated.completed || show.updatedAt.getTime() !== evaluated.updatedAt.getTime() || (show.completedMonitorFrom?.getTime() ?? null) !== (evaluated.completedMonitorFrom?.getTime() ?? null) || show.seasonsWatched !== target.initial!.seasonsWatched || show.episodesWatched !== target.initial!.episodesWatched || historyDigest(watches, unwatches) !== target.initial!.historySha256 || Date.now() - prepared.evaluations[i].evaluatedAt > 120_000) throw new StatusActivationConflict('Concurrent change detected; entire batch rolled back');
     }
     for (const show of prepared.rows) {
+      if (show.status === 'watching' && !show.completed) continue;
       const result = await tx.show.updateMany({ where: { id: show.id, userId, updatedAt: show.updatedAt, status: show.status, completed: show.completed }, data: { status: 'watching', completed: false, completedMonitorFrom: null } });
       if (result.count !== 1) throw new StatusActivationConflict('Concurrent status edit; entire batch rolled back');
     }
-    return { updated: 6, alreadyApplied: false, verifiedAt: now.toISOString(), shows: prepared.rows.map(s => ({ id: s.id, name: s.name, from: 'completed', status: 'watching' })) };
+    return { updated: prepared.rows.filter(s => s.status === 'completed').length, alreadyWatching: prepared.rows.filter(s => s.status === 'watching').length, alreadyApplied: false, verifiedAt: now.toISOString(), shows: prepared.rows.map(s => ({ id: s.id, name: s.name, from: s.status, status: 'watching', unchanged: s.status === 'watching' })) };
   }, { timeout: 15000 });
 }

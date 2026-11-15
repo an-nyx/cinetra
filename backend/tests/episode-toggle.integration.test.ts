@@ -376,6 +376,7 @@ async function main() {
   process.env.TV_STATUS_RECONCILIATION_SCOPE = JSON.stringify({ userId: user.id, targets: approved.map(s => ({ showId: s.id, tmdbId: s.tmdbId, tvmazeId: 10000 + s.tmdbId!, initial: initialFor(s) })), excludedShowIds: protectedShows.map(s => s.id) });
   const digest = scopeDigest()!;
   const activate = () => call('POST', '/show/status-activation', { approvalSha256: digest });
+  await prisma.show.update({ where: { id: approved[0].id }, data: { status: 'watching', completed: false, completedMonitorFrom: null } });
   const beforeBatch = JSON.stringify(await prisma.show.findMany({ where: { id: { in: approved.map(s => s.id) } }, orderBy: { id: 'asc' } }));
   assert.equal((await call('POST', '/show/status-activation', { approvalSha256: digest }, other.id)).status, 403);
   assert.equal((await call('POST', '/show/status-activation', { approvalSha256: 'wrong' })).status, 409);
@@ -386,7 +387,7 @@ async function main() {
   metadata.seasons[0].episode_count = 4;
   assert.equal((await activate()).status, 409, 'fresh incomplete metadata aborts all six even with older usable caches');
   metadata.seasons[0].episode_count = 3;
-  const lastId = approved.map(s => s.id).sort().at(-1)!;
+  const lastId = approved.filter(s => s.id !== approved[0].id).map(s => s.id).sort().at(-1)!;
   await prisma.$executeRawUnsafe(`CREATE FUNCTION reject_test_status() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id = '${lastId}' AND NEW.status = 'watching' THEN RAISE EXCEPTION 'test rollback'; END IF; RETURN NEW; END $$`);
   await prisma.$executeRawUnsafe('CREATE TRIGGER reject_test_status BEFORE UPDATE ON "Show" FOR EACH ROW EXECUTE FUNCTION reject_test_status()');
   assert.equal((await activate()).status, 503, 'failure after earlier updates rolls back the complete transaction');
@@ -395,7 +396,7 @@ async function main() {
   assert.equal(JSON.stringify(await prisma.show.findMany({ where: { id: { in: approved.map(s => s.id) } }, orderBy: { id: 'asc' } })), beforeBatch, 'every failed batch leaves all six rows untouched');
   const allHistoryBefore = JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ orderBy: { id: 'asc' } })]));
   const result = await activate();
-  assert.deepEqual([result.status, result.json.updated], [200, 6]);
+  assert.deepEqual([result.status, result.json.updated, result.json.alreadyWatching], [200, 5, 1], 'already-correct row remains a no-op while the other five update atomically');
   for (const s of approved) assert.equal((await row(s.id)).status, 'watching');
   assert.equal((await activate()).json.updated, 0, 'repeating activation writes nothing');
   assert.equal(JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ orderBy: { id: 'asc' } })])), allHistoryBefore);
