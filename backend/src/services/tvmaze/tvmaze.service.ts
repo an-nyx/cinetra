@@ -43,7 +43,7 @@ const identityCache = new SWRCache<IdentityResult>({ freshMs: 3 * 24 * 60 * 60_0
 /** Shows whose latest refresh failed and are being served from an older copy. */
 const failedRefresh = new Map<number, number>();
 
-async function loadSchedule(tvmazeId: number): Promise<CachedSchedule> {
+async function loadSchedule(tvmazeId: number, trackCacheFailure = true): Promise<CachedSchedule> {
   try {
     // Show and episodes in one request. Specials are excluded by default.
     const response = await throttled(() => client.get<TVMazeShow & { _embedded?: { episodes?: TVMazeEpisode[] } }>(`/shows/${tvmazeId}`, { params: { embed: 'episodes' } }));
@@ -53,18 +53,18 @@ async function loadSchedule(tvmazeId: number): Promise<CachedSchedule> {
     const episodes = (_embedded?.episodes || []).map(e => !e.airdate || e.airdate >= keepFrom
       ? { id: e.id, season: e.season, number: e.number, type: e.type, name: e.name, airdate: e.airdate, airtime: e.airtime, airstamp: e.airstamp, runtime: e.runtime }
       : { id: e.id, season: e.season, number: e.number, type: e.type, airdate: e.airdate });
-    failedRefresh.delete(tvmazeId);
+    if (trackCacheFailure) failedRefresh.delete(tvmazeId);
     return {
       show: { id: show.id, name: show.name, premiered: show.premiered, status: show.status, updated: show.updated, externals: show.externals, network: channel(show.network), webChannel: channel(show.webChannel) },
       episodes, fetchedAt: Date.now(),
     };
-  } catch (error) { failedRefresh.set(tvmazeId, Date.now()); throw error; }
+  } catch (error) { if (trackCacheFailure) failedRefresh.set(tvmazeId, Date.now()); throw error; }
 }
 
 /** Cached show + episode list. Rejects only when TVMaze fails and no earlier copy exists. */
-export async function getSchedule(tvmazeId: number): Promise<CachedSchedule & { stale: boolean }> {
-  const value = await scheduleCache.get(String(tvmazeId), () => loadSchedule(tvmazeId));
-  return { ...value, stale: failedRefresh.has(tvmazeId) };
+export async function getSchedule(tvmazeId: number, fresh = false): Promise<CachedSchedule & { stale: boolean }> {
+  const value = fresh ? await loadSchedule(tvmazeId, false) : await scheduleCache.get(String(tvmazeId), () => loadSchedule(tvmazeId));
+  return { ...value, stale: !fresh && failedRefresh.has(tvmazeId) };
 }
 
 let lastUpdatesCheck = 0;
@@ -114,15 +114,15 @@ async function lookupId(kind: 'thetvdb' | 'imdb', value: string | number): Promi
 export type IdentityInput = { tmdbId: number; externalIds: () => Promise<TMDBExternalIds>; evidence: () => Promise<TitleEvidence> };
 
 /** Resolve a TMDB series to a TVMaze show: external IDs first, then the strict title fallback. Cached per TMDB ID. */
-export function resolveIdentity(input: IdentityInput): Promise<IdentityResult> {
-  return identityCache.get(`tmdb:${input.tmdbId}`, async () => {
+export function resolveIdentity(input: IdentityInput, fresh = false): Promise<IdentityResult> {
+  const loadIdentity = async (): Promise<IdentityResult> => {
     const ext = await input.externalIds();
     let id: number | null = null;
     if (ext.tvdbId) id = await lookupId('thetvdb', ext.tvdbId);
     if (!id && ext.imdbId) id = await lookupId('imdb', ext.imdbId);
     if (id) {
       // The lookup's record (with its own externals) is the episode list we need anyway.
-      const { show } = await getSchedule(id);
+      const { show } = await getSchedule(id, fresh);
       return decideExternalIdentity(ext, [show])!;
     }
     const evidence = await input.evidence();
@@ -130,7 +130,8 @@ export function resolveIdentity(input: IdentityInput): Promise<IdentityResult> {
     if (!query) return { status: 'unresolved', reason: 'not_on_tvmaze' };
     const response = await throttled(() => client.get<Array<{ show: TVMazeShow }>>('/search/shows', { params: { q: query } }));
     return chooseTitleCorroboratedMatch(evidence, (response.data || []).map(result => result.show), ext);
-  });
+  };
+  return fresh ? loadIdentity() : identityCache.get(`tmdb:${input.tmdbId}`, loadIdentity);
 }
 
 /** Tests only: forget cached identities and schedules so changed provider data is read again. */

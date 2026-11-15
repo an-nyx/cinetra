@@ -6,6 +6,7 @@
  * `completed` flag and the completion boundary). They never touch episodes, the saved position, ratings, favorites
  * or anything else, and a show whose status changed in the meantime is left alone.
  */
+import { statusScope, scopedTarget, scopeDigest } from './show-status-scope.model';
 import { prisma } from '../database/prisma';
 import { mapLimit } from './swr-cache';
 import { resolveShowIdentity, trackingState, type ShowRow } from './episode-guide.service';
@@ -14,29 +15,30 @@ import { scheduleTimeZone } from './notifications/episode-alerts.model';
 import { hasRegularTracking, verifiedPremieresAfterBaseline, verifiedPremiereAfterBaseline, verifiedCoverage, verifiedUnwatchedPremiere, decideStatus, effectiveStatus, isManaged, verifyCompletion, type CompletionCheck, type ReopenCheck, type StatusTransition, type TVMazeEvidence } from './show-status.model';
 
 /** TVMaze evidence for a show, through the same verified identity and cached schedules as Upcoming and notifications. */
-export async function tvmazeEvidence(show: { name: string; overview: string | null; tmdbId: number | null; tvmazeId: number | null }): Promise<TVMazeEvidence> {
+export async function tvmazeEvidence(show: { name: string; overview: string | null; tmdbId: number | null; tvmazeId: number | null }, fresh = false): Promise<TVMazeEvidence> {
   if (!show.tmdbId) return { kind: 'unavailable' };
   try {
-    const identity = await resolveShowIdentity(show.tmdbId, show);
+    const identity = await resolveShowIdentity(show.tmdbId, show, fresh);
     if (identity.status !== 'verified') return identity.reason === 'not_on_tvmaze' ? { kind: 'not_listed' } : { kind: 'unavailable' };
     if (show.tvmazeId && show.tvmazeId !== identity.tvmazeId) return { kind: 'unavailable' };   // contradictory links
-    const schedule = await getSchedule(identity.tvmazeId);
-    return { kind: 'verified', episodes: schedule.episodes, timeZone: scheduleTimeZone(schedule.show) };
+    const schedule = await getSchedule(identity.tvmazeId, fresh);
+    if (schedule.stale) return { kind: 'unavailable' };
+    return { kind: 'verified', tvmazeId: identity.tvmazeId, episodes: schedule.episodes, timeZone: scheduleTimeZone(schedule.show) };
   } catch { return { kind: 'unavailable' }; }
 }
 
-export const automaticStatusWritesEnabled = () => process.env.TV_STATUS_RECONCILIATION_ENABLED === 'true';
+export const automaticStatusWritesEnabled = () => process.env.TV_STATUS_RECONCILIATION_ENABLED === 'true' && statusScope() !== null;
 const recordKeys = (rows: { season: number; episode: number }[]) => rows.map(e => `${e.season}:${e.episode}`).sort().join(',');
 export type LegacyCompletionReview = { legacyCompletion: boolean; confirmationRequired: boolean; completionBaseline: string | null; explanation: string };
-export type Evaluation = LegacyCompletionReview & { released: number; watched: number | null; unwatched: string[]; evidenceIssue: string | null; watches: string; unwatches: string; status: string | null; completion: CompletionCheck; reopen: ReopenCheck; transition: StatusTransition | null };
+export type Evaluation = LegacyCompletionReview & { fresh: boolean; evaluatedAt: number; resolvedTvmazeId: number | null; released: number; watched: number | null; unwatched: string[]; evidenceIssue: string | null; watches: string; unwatches: string; status: string | null; completion: CompletionCheck; reopen: ReopenCheck; transition: StatusTransition | null };
 /** Evaluate one show without writing anything. Null when TMDB episode data cannot be loaded. */
-export async function evaluateShow(show: ShowRow, options: { now?: Date; confirmedCompletionBaseline?: Date } = {}): Promise<Evaluation | null> {
+export async function evaluateShow(show: ShowRow, options: { now?: Date; fresh?: boolean; confirmedCompletionBaseline?: Date } = {}): Promise<Evaluation | null> {
   const now = options.now ?? new Date();
   const status = effectiveStatus(show);
   if (!isManaged(status) || !show.tmdbId) return null;
   let state: Awaited<ReturnType<typeof trackingState>>;
-  try { state = await trackingState(show); } catch { return null; }
-  const tvmaze = await tvmazeEvidence(show);
+  try { state = await trackingState(show, options.fresh); } catch { return null; }
+  const tvmaze = await tvmazeEvidence(show, options.fresh);
   const catalog = { seasons: state.catalog.seasons, nextEpisode: state.catalog.meta?.nextEpisode ?? null };
   const completion = verifyCompletion({ episodes: state.episodes, catalog, progressReliable: state.progress.progressReliable, tvmaze, today: state.today, now });
   const coverage = verifiedCoverage({ episodes: state.episodes, tvmaze, today: state.today, now });
@@ -56,12 +58,13 @@ export async function evaluateShow(show: ShowRow, options: { now?: Date; confirm
   const relevantGaps = legacyCompletion
     ? baseline ? verifiedPremieresAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline }).episodes : []
     : coverage.released.filter(e => !e.watched);
-  return { legacyCompletion, confirmationRequired, completionBaseline: legacyCompletion && baseline ? baseline.toISOString() : null, explanation, released: coverage.released.length, watched: legacyCompletion ? null : coverage.released.filter(e => e.watched).length, unwatched: relevantGaps.map(e => `S${e.season}E${e.number}`), evidenceIssue, watches: recordKeys(state.watches), unwatches: recordKeys(state.unwatches), status, completion, reopen, transition: evidenceIssue || confirmationRequired ? null : decideStatus({ status, completion, reopen }) };
+  return { fresh: options.fresh === true, evaluatedAt: Date.now(), resolvedTvmazeId: tvmaze.kind === 'verified' ? tvmaze.tvmazeId ?? null : null, legacyCompletion, confirmationRequired, completionBaseline: legacyCompletion && baseline ? baseline.toISOString() : null, explanation, released: coverage.released.length, watched: legacyCompletion ? null : coverage.released.filter(e => e.watched).length, unwatched: relevantGaps.map(e => `S${e.season}E${e.number}`), evidenceIssue, watches: recordKeys(state.watches), unwatches: recordKeys(state.unwatches), status, completion, reopen, transition: evidenceIssue || confirmationRequired ? null : decideStatus({ status, completion, reopen }) };
 }
 
 /** Compare-and-set: only when the status fields are still exactly what was evaluated. True when a row changed. */
 export async function applyTransition(show: ShowRow, transition: StatusTransition, now = new Date(), evidence?: Evaluation) {
-  if (!automaticStatusWritesEnabled() || !evidence) return false;
+  const target = scopedTarget(show);
+  if (!automaticStatusWritesEnabled() || !target || !evidence?.fresh || evidence.legacyCompletion || evidence.evidenceIssue || evidence.resolvedTvmazeId !== target.tvmazeId || Date.now() - evidence.evaluatedAt > 120_000 || evidence.transition?.from !== transition.from || evidence.transition?.to !== transition.to) return false;
   return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${show.id} AND "userId" = ${show.userId} FOR UPDATE`;
     const [watches, unwatches] = await Promise.all([tx.episodeWatch.findMany({ where: { showId: show.id } }), tx.episodeUnwatch.findMany({ where: { showId: show.id } })]);
@@ -76,8 +79,8 @@ export async function reconcileAfterAction(showId: string, userId: string) {
   if (!automaticStatusWritesEnabled()) return null;
   try {
     const show = await prisma.show.findFirst({ where: { id: showId, userId } });
-    if (!show) return null;
-    const evaluation = await evaluateShow(show);
+    if (!show || !scopedTarget(show)) return null;
+    const evaluation = await evaluateShow(show, { fresh: true });
     if (!evaluation?.transition) return null;
     return (await applyTransition(show, evaluation.transition, new Date(), evaluation)) ? evaluation.transition : null;
   } catch (error) {
@@ -88,7 +91,7 @@ export async function reconcileAfterAction(showId: string, userId: string) {
 
 export type MonitorReport = { startedAt: string; checked: number; reopened: number; completed: number; unchanged: number; unavailable: number; durationMs: number };
 let monitorStatus: { running: boolean; intervalMinutes: number | null; lastRun: MonitorReport | null; lastError: string | null } = { running: false, intervalMinutes: null, lastRun: null, lastError: null };
-export const showStatusMonitorStatus = () => ({ ...structuredClone(monitorStatus), automaticWritesEnabled: automaticStatusWritesEnabled(), automaticWritesConfigured: process.env.TV_STATUS_RECONCILIATION_ENABLED ?? null });
+export const showStatusMonitorStatus = () => ({ ...structuredClone(monitorStatus), automaticWritesEnabled: automaticStatusWritesEnabled(), automaticWritesConfigured: process.env.TV_STATUS_RECONCILIATION_ENABLED ?? null, scopedShows: statusScope()?.targets.length ?? 0, scopeSha256: scopeDigest(), activationBatchEnabled: process.env.TV_STATUS_ACTIVATION_BATCH_ENABLED === 'true' && !automaticStatusWritesEnabled() && statusScope() !== null });
 
 /** All managed shows are reevaluated regardless of watch or completion dates. Writes require activation. */
 export async function runShowStatusMonitor(now = new Date()): Promise<MonitorReport> {
@@ -96,11 +99,12 @@ export async function runShowStatusMonitor(now = new Date()): Promise<MonitorRep
   const report: MonitorReport = { startedAt: now.toISOString(), checked: 0, reopened: 0, completed: 0, unchanged: 0, unavailable: 0, durationMs: 0 };
   if (!automaticStatusWritesEnabled()) return report;
   const shows = await prisma.show.findMany({
-    where: { tmdbId: { not: null }, OR: [{ status: 'completed' }, { status: null, completed: true }, { status: 'watching' }] },
+    where: { userId: statusScope()!.userId, id: { in: statusScope()!.targets.map(t => t.showId) }, tmdbId: { not: null }, OR: [{ status: 'completed' }, { status: null, completed: true }, { status: 'watching' }] },
   });
   await mapLimit(shows, 3, async show => {
+    if (!scopedTarget(show)) return;
     report.checked++;
-    const evaluation = await evaluateShow(show, { now });
+    const evaluation = await evaluateShow(show, { now, fresh: true });
     if (!evaluation) { report.unavailable++; return; }
     if (!evaluation.transition) { report.unchanged++; return; }
     if (!(await applyTransition(show, evaluation.transition, now, evaluation))) { report.unchanged++; return; }
@@ -164,7 +168,7 @@ export async function statusPreview(userId: string, now = new Date(), confirmedB
     const evaluation = await evaluateShow(show, { now, confirmedCompletionBaseline: confirmedBaselines[show.id] ? new Date(confirmedBaselines[show.id]) : undefined });
     if (!evaluation) return unavailable('TMDB episode data unavailable');
     const t = evaluation.transition;
-    const automatic = automaticStatusWritesEnabled() && !evaluation.legacyCompletion ? t : null;
+    const automatic = automaticStatusWritesEnabled() && !!scopedTarget(show) && !evaluation.legacyCompletion ? t : null;
     return {
       ...base, legacyCompletion: evaluation.legacyCompletion, confirmationRequired: evaluation.confirmationRequired, completionBaseline: evaluation.completionBaseline, explanation: evaluation.explanation + (evaluation.evidenceIssue ? ` Verification issue: ${evaluation.evidenceIssue}` : ''), released: evaluation.evidenceIssue ? null : evaluation.released, watched: evaluation.evidenceIssue ? null : evaluation.watched, unwatched: evaluation.unwatched, automatic, retroactive: t && !automatic ? t : null,
       completion: evaluation.legacyCompletion ? evaluation.explanation + (evaluation.evidenceIssue ? ` Verification issue: ${evaluation.evidenceIssue}` : '') : evaluation.evidenceIssue ?? (evaluation.completion.complete ? 'verified complete' : evaluation.completion.reason),

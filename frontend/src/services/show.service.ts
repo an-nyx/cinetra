@@ -160,7 +160,7 @@ class ShowServiceClass extends ApiService {
   }
 
   /** Read-only: how automatic Watching/Completed statuses see each show. Changes nothing. */
-  async getStatusPreview(confirmedCompletionBaselines: Record<string, string> = {}): Promise<{ automaticWritesEnabled: boolean; generatedAt: string; shows: StatusPreviewRow[] }> {
+  async getStatusPreview(confirmedCompletionBaselines: Record<string, string> = {}): Promise<{ automaticWritesEnabled: boolean; automationEnrolledCount: number; generatedAt: string; shows: StatusPreviewRow[] }> {
     return Object.keys(confirmedCompletionBaselines).length
       ? (await this.api.post('/show/status-preview', { confirmedCompletionBaselines }, { timeout: 120_000 })).data
       : (await this.api.get('/show/status-preview', { timeout: 120_000 })).data;

@@ -26,16 +26,18 @@ export class EpisodeGuideError extends Error {
 
 const validNumber = (value: unknown, minimum: number) => typeof value === 'number' && Number.isInteger(value) && value >= minimum;
 
-async function catalogFor(show: { name: string; tmdbId: number | null }): Promise<Catalog> {
+async function catalogFor(show: { name: string; tmdbId: number | null }, fresh = false): Promise<Catalog> {
   if (!show.tmdbId) throw new EpisodeGuideError(404, 'TMDB match required to load episode metadata');
   const tmdbId = show.tmdbId;
-  return catalogCache.get(`tmdb:${tmdbId}`, async () => {
-    const details = await tmdb.getShow(tmdbId);
+  const provider = fresh ? new TMDBApiService() : tmdb;
+  const loadCatalog = async () => {
+    const details = await provider.getShow(tmdbId);
     const numbers = (details.seasons || []).filter(s => s.season_number > 0).map(s => s.season_number);
     // A page that fails for a season that has not aired yet must not break released progress (see catalogFromTMDB).
-    const settled = await Promise.allSettled(numbers.map(n => tmdb.getSeason(tmdbId, n)));
+    const settled = await Promise.allSettled(numbers.map(n => provider.getSeason(tmdbId, n)));
     return catalogFromTMDB(details, settled.map((r, i) => ({ season: numbers[i], data: r.status === 'fulfilled' ? r.value : null })), today());
-  });
+  };
+  return fresh ? loadCatalog() : catalogCache.get(`tmdb:${tmdbId}`, loadCatalog);
 }
 
 /**
@@ -62,8 +64,8 @@ async function load(showId: string, userId: string) {
  * The merged per-episode watch state and progress verdict for one show, as every page sees it. Used by automatic
  * status management. Throws when TMDB episode data cannot be loaded (the caller then changes nothing).
  */
-export async function trackingState(show: ShowRow) {
-  const [catalog, watches, unwatches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(show.id)]);
+export async function trackingState(show: ShowRow, fresh = false) {
+  const [catalog, watches, unwatches] = await Promise.all([catalogFor(show, fresh), prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(show.id)]);
   const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today(), unwatches);
   const progress = calculateTrackingProgress(episodes, catalog, legacy.needsReview, toBroadcastStatus(catalog.broadcastStatus), catalog.inProduction, catalog.nextEpisodeAnnounced, today(), true);
   return { catalog, episodes, watches, unwatches, progress, today: today() };
@@ -137,15 +139,16 @@ const providerOf = (error: unknown): 'TMDB' | 'TVMaze' => axios.isAxiosError(err
  * TVMaze identity for a TMDB series (cached): TheTVDB/IMDb IDs TMDB lists first, then the strict title fallback.
  * Shared by Upcoming and new-episode notifications so both trust exactly the same matches.
  */
-export function resolveShowIdentity(seriesId: number, show: { name: string; overview: string | null }) {
+export function resolveShowIdentity(seriesId: number, show: { name: string; overview: string | null }, fresh = false) {
+  const provider = fresh ? new TMDBApiService() : tmdb;
   return resolveIdentity({
     tmdbId: seriesId,
-    externalIds: () => tmdb.getExternalIds(seriesId),
+    externalIds: () => provider.getExternalIds(seriesId),
     evidence: async () => {
-      const details = await tmdb.getShow(seriesId);
+      const details = await provider.getShow(seriesId);
       return { names: [details.name, details.original_name, show.name], firstAirDate: details.first_air_date || null, overview: details.overview || show.overview || null };
     },
-  });
+  }, fresh);
 }
 
 type UpcomingShowRow = { id: string; name: string; overview: string | null; posterURL: string | null; status: string | null; completed: boolean; tmdbId: number | null; tvmazeId: number | null };

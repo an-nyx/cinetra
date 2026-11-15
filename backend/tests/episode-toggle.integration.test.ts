@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { historyDigest, scopeDigest } from '../src/services/show-status-scope.model';
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 if (!/^postgresql:\/\/postgres:status-test@127\.0\.0\.1:55439\/cinetra_status_test$/.test(process.env.DATABASE_URL ?? '')) throw new Error('Use the isolated episode toggle test database only.');
@@ -87,7 +88,9 @@ async function main() {
   const call = async (method: string, path: string, body?: unknown, who = user.id) => {
     const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: auth(who) }, body: body === undefined ? undefined : JSON.stringify(body) });
     const text = await res.text();
-    return { status: res.status, json: text ? JSON.parse(text) : null };
+    let json: any = null;
+    if (text) { try { json = JSON.parse(text); } catch { json = { message: text }; } }
+    return { status: res.status, json };
   };
   const mark = (showId: string, season: number, episode: number, watched: boolean, who = user.id) => call('PUT', `/show/${showId}/episodes/${season}/${episode}`, { watched }, who);
   const markSeason = (showId: string, season: number) => call('POST', `/show/${showId}/seasons/${season}/watched`);
@@ -97,7 +100,11 @@ async function main() {
   const addShow = async (name: string, tmdbId: number, s: TmdbSeries, data: Record<string, unknown> = {}, tvmazeEpisodes: TvEpisode[] | null = tvFromTmdb(s)) => {
     tmdb.set(tmdbId, s);
     if (tvmazeEpisodes && s.tvdb) tvmaze.set(10_000 + tmdbId, { tvdb: s.tvdb, episodes: tvmazeEpisodes });
-    return prisma.show.create({ data: { userId: user.id, name, tmdbId, status: 'watching', favorite: true, ...data } });
+    const show = await prisma.show.create({ data: { userId: user.id, name, tmdbId, status: 'watching', favorite: true, ...data } });
+    const scope = JSON.parse(process.env.TV_STATUS_RECONCILIATION_SCOPE || JSON.stringify({ userId: user.id, targets: [], excludedShowIds: [] }));
+    scope.targets.push({ showId: show.id, tmdbId, tvmazeId: 10000 + tmdbId });
+    process.env.TV_STATUS_RECONCILIATION_SCOPE = JSON.stringify(scope);
+    return show;
   };
   // Every field automatic statuses must never touch.
   const untouched = (s: Awaited<ReturnType<typeof row>>) => ({ seasonsWatched: s.seasonsWatched, episodesWatched: s.episodesWatched, favorite: s.favorite, tmdbId: s.tmdbId, name: s.name, posterURL: s.posterURL, overview: s.overview });
@@ -173,7 +180,7 @@ async function main() {
   await markSeason(numberingShow.id, 1);
   assert.equal((await row(numberingShow.id)).status, 'watching', 'TVMaze numbers seasons differently: no guessing');
   const unlisted = await addShow('Not On TVMaze', 5007, series('Not On TVMaze', null, { 1: episodes(3, -60) }), {}, null);
-  assert.equal((await markSeason(unlisted.id, 1)).json.statusChange?.to, 'completed', 'not on TVMaze: TMDB alone verifies a finished season');
+  assert.equal((await markSeason(unlisted.id, 1)).json.statusChange, null, 'scoped automation requires its approved verified TVMaze identity');
   const specials = await addShow('With Specials', 5008, series('With Specials', 7008, { 1: episodes(3, -60) }));
   tmdb.get(5008)!.seasons.push({ season_number: 0, episode_count: 2, air_date: day(-10) }); tmdb.get(5008)!.pages[0] = episodes(2, -10);
   assert.equal((await markSeason(specials.id, 1)).json.statusChange?.to, 'completed', 'unwatched specials never block completion');
@@ -279,7 +286,7 @@ async function main() {
   assert.equal((await mark(stale.id, 1, 3, true)).json.statusChange, null, 'episode watch cannot complete while disabled');
   assert.equal((await mark(historicalPreview.id, 1, 2, false)).json.statusChange, null, 'episode unwatch cannot reopen while disabled');
   assert.equal((await markSeason(stale.id, 1)).json.statusChange, null, 'season watch cannot complete while disabled');
-  const disabledEvaluation = await evaluateShow(await row(stale.id));
+  const disabledEvaluation = await evaluateShow(await row(stale.id), { fresh: true });
   assert.ok(disabledEvaluation?.transition);
   assert.equal(await applyTransition(await row(stale.id), disabledEvaluation!.transition!, new Date(), disabledEvaluation!), false, 'writer itself refuses while disabled');
   report = await runShowStatusMonitor(new Date());
@@ -328,12 +335,12 @@ async function main() {
   assert.equal(manualResponse.json.status, 'watching', 'manual Completed uses the same verified gap rules');
   await prisma.show.update({ where: { id: historical.id }, data: { status: 'completed', completed: true } });
   const candidate = await row(historical.id);
-  const evaluated = await evaluateShow(candidate);
+  const evaluated = await evaluateShow(candidate, { fresh: true });
   assert.ok(evaluated?.transition);
   await prisma.episodeWatch.create({ data: { showId: candidate.id, season: 1, episode: 2, watchedAt: new Date('2020-01-01') } });
   assert.equal(await applyTransition(candidate, evaluated!.transition!, new Date(), evaluated!), false, 'concurrent watch changes invalidate evaluation');
   const fresh = await row(candidate.id);
-  const evaluation2 = await evaluateShow(fresh);
+  const evaluation2 = await evaluateShow(fresh, { fresh: true });
   await prisma.show.update({ where: { id: fresh.id }, data: { status: 'paused' } });
   assert.equal(await applyTransition(fresh, evaluation2!.transition!, new Date(), evaluation2!), false, 'concurrent status edits preserved');
   assert.equal((await row(fresh.id)).status, 'paused');
@@ -357,6 +364,56 @@ async function main() {
   await repository.update(manualShow.id, { status: 'dropped', completed: false }, user.id);
   assert.equal((await row(manualShow.id)).status, 'dropped');
   console.log('✓ manual status edits keep the completion boundary');
+
+  // ===== 7. Six-only activation: identity, approval, atomicity, idempotence, and prospective scope =====
+  process.env.TV_STATUS_RECONCILIATION_ENABLED = 'false';
+  process.env.TV_STATUS_ACTIVATION_BATCH_ENABLED = 'true';
+  const approved: Awaited<ReturnType<typeof addShow>>[] = [];
+  for (let i = 0; i < 6; i++) approved.push(await addShow(`Approved ${i}`, 5700 + i, series(`Approved ${i}`, 7700 + i, { 1: episodes(3, -900) }), { status: 'completed', completed: true, seasonsWatched: 1, episodesWatched: 1 }));
+  const explicitBefore = await prisma.episodeWatch.create({ data: { showId: approved[5].id, season: 1, episode: 1, watchedAt: new Date('2020-01-01') } });
+  assert.equal(historyDigest([JSON.parse(JSON.stringify(explicitBefore))], []), historyDigest([explicitBefore], []), 'exported and database history fingerprints agree');
+  const initialFor = (s: typeof approved[number]) => ({ updatedAt: s.updatedAt.toISOString(), status: s.status, completed: s.completed, completedMonitorFrom: s.completedMonitorFrom?.toISOString() ?? null, seasonsWatched: s.seasonsWatched, episodesWatched: s.episodesWatched, historySha256: historyDigest(s.id === approved[5].id ? [explicitBefore] : [], []), released: 3, watched: 1, unwatched: ['S1E2', 'S1E3'] });
+  process.env.TV_STATUS_RECONCILIATION_SCOPE = JSON.stringify({ userId: user.id, targets: approved.map(s => ({ showId: s.id, tmdbId: s.tmdbId, tvmazeId: 10000 + s.tmdbId!, initial: initialFor(s) })), excludedShowIds: protectedShows.map(s => s.id) });
+  const digest = scopeDigest()!;
+  const activate = () => call('POST', '/show/status-activation', { approvalSha256: digest });
+  const beforeBatch = JSON.stringify(await prisma.show.findMany({ where: { id: { in: approved.map(s => s.id) } }, orderBy: { id: 'asc' } }));
+  assert.equal((await call('POST', '/show/status-activation', { approvalSha256: digest }, other.id)).status, 403);
+  assert.equal((await call('POST', '/show/status-activation', { approvalSha256: 'wrong' })).status, 409);
+  const concurrent = await prisma.episodeWatch.create({ data: { showId: approved[5].id, season: 1, episode: 2 } });
+  assert.equal((await activate()).status, 409, 'changed history aborts all six');
+  await prisma.episodeWatch.delete({ where: { id: concurrent.id } });
+  const metadata = tmdb.get(5705)!;
+  metadata.seasons[0].episode_count = 4;
+  assert.equal((await activate()).status, 409, 'fresh incomplete metadata aborts all six even with older usable caches');
+  metadata.seasons[0].episode_count = 3;
+  const lastId = approved.map(s => s.id).sort().at(-1)!;
+  await prisma.$executeRawUnsafe(`CREATE FUNCTION reject_test_status() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id = '${lastId}' AND NEW.status = 'watching' THEN RAISE EXCEPTION 'test rollback'; END IF; RETURN NEW; END $$`);
+  await prisma.$executeRawUnsafe('CREATE TRIGGER reject_test_status BEFORE UPDATE ON "Show" FOR EACH ROW EXECUTE FUNCTION reject_test_status()');
+  assert.equal((await activate()).status, 503, 'failure after earlier updates rolls back the complete transaction');
+  await prisma.$executeRawUnsafe('DROP TRIGGER reject_test_status ON "Show"');
+  await prisma.$executeRawUnsafe('DROP FUNCTION reject_test_status()');
+  assert.equal(JSON.stringify(await prisma.show.findMany({ where: { id: { in: approved.map(s => s.id) } }, orderBy: { id: 'asc' } })), beforeBatch, 'every failed batch leaves all six rows untouched');
+  const allHistoryBefore = JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ orderBy: { id: 'asc' } })]));
+  const result = await activate();
+  assert.deepEqual([result.status, result.json.updated], [200, 6]);
+  for (const s of approved) assert.equal((await row(s.id)).status, 'watching');
+  assert.equal((await activate()).json.updated, 0, 'repeating activation writes nothing');
+  assert.equal(JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ orderBy: { id: 'asc' } })])), allHistoryBefore);
+  process.env.TV_STATUS_ACTIVATION_BATCH_ENABLED = 'false';
+  process.env.TV_STATUS_RECONCILIATION_ENABLED = 'true';
+  assert.equal((await activate()).status, 409, 'batch endpoint closed during prospective automation');
+  assert.equal((await markSeason(approved[0].id, 1)).json.statusChange?.to, 'completed', 'enrolled show completes through its watch action');
+  assert.equal((await mark(approved[0].id, 1, 2, false)).json.statusChange?.to, 'watching', 'enrolled show reopens through its unwatch action');
+  const protectedBefore = await row(protectedShows[0].id);
+  await prisma.episodeWatch.create({ data: { showId: protectedBefore.id, season: 1, episode: 1 } });
+  await mark(protectedBefore.id, 1, 2, true);
+  assert.equal((await row(protectedBefore.id)).status, protectedBefore.status, 'first tracking records never enroll a protected legacy show');
+  const onlySix = await runShowStatusMonitor();
+  assert.equal(onlySix.checked, 6, 'monitor evaluates only enrolled identities');
+  for (const s of protectedShows) assert.equal((await row(s.id)).status, s.status, 'all exclusions survive monitor passes');
+  await prisma.show.update({ where: { id: approved[0].id }, data: { tmdbId: 999999 } });
+  assert.equal((await runShowStatusMonitor()).checked, 5, 'rematched identities lose automation enrollment');
+  console.log('✓ six-only activation: wrong account/hash, history/provider conflicts, atomic rollback, repeat no-op, future transitions, excluded legacy first tracking, and rematch guards');
 
   server.close();
   await prisma.$executeRawUnsafe('TRUNCATE "EpisodeUnwatch", "EpisodeWatch", "Show", "User" CASCADE');

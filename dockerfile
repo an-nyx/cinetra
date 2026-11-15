@@ -35,8 +35,8 @@ RUN pnpm build
 
 COPY --from=frontend-builder /frontend/dist ./dist/ui
 
-# Preview-only release: pin automatic status writes off in the image and Node process.
+# Default off. Runtime activation also requires an explicit account/show/provider scope.
 ENV TV_STATUS_RECONCILIATION_ENABLED=false
 
 # Apply pending Prisma migrations before starting (replaces the compose "migrate" service).
-CMD ["sh", "-c", "pnpm prisma migrate deploy && TV_STATUS_RECONCILIATION_ENABLED=false pnpm start"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]

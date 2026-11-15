@@ -1,7 +1,7 @@
 # Automatic TV status reconciliation: review before activation
 
-Automatic status writes are disabled unless the backend environment contains exactly
-`TV_STATUS_RECONCILIATION_ENABLED=true`. Leave it absent or `false` during review.
+Automatic status writes require both `TV_STATUS_RECONCILIATION_ENABLED=true` and
+a valid approved account/show/provider scope. Leave the flag absent or `false` during review.
 This gate covers actions, manual edits and the background status monitor. It does
 not affect Web Push or its scheduler. No migration or history rewrite is needed.
 
@@ -26,13 +26,11 @@ of local implementation. Provider outages, missing identities, season numbering
 conflicts, incomplete canonical lists and checkpoint conflicts require review or
 a later retry, with current status preserved.
 
-Only after the user approves the preview may a separate authorized release remove
-the Dockerfile startup pin and set the runtime flag to `true`. Then historical tracked Watching and Completed rows (including the
-legacy completed flag) are eligible regardless of their completion/watch dates.
-Personal Completed shows with no regular tracking remain protected as described below.
-Proposals are reevaluated with current provider evidence and watch coverage at
-execution time; a preview is not a frozen write plan. Turning the flag off stops
-subsequent automatic writes. It does not reverse already approved corrections.
+After explicit approval, use the staged six-show rollout described below. Only
+enrolled identities are eligible for automatic transitions. Personal Completed shows
+without regular tracking remain protected; all non-enrolled rows stay unchanged.
+Every write reevaluates fresh provider evidence and effective viewing coverage.
+Disabling the runtime flag stops subsequent writes without reversing prior corrections.
 
 Local integration verification uses a disposable PostgreSQL container, never the
 application database:
@@ -52,12 +50,10 @@ It stubs TMDB and TVMaze, exercising real tracking, HTTP authentication, databas
 transactions, historical gaps, legacy-only completion, EpisodeUnwatch exceptions,
 manual edits, concurrent changes, disabled writes and read-only preview behavior.
 
-The preview image pins the runtime flag to `false` at Node startup; the release
-workflow verifies the exact live value after deployment without modifying Coolify
-environment settings or requiring permission to edit those settings.
-The live health response exposes `showStatus.automaticWritesEnabled: false` and
-`showStatus.running: false`; disabled episode reconciliation returns immediately,
-and the writer independently refuses writes. Web Push uses its existing scheduler.
+The image defaults to reconciliation disabled. Runtime configuration defines the
+approved scope and mutually exclusive batch/automatic modes. The release workflow
+verifies the live count, scope fingerprint, flag, monitor and Web Push settings.
+The final status writer independently enforces scope and fresh verified evidence.
 
 ## Unrecorded legacy completion
 
@@ -86,3 +82,33 @@ Automatic triggers do not accept these ephemeral preview baselines and continue
 preserving untracked Completed shows. Persisting confirmed baselines for future
 automation is a separate change requiring authorization. Partially tracked shows
 retain their ordinary effective-coverage proposals for individual review.
+
+## Approved six-show rollout (2026-11-15)
+
+The runtime flag alone no longer enables any automatic writes. A valid
+`TV_STATUS_RECONCILIATION_SCOPE` is also required, with the approved account ID,
+show IDs, canonical TMDB IDs, resolved TVMaze IDs and explicit exclusions. Missing,
+malformed, duplicated, conflicting or mismatched identities fail closed. Monitoring
+queries only this scope; action reconciliation and the final writer check it too.
+All other shows remain outside automation, even after a first tracking action.
+
+For an inactive scope, the release workflow selects `prepare`: it installs the approved scope from the
+encrypted GitHub secret, keeps automation false and opens the account-scoped batch
+endpoint. `GET /api/v1/show/status-activation` performs a fresh read-only preflight.
+`POST` with its `approvalSha256` rechecks all six, locks all rows, compares approved
+revisions/checkpoints/history, and atomically updates status fields only. Any conflict
+aborts the entire batch. A repeated completed batch writes nothing. No baseline is
+saved, and there is no general-purpose status reconciliation write endpoint.
+
+Routine pushes preserve an already active approved scope; they cannot replace it silently.
+After the batch and history comparison succeed, dispatch the same release workflow
+with `mode=active`. This closes the batch endpoint and enables prospective writes for
+exactly the approved six-show scope. The Docker image defaults false; runtime activation
+comes from Coolify configuration and cannot widen the deployment-held scope. Every
+status-writing evaluation bypasses TMDB/TVMaze stale caches, checks the resolved identity
+and expires after two minutes. Preview-only legacy baseline confirmations cannot authorize
+an automatic write. Provider failures preserve status.
+
+Health reports the scope count and SHA-256 fingerprint without exposing account or show
+IDs. The authenticated Review panel states how many shows are approved for automation.
+No Web Push configuration, subscription, preference or delivery-ledger behavior changes.

@@ -4,6 +4,18 @@ on:
   push:
     branches: [ main ]
 
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Prepare the approved batch or enable its verified six-show scope'
+        type: choice
+        options: [preserve, prepare, active]
+        default: preserve
+
+concurrency:
+  group: cinetra-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -11,8 +23,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Deploy status review with automatic writes disabled
+    - name: Deploy approved six-show status scope
       env:
+        TV_STATUS_DEPLOY_MODE: ${{ inputs.mode || 'preserve' }}
+        TV_STATUS_APPROVED_SCOPE: ${{ secrets.TV_STATUS_APPROVED_SCOPE }}
         CINETRA_URL: https://cinetra.aniskh.com
         COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
         COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}

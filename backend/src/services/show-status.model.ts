@@ -27,7 +27,7 @@ export type StatusCatalog = {
 };
 /** What TVMaze can contribute: a verified schedule, "not on TVMaze" (TMDB alone decides), or unusable. */
 export type TVMazeEvidence =
-  | { kind: 'verified'; episodes: TVMazeEpisode[]; timeZone: string | null }
+  | { kind: 'verified'; tvmazeId?: number; episodes: TVMazeEpisode[]; timeZone: string | null }
   | { kind: 'not_listed' }
   | { kind: 'unavailable' };
 

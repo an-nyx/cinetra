@@ -1,3 +1,5 @@
+import { applyStatusActivation, prepareStatusActivation, StatusActivationConflict } from '../../services/show-status-activation.service';
+import { scopeDigest, statusScope } from '../../services/show-status-scope.model';
 import { Router, Request, Response } from "express";
 import { showModule } from '../../modules/show';
 import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.entity';
@@ -46,8 +48,25 @@ router.get("/search", async (req: Request, res: Response) => {
 
 /** Read-only: how automatic Watching/Completed statuses see each of your shows. Changes nothing. */
 router.get("/status-preview", async (req: Request, res: Response) => {
-  try { res.setHeader('Cache-Control', 'no-store'); res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
+  try { res.setHeader('Cache-Control', 'no-store'); res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), automationEnrolledCount: statusScope()?.userId === req.user.id ? statusScope()!.targets.length : 0, generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
   catch (error) { console.error('Status preview failed:', error instanceof Error ? error.name : 'unknown error'); res.status(500).json({ message: 'Status preview unavailable' }); }
+});
+
+/** Fresh, read-only preflight. The approved account and deployment-held manifest define the scope. */
+router.get('/status-activation', async (req: Request, res: Response) => {
+  if (statusScope()?.userId !== req.user.id) { res.sendStatus(403); return; }
+  try {
+    const digest = scopeDigest()!;
+    const result = await prepareStatusActivation(req.user.id, digest);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ approvalSha256: digest, alreadyApplied: result.alreadyApplied, shows: result.rows.map((s,i) => ({ id: s.id, name: s.name, status: s.status, released: result.evaluations[i]?.released, watched: result.evaluations[i]?.watched, unwatched: result.evaluations[i]?.unwatched })) });
+  } catch (error) { res.status(error instanceof StatusActivationConflict ? 409 : 503).json({ message: error instanceof StatusActivationConflict ? error.message : 'Fresh activation verification unavailable' }); }
+});
+router.post('/status-activation', async (req: Request, res: Response) => {
+  if (statusScope()?.userId !== req.user.id) { res.sendStatus(403); return; }
+  if (typeof req.body?.approvalSha256 !== 'string') { res.sendStatus(400); return; }
+  try { res.setHeader('Cache-Control', 'no-store'); res.json(await applyStatusActivation(req.user.id, req.body.approvalSha256)); invalidateUpcoming(req.user.id); }
+  catch (error) { res.status(error instanceof StatusActivationConflict ? 409 : 503).json({ message: error instanceof StatusActivationConflict ? error.message : 'Fresh activation verification unavailable; no batch committed' }); }
 });
 
 /** Optional user-confirmed baselines affect this read-only preview only; nothing is persisted. */
@@ -61,7 +80,7 @@ router.post('/status-preview', async (req: Request, res: Response) => {
   }
   try {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id, new Date(), baselines) });
+    res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), automationEnrolledCount: statusScope()?.userId === req.user.id ? statusScope()!.targets.length : 0, generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id, new Date(), baselines) });
   } catch { res.status(500).json({ message: 'Status preview unavailable' }); }
 });
 
