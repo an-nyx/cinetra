@@ -57,15 +57,18 @@ def set_env(key, value):
     if len(saved) != 1 or saved[0].get('value') != value or saved[0].get('is_runtime') is False:
         raise RuntimeError('Runtime setting could not be verified: ' + key)
 
-# Only these three keys change; notification configuration remains untouched.
-if mode == 'prepare':
-    set_env('TV_STATUS_RECONCILIATION_ENABLED', 'false')
-    set_env('TV_STATUS_RECONCILIATION_SCOPE', scope_text)
-    set_env('TV_STATUS_ACTIVATION_BATCH_ENABLED', 'true')
-else:
-    set_env('TV_STATUS_ACTIVATION_BATCH_ENABLED', 'false')
-    set_env('TV_STATUS_RECONCILIATION_SCOPE', scope_text)
-    set_env('TV_STATUS_RECONCILIATION_ENABLED', 'true')
+# Runtime variables are configured through the authenticated Coolify admin UI.
+# The deploy-only token cannot read sensitive values or edit configuration. Optional
+# API configuration is available for operators with an explicitly write-capable token.
+if os.environ.get('COOLIFY_CONFIGURE_RUNTIME') == 'true':
+    if mode == 'prepare':
+        set_env('TV_STATUS_RECONCILIATION_ENABLED', 'false')
+        set_env('TV_STATUS_RECONCILIATION_SCOPE', scope_text)
+        set_env('TV_STATUS_ACTIVATION_BATCH_ENABLED', 'true')
+    else:
+        set_env('TV_STATUS_ACTIVATION_BATCH_ENABLED', 'false')
+        set_env('TV_STATUS_RECONCILIATION_SCOPE', scope_text)
+        set_env('TV_STATUS_RECONCILIATION_ENABLED', 'true')
 queued = api(f'/deploy?uuid={app_id}', 'POST')
 print('Scoped deployment queued: ' + queued['deployments'][0]['deployment_uuid'], flush=True)
 for attempt in range(100):

@@ -9,6 +9,10 @@ for (const value of ['broken', '{}', '{"userId":"owner","targets":[],"excludedSh
 const config = { userId: 'owner', targets: [{ showId: 'approved', tmdbId: 1, tvmazeId: 2 }], excludedShowIds: ['legacy', 'unverifiable'] };
 process.env.TV_STATUS_RECONCILIATION_SCOPE = JSON.stringify(config);
 assert.ok(scopedTarget(show)); assert.ok(scopeDigest());
+const nodeEnvBefore = process.env.NODE_ENV;
+process.env.NODE_ENV = 'production';
+assert.equal(statusScope(), null, 'production rejects every manifest except the exact approved fingerprint');
+if (nodeEnvBefore === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = nodeEnvBefore;
 for (const changed of [{...show, id:'legacy'}, {...show, id:'other'}, {...show,userId:'another'}, {...show,tmdbId:3}, {...show,tvmazeId:4}]) assert.equal(scopedTarget(changed),null);
 process.env.TV_STATUS_RECONCILIATION_SCOPE = JSON.stringify({...config, excludedShowIds:['approved']}); assert.equal(statusScope(),null);
 process.env.TV_STATUS_RECONCILIATION_SCOPE = JSON.stringify({...config, targets:[...config.targets,...config.targets]}); assert.equal(statusScope(),null);

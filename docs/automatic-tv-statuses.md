@@ -92,9 +92,12 @@ malformed, duplicated, conflicting or mismatched identities fail closed. Monitor
 queries only this scope; action reconciliation and the final writer check it too.
 All other shows remain outside automation, even after a first tracking action.
 
-For an inactive scope, the release workflow selects `prepare`: it installs the approved scope from the
-encrypted GitHub secret, keeps automation false and opens the account-scoped batch
-endpoint. `GET /api/v1/show/status-activation` performs a fresh read-only preflight.
+For an inactive scope, the release workflow selects `prepare`. Configure the three
+TV_STATUS runtime variables through Coolify’s authenticated admin UI; the deploy-only
+API token cannot edit them. The workflow deploys and verifies their live values against
+the encrypted approved-scope secret. Preparation keeps automation false and opens
+the account-scoped batch endpoint. Production also pins the exact approved manifest
+fingerprint in code, so a different scope fails closed. `GET /api/v1/show/status-activation` performs a fresh read-only preflight.
 `POST` with its `approvalSha256` rechecks all six, locks all rows, compares approved
 revisions/checkpoints/history, and atomically updates status fields only. Any conflict
 aborts the entire batch. A repeated completed batch writes nothing. No baseline is

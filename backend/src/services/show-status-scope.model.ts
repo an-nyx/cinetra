@@ -9,6 +9,8 @@ export function statusScope(): StatusScope | null {
     if (new Set(s.excludedShowIds).size !== s.excludedShowIds.length || s.excludedShowIds.some((id: unknown) => typeof id !== 'string')) return null;
     if (s.targets.some((t: ScopedTarget) => !t || typeof t.showId !== 'string' || !t.showId || !Number.isInteger(t.tmdbId) || t.tmdbId <= 0 || !Number.isInteger(t.tvmazeId) || t.tvmazeId <= 0 || s.excludedShowIds.includes(t.showId))) return null;
     if (new Set(s.targets.map((t: ScopedTarget) => t.showId)).size !== s.targets.length || new Set(s.targets.map((t: ScopedTarget) => t.tmdbId)).size !== s.targets.length || new Set(s.targets.map((t: ScopedTarget) => t.tvmazeId)).size !== s.targets.length) return null;
+    // Production enrollment is the exact approved manifest, never an arbitrary global scope.
+    if (process.env.NODE_ENV === 'production' && createHash('sha256').update(stableJSON(s)).digest('hex') !== 'dd5eb0b86b08968ac10b3fba7f46e1ad061f6a77b6b0f025924f04f0fe404032') return null;
     return s;
   } catch { return null; }
 }
