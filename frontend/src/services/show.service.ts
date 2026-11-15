@@ -90,7 +90,7 @@ export interface TrackingSummary {
 /** An automatic personal-status change made by the server after a watch action. */
 export type StatusChange = { from: "watching" | "completed"; to: "watching" | "completed"; reason: string };
 /** One show in the read-only automatic-status preview. */
-export type StatusPreviewRow = { showId: string; name: string; status: string | null; automatic: StatusChange | null; retroactive: StatusChange | null; completion: string; reopen: string; ambiguous: boolean };
+export type StatusPreviewRow = { released: number | null; watched: number | null; unwatched: string[]; showId: string; name: string; status: string | null; automatic: StatusChange | null; retroactive: StatusChange | null; completion: string; reopen: string; ambiguous: boolean };
 
 class ShowServiceClass extends ApiService {
   async getLibraryTracking(): Promise<TrackingSummary[]> {
@@ -160,7 +160,7 @@ class ShowServiceClass extends ApiService {
   }
 
   /** Read-only: how automatic Watching/Completed statuses see each show. Changes nothing. */
-  async getStatusPreview(): Promise<{ generatedAt: string; shows: StatusPreviewRow[] }> {
+  async getStatusPreview(): Promise<{ automaticWritesEnabled: boolean; generatedAt: string; shows: StatusPreviewRow[] }> {
     return (await this.api.get("/show/status-preview", { timeout: 120_000 })).data;
   }
 

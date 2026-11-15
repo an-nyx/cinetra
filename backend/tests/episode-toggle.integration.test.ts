@@ -11,7 +11,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
-if (!process.env.DATABASE_URL?.includes('/cinetra_episode_toggle_test_20261109')) throw new Error('Use the isolated episode toggle test database only.');
+if (!/^postgresql:\/\/postgres:status-test@127\.0\.0\.1:55439\/cinetra_status_test$/.test(process.env.DATABASE_URL ?? '')) throw new Error('Use the isolated episode toggle test database only.');
+process.env.TV_STATUS_RECONCILIATION_ENABLED = 'true';
 process.env.JWT_SECRET ||= crypto.randomBytes(32).toString('hex');
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -70,7 +71,7 @@ async function main() {
   const { prisma } = await import('../src/database/prisma');
   const { invalidateCatalog } = await import('../src/services/episode-guide.service');
   const { resetTvmazeCachesForTests } = await import('../src/services/tvmaze/tvmaze.service');
-  const { runShowStatusMonitor, statusPreview } = await import('../src/services/show-status.service');
+  const { runShowStatusMonitor, statusPreview, evaluateShow, applyTransition, startShowStatusMonitor, showStatusMonitorStatus } = await import('../src/services/show-status.service');
   const { ShowPrismaRepository } = await import('../src/modules/show/infra/show-prisma.repository');
   const { securityModule } = await import('../src/modules/security');
   const express = (await import('express')).default;
@@ -119,8 +120,7 @@ async function main() {
   life.next = { season_number: 2, episode_number: 1, air_date: day(20) };
   tvmaze.get(15001)!.episodes = tvFromTmdb(life);
   providerChanged(5001);
-  const featureSince = new Date(Date.now() - 30 * DAY);   // tests run on any date; production uses AUTO_STATUS_SINCE
-  let report = await runShowStatusMonitor(new Date(), { featureSince });
+  let report = await runShowStatusMonitor(new Date());
   assert.equal(report.reopened, 0); assert.equal((await row(lifeShow.id)).status, 'completed', 'announced season: still Completed');
 
   // S2E1 premieres (TMDB date today, TVMaze aired 3 hours ago) after the show was completed.
@@ -130,14 +130,14 @@ async function main() {
   tvmaze.get(15001)!.episodes = [...tvFromTmdb({ ...life, pages: { 1: life.pages[1] } }), tvEp(2, 1, hoursAgo(3)), ...life.pages[2].slice(1).map(e => tvEp(2, e.episode_number, new Date(`${e.air_date}T02:00:00Z`)))];
   providerChanged(5001);
   const watchesBefore = await prisma.episodeWatch.count();
-  report = await runShowStatusMonitor(new Date(), { featureSince });
+  report = await runShowStatusMonitor(new Date());
   assert.equal(report.reopened, 1, 'verified premiere reopens it in the background');
   s = await row(lifeShow.id);
   assert.deepEqual([s.status, s.completed, s.completedMonitorFrom], ['watching', false, null]);
   assert.deepEqual(untouched(s), before);
   assert.equal(await prisma.episodeWatch.count(), watchesBefore, 'no watch records created or removed');
   const stamp = s.updatedAt;
-  report = await runShowStatusMonitor(new Date(), { featureSince });   // a second pass, as after a restart
+  report = await runShowStatusMonitor(new Date());   // a second pass, as after a restart
   assert.equal((await row(lifeShow.id)).updatedAt.getTime(), stamp.getTime(), 'repeated passes write nothing');
 
   // Season 2 still airing: watching every released episode does not complete it.
@@ -259,20 +259,62 @@ async function main() {
   assert.deepEqual([(await row(legacyDoneShow.id)).seasonsWatched, (await row(legacyDoneShow.id)).episodesWatched], [3, 0]);
   console.log('✓ legacy positions S02E08, S02E00, S03E00, S02E03 keep their meaning; unwatch/re-watch never rewrites them');
 
-  // ===== 5. Read-only preview =====
+  // ===== 5. Read-only preview with every automatic write gated off =====
+  process.env.TV_STATUS_RECONCILIATION_ENABLED = 'false';
   const snapshot = JSON.stringify(await prisma.show.findMany({ orderBy: { id: 'asc' } }));
   // A show finished long ago and left on Watching: only the preview mentions it; nothing changes on its own.
   const stale = await addShow('Finished Long Ago', 5500, series('Finished Long Ago', 7500, { 1: episodes(3, -200) }), { seasonsWatched: 2, episodesWatched: 0 });
+  const historicalPreview = await addShow('Historical preview gaps', 5501, series('Historical preview gaps', 7501, { 1: episodes(3, -900) }), { status: 'completed', completed: true });
   const snapshot2 = JSON.stringify(await prisma.show.findMany({ orderBy: { id: 'asc' } }));
-  report = await runShowStatusMonitor(new Date(), { featureSince });
+  startShowStatusMonitor();
+  assert.equal(showStatusMonitorStatus().running, false, 'disabled monitor never arms timers');
+  assert.equal(showStatusMonitorStatus().automaticWritesEnabled, false);
+  assert.equal((await mark(stale.id, 1, 3, true)).json.statusChange, null, 'episode watch cannot complete while disabled');
+  assert.equal((await mark(historicalPreview.id, 1, 1, false)).json.statusChange, null, 'episode unwatch cannot reopen while disabled');
+  assert.equal((await markSeason(stale.id, 1)).json.statusChange, null, 'season watch cannot complete while disabled');
+  const disabledEvaluation = await evaluateShow(await row(stale.id));
+  assert.ok(disabledEvaluation?.transition);
+  assert.equal(await applyTransition(await row(stale.id), disabledEvaluation!.transition!, new Date(), disabledEvaluation!), false, 'writer itself refuses while disabled');
+  report = await runShowStatusMonitor(new Date());
   assert.equal((await row(stale.id)).status, 'watching', 'never changed in bulk without approval');
   const preview = await call('GET', '/show/status-preview');
   assert.equal(preview.status, 200);
+  assert.equal(preview.json.automaticWritesEnabled, false);
   const staleRow = preview.json.shows.find((r: { showId: string }) => r.showId === stale.id);
   assert.deepEqual([staleRow.retroactive?.to, staleRow.automatic], ['completed', null], 'listed as a retroactive change awaiting approval');
+  assert.deepEqual([staleRow.released, staleRow.watched, staleRow.unwatched], [3, 3, []]);
+  const historicalRow = preview.json.shows.find((r: { showId: string }) => r.showId === historicalPreview.id);
+  assert.deepEqual([historicalRow.retroactive?.to, historicalRow.released, historicalRow.watched, historicalRow.unwatched], ['watching', 3, 0, ['S1E1', 'S1E2', 'S1E3']]);
+  assert.equal((await call('GET', '/show/status-preview', undefined, other.id)).json.shows.length, 0, 'preview is account scoped');
   assert.ok(preview.json.shows.filter((r: { status: string }) => ['dropped', 'paused', 'planned'].includes(r.status)).every((r: { automatic: unknown; retroactive: unknown }) => !r.automatic && !r.retroactive));
   assert.equal(JSON.stringify(await prisma.show.findMany({ orderBy: { id: 'asc' } })), snapshot2, 'the preview writes nothing');
   assert.ok(snapshot.length > 0);
+  process.env.TV_STATUS_RECONCILIATION_ENABLED = 'true';
+  const historical = await addShow('Historical manual Completed', 5591, series('Historical manual Completed', 7591, { 1: episodes(3, -900) }), { status: 'completed', completed: true });
+  const oldLegacy = await addShow('Old legacy only', 5592, series('Old legacy only', 7592, { 1: episodes(3, -900) }), { seasonsWatched: 1, episodesWatched: 3 });
+  await runShowStatusMonitor();
+  assert.equal((await row(historical.id)).status, 'watching');
+  assert.equal((await row(oldLegacy.id)).status, 'completed');
+  const manualResponse = await call('PUT', `/show/${historical.id}`, { status: 'completed', completed: true });
+  assert.equal(manualResponse.json.status, 'watching', 'manual Completed uses the same verified gap rules');
+  await prisma.show.update({ where: { id: historical.id }, data: { status: 'completed', completed: true } });
+  const candidate = await row(historical.id);
+  const evaluated = await evaluateShow(candidate);
+  assert.ok(evaluated?.transition);
+  await prisma.episodeWatch.create({ data: { showId: candidate.id, season: 1, episode: 1, watchedAt: new Date('2020-01-01') } });
+  assert.equal(await applyTransition(candidate, evaluated!.transition!, new Date(), evaluated!), false, 'concurrent watch changes invalidate evaluation');
+  const fresh = await row(candidate.id);
+  const evaluation2 = await evaluateShow(fresh);
+  await prisma.show.update({ where: { id: fresh.id }, data: { status: 'paused' } });
+  assert.equal(await applyTransition(fresh, evaluation2!.transition!, new Date(), evaluation2!), false, 'concurrent status edits preserved');
+  assert.equal((await row(fresh.id)).status, 'paused');
+  const gapPreview = (await statusPreview(user.id)).find(r => r.showId === fresh.id)!;
+  assert.equal(gapPreview.retroactive, null, 'paused never proposed');
+  await prisma.episodeWatch.create({ data: { showId: oldLegacy.id, season: 9, episode: 99 } });
+  await prisma.show.update({ where: { id: oldLegacy.id }, data: { status: 'watching', completed: false } });
+  const uncertain = await evaluateShow(await row(oldLegacy.id));
+  assert.equal(uncertain?.transition, null, 'unmapped saved identities block completion');
+  assert.match(uncertain!.evidenceIssue!, /identity does not fit/);
   console.log('✓ status preview is read-only; shows finished before automatic statuses are only proposed, never changed');
 
   // ===== 6. Manual status edits still maintain the completion boundary (existing behavior) =====

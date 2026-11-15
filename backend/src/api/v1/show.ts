@@ -4,7 +4,7 @@ import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.enti
 import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming, previewRematch, applyRematch, RematchConflictError } from '../../services/episode-guide.service';
 
 import { TMDBApiService } from "../../services/tmdb/tmdb-api.service";
-import { isVerifiedComplete, reconcileAfterAction, statusPreview } from "../../services/show-status.service";
+import { automaticStatusWritesEnabled, reconcileAfterAction, statusPreview } from "../../services/show-status.service";
 
 const router = Router();
 const tmdb = new TMDBApiService();
@@ -46,7 +46,7 @@ router.get("/search", async (req: Request, res: Response) => {
 
 /** Read-only: how automatic Watching/Completed statuses see each of your shows. Changes nothing. */
 router.get("/status-preview", async (req: Request, res: Response) => {
-  try { res.setHeader('Cache-Control', 'no-store'); res.json({ generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
+  try { res.setHeader('Cache-Control', 'no-store'); res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id) }); }
   catch (error) { console.error('Status preview failed:', error instanceof Error ? error.name : 'unknown error'); res.status(500).json({ message: 'Status preview unavailable' }); }
 });
 
@@ -97,9 +97,8 @@ router.get("/:id/episodes", async (req: Request<{id: string}>, res: Response) =>
 // The response carries the summary as it is after any automatic change, plus that change, if one happened.
 router.put("/:id/episodes/:season/:episode", async (req: Request<{id: string; season: string; episode: string}>, res: Response) => {
   try {
-    const wasComplete = req.body?.watched === false ? await isVerifiedComplete(req.params.id, req.user.id) : false;
     await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched);
-    const statusChange = await reconcileAfterAction(req.params.id, req.user.id, { wasComplete });
+    const statusChange = await reconcileAfterAction(req.params.id, req.user.id);
     res.json({ ...(await getTrackingSummary(req.params.id, req.user.id)), statusChange });
   }
   catch (error) { guideError(res, error); }
@@ -177,7 +176,8 @@ router.put("/:id", async (req: Request<{id: string}, {}, UpdateShowDto>, res: Re
   if (!result) {
     res.status(404).json({ message: "Show not found or you don't have permission to update it" });
   } else {
-    res.status(200).json(result);
+    await reconcileAfterAction(showId, req.user.id);
+    res.status(200).json(await showModule.Queries.GetByIdQuery.execute(showId, req.user.id));
   }
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'P2002') res.status(409).json({ message: 'Show already exists' });

@@ -63,6 +63,7 @@ locals {
   runtime_env = {
     PORT              = tostring(var.app_port)
     NODE_ENV          = "production"
+    TV_STATUS_RECONCILIATION_ENABLED = "false"
     JWT_SECRET        = coalesce(var.jwt_secret, random_password.jwt_secret.result)
     API_AUTHORIZATION = var.api_authorization
     DATABASE_URL      = coolify_database_postgresql.db.internal_db_url

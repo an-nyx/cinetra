@@ -3,7 +3,7 @@
  *
  * "Completed" means every released regular episode is watched and the latest released season has verifiably finished
  * airing. It does not require the series to have ended: an announced future season that has not started does not
- * reopen the show. A verified premiere of a new episode after the show was completed moves it back to Watching.
+ * reopen the show. Any verified released unwatched episode moves it back to Watching.
  *
  * Only the two managed statuses ever change: Dropped, Paused, Planned and "no status" are never touched. Anything
  * uncertain (incomplete or contradictory provider data) yields "no change".
@@ -11,8 +11,7 @@
 import type { TVMazeEpisode } from './tvmaze/tvmaze-schedule.model';
 import { premiereInstant } from './notifications/episode-alerts.model';
 
-/** Earliest premiere that may reopen a completed show: episodes that were already out before automatic statuses existed never do. */
-export const AUTO_STATUS_SINCE = new Date('2026-11-14T00:00:00Z');
+
 
 export type ManagedStatus = 'watching' | 'completed';
 /** The effective personal status, honoring the legacy `completed` flag for shows saved without a status. */
@@ -67,47 +66,59 @@ export function verifyCompletion(input: { episodes: StatusEpisode[]; catalog: St
     }
     if ([...earliest.values()].some(at => at === null || at > now.getTime())) return { complete: false, reason: `TVMaze lists unaired episodes of season ${latest}` };
   }
+  const coverage = verifiedCoverage(input);
+  if (coverage.reason) return { complete: false, reason: coverage.reason };
   return { complete: true };
 }
 
 export type ReopenCheck = { reopen: true; season: number; number: number } | { reopen: false; reason: string };
-/**
- * Whether a verified new regular episode premiered after the show was completed (and after automatic statuses were
- * introduced), and is unwatched. TMDB lists the episode; a verified TVMaze schedule must confirm the same episode has
- * premiered (its conservative premiere instant). Without a TVMaze listing, the TMDB air date must have fully passed.
- */
-export function newPremiereSinceCompleted(input: { episodes: StatusEpisode[]; completedSince: Date | null; tvmaze: TVMazeEvidence; today: string; now: Date; featureSince?: Date }): ReopenCheck {
-  const { tvmaze, now, today } = input;
-  if (tvmaze.kind === 'unavailable') return { reopen: false, reason: 'TVMaze schedule unavailable' };
-  const since = new Date(Math.max((input.featureSince ?? AUTO_STATUS_SINCE).getTime(), input.completedSince?.getTime() ?? 0));
-  const sinceDay = since.toISOString().slice(0, 10);
-  const candidates = input.episodes
-    .filter(e => regular(e) && !e.watched && !!e.airDate && e.airDate <= today && e.airDate >= sinceDay)
-    .sort((a, b) => a.season - b.season || a.number - b.number);
-  for (const episode of candidates) {
-    if (tvmaze.kind === 'verified') {
-      const match = tvmaze.episodes.filter(e => tvRegular(e) && e.season === episode.season && e.number === episode.number);
-      if (match.length !== 1) continue;   // not listed, or listed twice: no guessing
-      const premiere = premiereInstant(match[0], tvmaze.timeZone);
-      if (!premiere || premiere.at.getTime() > now.getTime() || premiere.at.getTime() < since.getTime()) continue;
-    } else if (Date.parse(`${episode.airDate}T00:00:00Z`) + 2 * 86_400_000 > now.getTime()) {
-      continue;   // TMDB dates carry no time zone: wait until the listed day has ended everywhere
-    }
-    return { reopen: true, season: episode.season, number: episode.number };
-  }
-  return { reopen: false, reason: candidates.length ? 'premiere not yet verified' : 'no new unwatched premiere' };
+/** Find an unwatched canonical regular episode whose premiere is verified, regardless of its age. */
+export function verifiedUnwatchedPremiere(input: { episodes: StatusEpisode[]; tvmaze: TVMazeEvidence; today: string; now: Date }): ReopenCheck {
+  const coverage = verifiedCoverage(input);
+  if (coverage.reason) return { reopen: false, reason: coverage.reason };
+  const gap = coverage.released.find(e => !e.watched);
+  return gap ? { reopen: true, season: gap.season, number: gap.number }
+    : { reopen: false, reason: 'No verified released regular episode remains unwatched' };
+
 }
 
 export type StatusTransition = { from: ManagedStatus; to: ManagedStatus; reason: string };
-/**
- * The single decision used by every trigger. `brokeCompletion` is true when a user action (unwatching) turned a
- * verified completion into an incomplete one; only then may an unwatch reopen a Completed show.
- */
-export function decideStatus(input: { status: string | null; completion: CompletionCheck; reopen: ReopenCheck; brokeCompletion?: boolean }): StatusTransition | null {
+/** The single decision used by every trigger; unwatch actions also require verified evidence. */
+export function decideStatus(input: { status: string | null; completion: CompletionCheck; reopen: ReopenCheck }): StatusTransition | null {
   if (input.status === 'watching' && input.completion.complete) return { from: 'watching', to: 'completed', reason: 'all released episodes watched and the latest season has finished' };
   if (input.status === 'completed') {
-    if (input.reopen.reopen) return { from: 'completed', to: 'watching', reason: `S${input.reopen.season}E${input.reopen.number} premiered` };
-    if (input.brokeCompletion && !input.completion.complete) return { from: 'completed', to: 'watching', reason: 'a watched episode was unmarked' };
+    if (input.reopen.reopen) return { from: 'completed', to: 'watching', reason: `S${input.reopen.season}E${input.reopen.number} is verified released and unwatched` };
+
   }
   return null;
+}
+
+/** Canonical episode identities only; unknown or conflicting schedules block status writes. */
+export function verifiedCoverage(input: { episodes: StatusEpisode[]; tvmaze: TVMazeEvidence; today: string; now: Date }) {
+  const released: StatusEpisode[] = [];
+  const canonical = input.episodes.filter(regular);
+  if (new Set(canonical.map(e => `${e.season}:${e.number}`)).size !== canonical.length)
+    return { released, reason: 'Contradictory duplicate TMDB episode identities' };
+  if (input.tvmaze.kind === 'verified') {
+    for (const t of input.tvmaze.episodes.filter(tvRegular)) {
+      const at = premiereInstant(t, input.tvmaze.timeZone)?.at.getTime();
+      if (at !== undefined && at <= input.now.getTime() && !canonical.some(e => e.season === t.season && e.number === t.number && !!e.airDate && e.airDate <= input.today))
+        return { released, reason: `Cannot reconcile released TVMaze S${t.season}E${t.number} with TMDB` };
+    }
+  }
+
+  for (const e of input.episodes.filter(e => regular(e) && !!e.airDate && e.airDate <= input.today)) {
+    if (input.tvmaze.kind === 'unavailable') return { released, reason: 'TVMaze schedule unavailable' };
+    if (input.tvmaze.kind === 'verified') {
+      const matches = input.tvmaze.episodes.filter(t => tvRegular(t) && t.season === e.season && t.number === e.number);
+      const times = matches.map(t => premiereInstant(t, input.tvmaze.kind === 'verified' ? input.tvmaze.timeZone : null)?.at.getTime());
+      if (!times.length || times.some(t => t === undefined)) return { released, reason: `Cannot verify S${e.season}E${e.number} premiere` };
+      if (times.filter(t => t === Math.min(...times as number[])).length > 1) return { released, reason: `Cannot verify duplicate TVMaze S${e.season}E${e.number}` };
+      if (Math.min(...times as number[]) > input.now.getTime()) return { released, reason: `S${e.season}E${e.number} premiere not yet verified` };
+    } else if (Date.parse(`${e.airDate}T00:00:00Z`) + 2 * 86400000 > input.now.getTime()) {
+      return { released, reason: `S${e.season}E${e.number} premiere not yet verified` };
+    }
+    released.push(e);
+  }
+  return { released, reason: null };
 }

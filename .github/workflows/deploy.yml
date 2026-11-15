@@ -9,12 +9,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Trigger Coolify deployment
+    - uses: actions/checkout@v4
+
+    - name: Deploy status review with automatic writes disabled
       env:
         COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
         COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
         COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
-      run: |
-        curl --fail-with-body -sS -X POST \
-          -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-          "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}"
+      run: python3 scripts/deploy-status-review.py

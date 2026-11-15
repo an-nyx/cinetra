@@ -66,7 +66,7 @@ export async function trackingState(show: ShowRow) {
   const [catalog, watches, unwatches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(show.id)]);
   const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today(), unwatches);
   const progress = calculateTrackingProgress(episodes, catalog, legacy.needsReview, toBroadcastStatus(catalog.broadcastStatus), catalog.inProduction, catalog.nextEpisodeAnnounced, today(), true);
-  return { catalog, episodes, watches, progress, today: today() };
+  return { catalog, episodes, watches, unwatches, progress, today: today() };
 }
 
 /** Distinguish a missing association from authentication, not-found and transient TMDB failures. */

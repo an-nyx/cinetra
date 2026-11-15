@@ -1,6 +1,6 @@
 /** Automatic Watching <-> Completed rules (pure). */
 import assert from 'node:assert/strict';
-import { decideStatus, effectiveStatus, newPremiereSinceCompleted, verifyCompletion, type StatusEpisode, type TVMazeEvidence } from '../src/services/show-status.model';
+import { decideStatus, effectiveStatus, verifiedUnwatchedPremiere, verifyCompletion, type StatusEpisode, type TVMazeEvidence } from '../src/services/show-status.model';
 import type { TVMazeEpisode } from '../src/services/tvmaze/tvmaze-schedule.model';
 
 const now = new Date('2026-12-01T12:00:00Z');
@@ -46,9 +46,7 @@ assert.equal(check([]).complete, false); assert.equal(check(s1, null as never).c
 assert.deepEqual(check([...season(1, 4, '2025-01-01'), ...season(2, 4, '2026-09-01')], catalog([[1, 4], [2, 4]]), verified([...tvSeason(1, 4, '2025-01-01'), ...tvSeason(2, 4, '2026-09-01')])), { complete: true });
 
 // --- Reopening --------------------------------------------------------------------------------------------------
-const featureSince = new Date('2026-11-14T00:00:00Z');
-const completedAt = new Date('2026-11-20T00:00:00Z');
-const reopen = (episodes: StatusEpisode[], tvmaze: TVMazeEvidence, completedSince: Date | null = completedAt) => newPremiereSinceCompleted({ episodes, completedSince, tvmaze, today, now, featureSince });
+const reopen = (episodes: StatusEpisode[], tvmaze: TVMazeEvidence) => verifiedUnwatchedPremiere({ episodes, tvmaze, today, now });
 const s2premiere = [...s1, ep(2, 1, '2026-12-01', false), ep(2, 2, '2026-12-08', false)];
 const tvS2 = verified([...tvSeason(1, 8, '2026-09-01'), tv(2, 1, '2026-11-30', '2026-12-01T02:00:00Z'), tv(2, 2, '2026-12-07', '2026-12-08T02:00:00Z')]);
 assert.deepEqual(reopen(s2premiere, tvS2), { reopen: true, season: 2, number: 1 }, 'verified premiere of S2E1');
@@ -60,9 +58,9 @@ assert.equal(reopen(s2premiere, verified([...tvSeason(1, 8, '2026-09-01'), tv(2,
 assert.equal(reopen(s2premiere, { kind: 'unavailable' }).reopen, false);
 assert.equal(reopen([...s1, ep(2, 1, '2026-11-25', false)], { kind: 'not_listed' }).reopen, true, 'TMDB only, day long over');
 assert.equal(reopen(s2premiere, { kind: 'not_listed' }).reopen, false, 'TMDB only, listed day not over everywhere yet');
-// History: episodes out before the show was completed, or before automatic statuses existed, never reopen.
-assert.equal(reopen([...s1, ep(2, 1, '2026-11-18', false)], verified([...tvSeason(1, 8, '2026-09-01'), tv(2, 1, '2026-11-17', '2026-11-18T02:00:00Z')])).reopen, false, 'premiered before completion');
-assert.equal(reopen([...s1, ep(2, 1, '2026-11-10', false)], verified([...tvSeason(1, 8, '2026-09-01'), tv(2, 1, '2026-11-09', '2026-11-10T02:00:00Z')]), null).reopen, false, 'before the feature existed');
+// Historical gaps reopen regardless of when Completed was saved or automation was introduced.
+assert.equal(reopen([...s1, ep(2, 1, '2026-11-18', false)], verified([...tvSeason(1, 8, '2026-09-01'), tv(2, 1, '2026-11-17', '2026-11-18T02:00:00Z')])).reopen, true, 'historical gap before completion');
+assert.equal(reopen([...s1, ep(2, 1, '2026-11-10', false)], verified([...tvSeason(1, 8, '2026-09-01'), tv(2, 1, '2026-11-09', '2026-11-10T02:00:00Z')])).reopen, true, 'historical gap before feature launch');
 assert.equal(reopen([...s1, ep(0, 3, '2026-12-01', false)], tvS2).reopen, false, 'specials never reopen');
 
 // --- Decisions: only Watching <-> Completed ---------------------------------------------------------------------
@@ -72,10 +70,10 @@ assert.equal(decideStatus({ status: 'watching', completion: done, reopen: no })?
 assert.equal(decideStatus({ status: 'watching', completion: notDone, reopen: yes }), null);
 assert.equal(decideStatus({ status: 'completed', completion: done, reopen: yes })?.to, 'watching');
 assert.equal(decideStatus({ status: 'completed', completion: notDone, reopen: no }), null, 'manual Completed with gaps is left alone');
-assert.equal(decideStatus({ status: 'completed', completion: notDone, reopen: no, brokeCompletion: true })?.to, 'watching', 'the user just unmarked an episode');
-assert.equal(decideStatus({ status: 'completed', completion: done, reopen: no, brokeCompletion: true }), null);
+assert.equal(decideStatus({ status: 'completed', completion: notDone, reopen: no }), null, 'unwatch still requires verified release evidence');
+assert.equal(decideStatus({ status: 'completed', completion: done, reopen: no }), null);
 for (const status of ['dropped', 'paused', 'planned', null]) {
-  assert.equal(decideStatus({ status, completion: done, reopen: yes, brokeCompletion: true }), null, `${status} never changes`);
+  assert.equal(decideStatus({ status, completion: done, reopen: yes }), null, `${status} never changes`);
 }
 assert.equal(effectiveStatus({ status: null, completed: true }), 'completed', 'legacy completed flag');
 assert.equal(effectiveStatus({ status: 'dropped', completed: true }), 'dropped');
