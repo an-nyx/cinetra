@@ -3,7 +3,8 @@
  *
  * "Completed" means every released regular episode is watched and the latest released season has verifiably finished
  * airing. It does not require the series to have ended: an announced future season that has not started does not
- * reopen the show. Any verified released unwatched episode moves it back to Watching.
+ * reopen the show. Tracked gaps can move it back to Watching. A personal Completed assertion without regular tracking is protected;
+ * only verified premieres after a user-confirmed baseline can reopen it.
  *
  * Only the two managed statuses ever change: Dropped, Paused, Planned and "no status" are never touched. Anything
  * uncertain (incomplete or contradictory provider data) yields "no change".
@@ -121,4 +122,37 @@ export function verifiedCoverage(input: { episodes: StatusEpisode[]; tvmaze: TVM
     released.push(e);
   }
   return { released, reason: null };
+}
+
+/** A personal Completed assertion is viewing evidence even when no regular tracking was recorded. */
+export function hasRegularTracking(input: { seasonsWatched: number; episodesWatched: number; watches: { season: number; episode: number }[]; unwatches: { season: number; episode: number }[] }) {
+  return input.seasonsWatched !== 0 || input.episodesWatched !== 0 ||
+    [...input.watches, ...input.unwatches].some(e => e.season > 0 && e.episode > 0);
+}
+
+/** A supplied baseline is a per-show user assertion, never inferred from createdAt/updatedAt/monitor timestamps. */
+export function verifiedPremieresAfterBaseline(input: Parameters<typeof verifiedUnwatchedPremiere>[0] & { baseline: Date }) {
+  if (!Number.isFinite(input.baseline.getTime()) || input.baseline > input.now)
+    return { episodes: [] as StatusEpisode[], reason: 'Completion baseline must be a valid past instant' };
+  const coverage = verifiedCoverage(input);
+  if (coverage.reason) return { episodes: [] as StatusEpisode[], reason: coverage.reason };
+  const episodes = coverage.released.filter(e => {
+    if (e.watched) return false;
+    if (input.tvmaze.kind === 'verified') {
+      const times = input.tvmaze.episodes.filter(t => tvRegular(t) && t.season === e.season && t.number === e.number)
+        .map(t => premiereInstant(t, input.tvmaze.kind === 'verified' ? input.tvmaze.timeZone : null)!.at.getTime());
+      return Math.min(...times) > input.baseline.getTime();
+    }
+    // A date without a timezone cannot prove a premiere was after a baseline within that day.
+    return Date.parse(`${e.airDate}T00:00:00Z`) - 14 * 3600000 > input.baseline.getTime();
+  });
+  return { episodes, reason: null };
+}
+
+export function verifiedPremiereAfterBaseline(input: Parameters<typeof verifiedPremieresAfterBaseline>[0]): ReopenCheck {
+  const result = verifiedPremieresAfterBaseline(input);
+  if (result.reason) return { reopen: false, reason: result.reason };
+  const gap = result.episodes[0];
+  return gap ? { reopen: true, season: gap.season, number: gap.number }
+    : { reopen: false, reason: 'No verified new regular premiere after your confirmed completion baseline' };
 }

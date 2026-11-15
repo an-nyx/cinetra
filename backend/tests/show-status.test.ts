@@ -1,6 +1,6 @@
 /** Automatic Watching <-> Completed rules (pure). */
 import assert from 'node:assert/strict';
-import { decideStatus, effectiveStatus, verifiedUnwatchedPremiere, verifyCompletion, type StatusEpisode, type TVMazeEvidence } from '../src/services/show-status.model';
+import { hasRegularTracking, verifiedPremiereAfterBaseline, verifiedPremieresAfterBaseline, decideStatus, effectiveStatus, verifiedUnwatchedPremiere, verifyCompletion, type StatusEpisode, type TVMazeEvidence } from '../src/services/show-status.model';
 import type { TVMazeEpisode } from '../src/services/tvmaze/tvmaze-schedule.model';
 
 const now = new Date('2026-12-01T12:00:00Z');
@@ -78,3 +78,19 @@ for (const status of ['dropped', 'paused', 'planned', null]) {
 assert.equal(effectiveStatus({ status: null, completed: true }), 'completed', 'legacy completed flag');
 assert.equal(effectiveStatus({ status: 'dropped', completed: true }), 'dropped');
 console.log('Show status rule tests passed');
+
+// Personal Completed with no regular tracking is not evidence of zero actual viewing.
+assert.equal(hasRegularTracking({ seasonsWatched: 0, episodesWatched: 0, watches: [], unwatches: [] }), false);
+assert.equal(hasRegularTracking({ seasonsWatched: 0, episodesWatched: 0, watches: [{ season: 0, episode: 1 }], unwatches: [] }), false, 'specials are not regular viewing history');
+assert.equal(hasRegularTracking({ seasonsWatched: 1, episodesWatched: 0, watches: [], unwatches: [] }), true, 'saved checkpoints keep their meaning');
+assert.equal(hasRegularTracking({ seasonsWatched: 0, episodesWatched: 0, watches: [], unwatches: [{ season: 1, episode: 1 }] }), true, 'explicit unwatch is tracking evidence');
+const baselineInput = { episodes: s2premiere.map(e => ({ ...e, watched: false })), tvmaze: tvS2, today, now, baseline: new Date('2026-11-20T00:00:00Z') };
+assert.deepEqual(verifiedPremieresAfterBaseline(baselineInput).episodes.map(e => [e.season, e.number]), [[2, 1]], 'historical unrecorded episodes never become gap claims');
+assert.equal(verifiedPremiereAfterBaseline({ ...baselineInput, baseline: now }).reopen, false, 'no premiere strictly after baseline');
+assert.equal(verifiedPremiereAfterBaseline({ ...baselineInput, baseline: new Date('invalid') }).reopen, false);
+assert.equal(verifiedPremiereAfterBaseline({ ...baselineInput, baseline: new Date('2027-01-01') }).reopen, false);
+assert.equal(verifiedPremiereAfterBaseline({ ...baselineInput, tvmaze: { kind: 'unavailable' } }).reopen, false);
+const rerun = { episodes: [{ ...s1[0], watched: false }], today, now, baseline: new Date('2026-11-20'), tvmaze: verified([tv(1, 1, '2026-09-01', '2026-09-01T02:00:00Z'), tv(1, 1, '2026-11-25', '2026-11-25T02:00:00Z', 'regular', 99)]) };
+assert.equal(verifiedPremiereAfterBaseline(rerun).reopen, false, 'later reruns cannot reopen baseline-protected completion');
+assert.equal(verifiedPremiereAfterBaseline({ episodes: [ep(1, 1, '2026-11-25', false)], today, now, baseline: new Date('2026-11-25T00:00:00Z'), tvmaze: { kind: 'not_listed' } }).reopen, false, 'date-only premiere within baseline day is uncertain');
+console.log('Legacy manual completion baseline tests passed');

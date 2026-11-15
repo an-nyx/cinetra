@@ -264,13 +264,20 @@ async function main() {
   const snapshot = JSON.stringify(await prisma.show.findMany({ orderBy: { id: 'asc' } }));
   // A show finished long ago and left on Watching: only the preview mentions it; nothing changes on its own.
   const stale = await addShow('Finished Long Ago', 5500, series('Finished Long Ago', 7500, { 1: episodes(3, -200) }), { seasonsWatched: 2, episodesWatched: 0 });
-  const historicalPreview = await addShow('Historical preview gaps', 5501, series('Historical preview gaps', 7501, { 1: episodes(3, -900) }), { status: 'completed', completed: true });
+  const historicalPreview = await addShow('Historical preview gaps', 5501, series('Historical preview gaps', 7501, { 1: episodes(3, -900) }), { status: 'completed', completed: true, seasonsWatched: 1, episodesWatched: 1 });
+  // These are isolated provider fixtures, not production metadata for the named shows.
+  const protectedShows: Awaited<ReturnType<typeof addShow>>[] = [];
+  for (const [i, name] of ['Banshee', 'Sherlock', 'The Last Kingdom'].entries()) {
+    protectedShows.push(await addShow(name, 5510 + i, series(name, 7510 + i, { 1: episodes(3, -900), 2: episodes(1, -10), 3: episodes(1, 30) }),
+      { status: i === 1 ? null : 'completed', completed: true, completedMonitorFrom: i === 2 ? new Date('2020-01-01') : null }));
+  }
+  const historySnapshot = JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ orderBy: { id: 'asc' } })]));
   const snapshot2 = JSON.stringify(await prisma.show.findMany({ orderBy: { id: 'asc' } }));
   startShowStatusMonitor();
   assert.equal(showStatusMonitorStatus().running, false, 'disabled monitor never arms timers');
   assert.equal(showStatusMonitorStatus().automaticWritesEnabled, false);
   assert.equal((await mark(stale.id, 1, 3, true)).json.statusChange, null, 'episode watch cannot complete while disabled');
-  assert.equal((await mark(historicalPreview.id, 1, 1, false)).json.statusChange, null, 'episode unwatch cannot reopen while disabled');
+  assert.equal((await mark(historicalPreview.id, 1, 2, false)).json.statusChange, null, 'episode unwatch cannot reopen while disabled');
   assert.equal((await markSeason(stale.id, 1)).json.statusChange, null, 'season watch cannot complete while disabled');
   const disabledEvaluation = await evaluateShow(await row(stale.id));
   assert.ok(disabledEvaluation?.transition);
@@ -284,16 +291,38 @@ async function main() {
   assert.deepEqual([staleRow.retroactive?.to, staleRow.automatic], ['completed', null], 'listed as a retroactive change awaiting approval');
   assert.deepEqual([staleRow.released, staleRow.watched, staleRow.unwatched], [3, 3, []]);
   const historicalRow = preview.json.shows.find((r: { showId: string }) => r.showId === historicalPreview.id);
-  assert.deepEqual([historicalRow.retroactive?.to, historicalRow.released, historicalRow.watched, historicalRow.unwatched], ['watching', 3, 0, ['S1E1', 'S1E2', 'S1E3']]);
+  assert.deepEqual([historicalRow.retroactive?.to, historicalRow.released, historicalRow.watched, historicalRow.unwatched], ['watching', 3, 1, ['S1E2', 'S1E3']]);
+  for (const protectedShow of protectedShows) {
+    const entry = preview.json.shows.find((r: { showId: string }) => r.showId === protectedShow.id);
+    assert.deepEqual([entry.status, entry.legacyCompletion, entry.confirmationRequired, entry.watched, entry.unwatched, entry.retroactive, entry.automatic], ['completed', true, true, null, [], null, null]);
+    assert.match(entry.explanation, /actual viewing is unknown/i);
+    const confirmed = await call('POST', '/show/status-preview', { confirmedCompletionBaselines: { [protectedShow.id]: new Date(`${day(-100)}T12:00:00Z`).toISOString() } });
+    const confirmedEntry = confirmed.json.shows.find((r: { showId: string }) => r.showId === protectedShow.id);
+    assert.deepEqual([confirmedEntry.confirmationRequired, confirmedEntry.watched, confirmedEntry.unwatched, confirmedEntry.retroactive?.to], [false, null, ['S2E1'], 'watching'], 'only post-baseline verified premieres can be proposed');
+    const afterAllPremieres = await call('POST', '/show/status-preview', { confirmedCompletionBaselines: { [protectedShow.id]: new Date(`${day(-1)}T12:00:00Z`).toISOString() } });
+    assert.equal(afterAllPremieres.json.shows.find((r: { showId: string }) => r.showId === protectedShow.id).retroactive, null, 'future season never reopens');
+  }
+  for (const invalid of ['2020-01-01', 'invalid', new Date(Date.now() + DAY).toISOString(), '2026-02-31T00:00:00.000Z']) {
+    assert.equal((await call('POST', '/show/status-preview', { confirmedCompletionBaselines: { [protectedShows[0].id]: invalid } })).status, 400);
+  }
+  const unowned = await call('POST', '/show/status-preview', { confirmedCompletionBaselines: { [protectedShows[0].id]: new Date('2020-01-01').toISOString() } }, other.id);
+  assert.deepEqual(unowned.json.shows, [], 'confirmation remains account scoped');
+  const nextPreview = await call('GET', '/show/status-preview');
+  assert.equal(nextPreview.json.shows.find((r: { showId: string }) => r.showId === protectedShows[0].id).confirmationRequired, true, 'preview confirmation is never persisted');
+  assert.equal(JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ orderBy: { id: 'asc' } })])), historySnapshot, 'no invented watch/unwatch records');
   assert.equal((await call('GET', '/show/status-preview', undefined, other.id)).json.shows.length, 0, 'preview is account scoped');
   assert.ok(preview.json.shows.filter((r: { status: string }) => ['dropped', 'paused', 'planned'].includes(r.status)).every((r: { automatic: unknown; retroactive: unknown }) => !r.automatic && !r.retroactive));
   assert.equal(JSON.stringify(await prisma.show.findMany({ orderBy: { id: 'asc' } })), snapshot2, 'the preview writes nothing');
   assert.ok(snapshot.length > 0);
   process.env.TV_STATUS_RECONCILIATION_ENABLED = 'true';
-  const historical = await addShow('Historical manual Completed', 5591, series('Historical manual Completed', 7591, { 1: episodes(3, -900) }), { status: 'completed', completed: true });
+  const historical = await addShow('Historical manual Completed', 5591, series('Historical manual Completed', 7591, { 1: episodes(3, -900) }), { status: 'completed', completed: true, seasonsWatched: 1, episodesWatched: 1 });
   const oldLegacy = await addShow('Old legacy only', 5592, series('Old legacy only', 7592, { 1: episodes(3, -900) }), { seasonsWatched: 1, episodesWatched: 3 });
   await runShowStatusMonitor();
   assert.equal((await row(historical.id)).status, 'watching');
+  for (const protectedShow of protectedShows) {
+    assert.equal((await row(protectedShow.id)).status, protectedShow.status, 'even enabled monitor preserves untracked manual Completed');
+    assert.equal((await row(protectedShow.id)).completed, true);
+  }
   assert.equal((await row(oldLegacy.id)).status, 'completed');
   const manualResponse = await call('PUT', `/show/${historical.id}`, { status: 'completed', completed: true });
   assert.equal(manualResponse.json.status, 'watching', 'manual Completed uses the same verified gap rules');
@@ -301,7 +330,7 @@ async function main() {
   const candidate = await row(historical.id);
   const evaluated = await evaluateShow(candidate);
   assert.ok(evaluated?.transition);
-  await prisma.episodeWatch.create({ data: { showId: candidate.id, season: 1, episode: 1, watchedAt: new Date('2020-01-01') } });
+  await prisma.episodeWatch.create({ data: { showId: candidate.id, season: 1, episode: 2, watchedAt: new Date('2020-01-01') } });
   assert.equal(await applyTransition(candidate, evaluated!.transition!, new Date(), evaluated!), false, 'concurrent watch changes invalidate evaluation');
   const fresh = await row(candidate.id);
   const evaluation2 = await evaluateShow(fresh);

@@ -11,7 +11,7 @@ import { mapLimit } from './swr-cache';
 import { resolveShowIdentity, trackingState, type ShowRow } from './episode-guide.service';
 import { getSchedule } from './tvmaze/tvmaze.service';
 import { scheduleTimeZone } from './notifications/episode-alerts.model';
-import { verifiedCoverage, verifiedUnwatchedPremiere, decideStatus, effectiveStatus, isManaged, verifyCompletion, type CompletionCheck, type ReopenCheck, type StatusTransition, type TVMazeEvidence } from './show-status.model';
+import { hasRegularTracking, verifiedPremieresAfterBaseline, verifiedPremiereAfterBaseline, verifiedCoverage, verifiedUnwatchedPremiere, decideStatus, effectiveStatus, isManaged, verifyCompletion, type CompletionCheck, type ReopenCheck, type StatusTransition, type TVMazeEvidence } from './show-status.model';
 
 /** TVMaze evidence for a show, through the same verified identity and cached schedules as Upcoming and notifications. */
 export async function tvmazeEvidence(show: { name: string; overview: string | null; tmdbId: number | null; tvmazeId: number | null }): Promise<TVMazeEvidence> {
@@ -27,9 +27,10 @@ export async function tvmazeEvidence(show: { name: string; overview: string | nu
 
 export const automaticStatusWritesEnabled = () => process.env.TV_STATUS_RECONCILIATION_ENABLED === 'true';
 const recordKeys = (rows: { season: number; episode: number }[]) => rows.map(e => `${e.season}:${e.episode}`).sort().join(',');
-export type Evaluation = { released: number; watched: number; unwatched: string[]; evidenceIssue: string | null; watches: string; unwatches: string; status: string | null; completion: CompletionCheck; reopen: ReopenCheck; transition: StatusTransition | null };
+export type LegacyCompletionReview = { legacyCompletion: boolean; confirmationRequired: boolean; completionBaseline: string | null; explanation: string };
+export type Evaluation = LegacyCompletionReview & { released: number; watched: number | null; unwatched: string[]; evidenceIssue: string | null; watches: string; unwatches: string; status: string | null; completion: CompletionCheck; reopen: ReopenCheck; transition: StatusTransition | null };
 /** Evaluate one show without writing anything. Null when TMDB episode data cannot be loaded. */
-export async function evaluateShow(show: ShowRow, options: { now?: Date } = {}): Promise<Evaluation | null> {
+export async function evaluateShow(show: ShowRow, options: { now?: Date; confirmedCompletionBaseline?: Date } = {}): Promise<Evaluation | null> {
   const now = options.now ?? new Date();
   const status = effectiveStatus(show);
   if (!isManaged(status) || !show.tmdbId) return null;
@@ -42,9 +43,20 @@ export async function evaluateShow(show: ShowRow, options: { now?: Date } = {}):
   const known = new Set(state.episodes.map(e => `${e.season}:${e.number}`));
   const unmapped = [...state.watches, ...state.unwatches].some(e => e.season > 0 && e.episode > 0 && !known.has(`${e.season}:${e.episode}`));
   const evidenceIssue = unmapped ? 'Saved watch or unwatch identity does not fit TMDB episodes' : !state.progress.progressReliable ? 'Episode metadata incomplete or checkpoint needs review' : coverage.reason;
-  const reopen: ReopenCheck = evidenceIssue ? { reopen: false, reason: evidenceIssue }
+  const legacyCompletion = status === 'completed' && !hasRegularTracking({ ...show, watches: state.watches, unwatches: state.unwatches });
+  const baseline = options.confirmedCompletionBaseline;
+  const confirmationRequired = legacyCompletion && !baseline;
+  const explanation = legacyCompletion
+    ? baseline ? `Personal Completed preserved through your confirmed baseline ${baseline.toISOString()}. Actual viewing is unrecorded; only verified new premieres after that instant are candidates. This confirmation is for this preview only.`
+      : 'Personal Completed is viewing evidence. No regular episode history or checkpoint was recorded; actual viewing is unknown. Confirm when you had finished all then-premiered regular episodes before any reopening can be proposed. Saved status timestamps are not a confirmed viewing baseline.'
+    : 'Effective episode tracking is available. Review this correction individually before activation.';
+  const reopen: ReopenCheck = confirmationRequired ? { reopen: false, reason: explanation } : evidenceIssue ? { reopen: false, reason: evidenceIssue }
+    : legacyCompletion && baseline ? verifiedPremiereAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline })
     : verifiedUnwatchedPremiere({ episodes: state.episodes, tvmaze, today: state.today, now });
-  return { released: coverage.released.length, watched: coverage.released.filter(e => e.watched).length, unwatched: coverage.released.filter(e => !e.watched).map(e => `S${e.season}E${e.number}`), evidenceIssue, watches: recordKeys(state.watches), unwatches: recordKeys(state.unwatches), status, completion, reopen, transition: evidenceIssue ? null : decideStatus({ status, completion, reopen }) };
+  const relevantGaps = legacyCompletion
+    ? baseline ? verifiedPremieresAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline }).episodes : []
+    : coverage.released.filter(e => !e.watched);
+  return { legacyCompletion, confirmationRequired, completionBaseline: legacyCompletion && baseline ? baseline.toISOString() : null, explanation, released: coverage.released.length, watched: legacyCompletion ? null : coverage.released.filter(e => e.watched).length, unwatched: relevantGaps.map(e => `S${e.season}E${e.number}`), evidenceIssue, watches: recordKeys(state.watches), unwatches: recordKeys(state.unwatches), status, completion, reopen, transition: evidenceIssue || confirmationRequired ? null : decideStatus({ status, completion, reopen }) };
 }
 
 /** Compare-and-set: only when the status fields are still exactly what was evaluated. True when a row changed. */
@@ -122,7 +134,7 @@ export function startShowStatusMonitor(intervalMinutes = 15) {
   return { stop: () => { clearTimeout(first); clearInterval(timer); monitorStatus.running = false; } };
 }
 
-export type PreviewRow = {
+export type PreviewRow = LegacyCompletionReview & {
   released: number | null; watched: number | null; unwatched: string[];
   showId: string; name: string; status: string | null;
   /** What happens without your approval: changes the automatic rules make on their own (future premieres and actions). */
@@ -133,20 +145,29 @@ export type PreviewRow = {
   ambiguous: boolean;
 };
 /** Read-only: how the rules see each of the user's managed shows today. Writes nothing. */
-export async function statusPreview(userId: string, now = new Date()): Promise<PreviewRow[]> {
+export async function statusPreview(userId: string, now = new Date(), confirmedBaselines: Record<string, string> = {}): Promise<PreviewRow[]> {
   const shows = await prisma.show.findMany({ where: { userId }, orderBy: { name: 'asc' } });
   const rows = await mapLimit(shows, 3, async (show): Promise<PreviewRow> => {
     const status = effectiveStatus(show);
-    const base = { released: null, watched: null, unwatched: [] as string[], showId: show.id, name: show.name, status };
+    const base = { legacyCompletion: false, confirmationRequired: false, completionBaseline: null as string | null, explanation: '', released: null, watched: null, unwatched: [] as string[], showId: show.id, name: show.name, status };
     if (!isManaged(status)) return { ...base, automatic: null, retroactive: null, completion: status ? `${status}: never changed automatically` : 'no status: never changed automatically', reopen: '-', ambiguous: false };
-    if (!show.tmdbId) return { ...base, automatic: null, retroactive: null, completion: 'not linked to TMDB', reopen: '-', ambiguous: true };
-    const evaluation = await evaluateShow(show, { now });
-    if (!evaluation) return { ...base, automatic: null, retroactive: null, completion: 'TMDB episode data unavailable', reopen: '-', ambiguous: true };
+    const unavailable = async (reason: string): Promise<PreviewRow> => {
+      const [watches, unwatches] = await Promise.all([
+        prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true } }),
+        prisma.episodeUnwatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true } }),
+      ]);
+      const legacyCompletion = status === 'completed' && !hasRegularTracking({ ...show, watches, unwatches });
+      const explanation = legacyCompletion ? `Personal Completed preserved. Actual viewing is unrecorded, not zero. ${reason}. A completion baseline requires your confirmation before new premieres can be assessed.` : reason;
+      return { ...base, legacyCompletion, confirmationRequired: legacyCompletion && !confirmedBaselines[show.id], completionBaseline: confirmedBaselines[show.id] ?? null, explanation, automatic: null, retroactive: null, completion: explanation, reopen: '-', ambiguous: true };
+    };
+    if (!show.tmdbId) return unavailable('not linked to TMDB');
+    const evaluation = await evaluateShow(show, { now, confirmedCompletionBaseline: confirmedBaselines[show.id] ? new Date(confirmedBaselines[show.id]) : undefined });
+    if (!evaluation) return unavailable('TMDB episode data unavailable');
     const t = evaluation.transition;
-    const automatic = automaticStatusWritesEnabled() ? t : null;
+    const automatic = automaticStatusWritesEnabled() && !evaluation.legacyCompletion ? t : null;
     return {
-      ...base, released: evaluation.evidenceIssue ? null : evaluation.released, watched: evaluation.evidenceIssue ? null : evaluation.watched, unwatched: evaluation.unwatched, automatic, retroactive: t && !automatic ? t : null,
-      completion: evaluation.evidenceIssue ?? (evaluation.completion.complete ? 'verified complete' : evaluation.completion.reason),
+      ...base, legacyCompletion: evaluation.legacyCompletion, confirmationRequired: evaluation.confirmationRequired, completionBaseline: evaluation.completionBaseline, explanation: evaluation.explanation + (evaluation.evidenceIssue ? ` Verification issue: ${evaluation.evidenceIssue}` : ''), released: evaluation.evidenceIssue ? null : evaluation.released, watched: evaluation.evidenceIssue ? null : evaluation.watched, unwatched: evaluation.unwatched, automatic, retroactive: t && !automatic ? t : null,
+      completion: evaluation.legacyCompletion ? evaluation.explanation + (evaluation.evidenceIssue ? ` Verification issue: ${evaluation.evidenceIssue}` : '') : evaluation.evidenceIssue ?? (evaluation.completion.complete ? 'verified complete' : evaluation.completion.reason),
       reopen: evaluation.reopen.reopen ? `S${evaluation.reopen.season}E${evaluation.reopen.number} premiered` : evaluation.reopen.reason,
       ambiguous: !!evaluation.evidenceIssue || (!evaluation.completion.complete && /incomplete|unavailable|does not fit|TVMaze has no|cannot/i.test(evaluation.completion.reason)),
     };

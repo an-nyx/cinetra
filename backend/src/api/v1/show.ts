@@ -50,6 +50,21 @@ router.get("/status-preview", async (req: Request, res: Response) => {
   catch (error) { console.error('Status preview failed:', error instanceof Error ? error.name : 'unknown error'); res.status(500).json({ message: 'Status preview unavailable' }); }
 });
 
+/** Optional user-confirmed baselines affect this read-only preview only; nothing is persisted. */
+router.post('/status-preview', async (req: Request, res: Response) => {
+  const baselines = req.body?.confirmedCompletionBaselines;
+  if (!baselines || typeof baselines !== 'object' || Array.isArray(baselines) || Object.keys(baselines).length > 1000 ||
+    Object.entries(baselines).some(([id, value]) => !id || typeof value !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) || !Number.isFinite(Date.parse(value)) ||
+      new Date(value).toISOString() !== value || Date.parse(value) > Date.now())) {
+    res.status(400).json({ message: 'Provide valid past completion instants for this preview' }); return;
+  }
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ automaticWritesEnabled: automaticStatusWritesEnabled(), generatedAt: new Date().toISOString(), shows: await statusPreview(req.user.id, new Date(), baselines) });
+  } catch { res.status(500).json({ message: 'Status preview unavailable' }); }
+});
+
 router.get("/tracking", async (req: Request, res: Response) => {
   try { res.json(await getLibraryTracking(req.user.id)); }
   catch (error) { guideError(res, error); }
