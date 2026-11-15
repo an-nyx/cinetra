@@ -50,6 +50,8 @@ def set_env(key, value):
     existing = [e for e in variables if e['key'] == key and not e.get('is_preview')]
     if len(existing) > 1:
         raise RuntimeError('Ambiguous application environment variable: ' + key)
+    if existing and existing[0].get('value') == value and existing[0].get('is_runtime') is not False:
+        return  # Already correct: no unnecessary configuration write.
     api(f'/applications/{app_id}/envs', 'PATCH' if existing else 'POST', {'key': key, 'value': value, 'is_preview': False, 'is_literal': True, 'is_runtime': True, 'is_buildtime': False})
     saved = [e for e in api(f'/applications/{app_id}/envs') if e['key'] == key and not e.get('is_preview')]
     if len(saved) != 1 or saved[0].get('value') != value or saved[0].get('is_runtime') is False:
