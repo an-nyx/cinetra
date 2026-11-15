@@ -9,13 +9,14 @@ app_id = os.environ['COOLIFY_APP_UUID']
 url = os.environ['CINETRA_URL'].rstrip('/')
 
 def health():
-    with urllib.request.urlopen(url + '/api/v1/health', timeout=20) as response:
+    request = urllib.request.Request(url + '/api/v1/health', headers={'User-Agent': 'Cinetra-Deployment/1.0', 'Accept': 'application/json'})
+    with urllib.request.urlopen(request, timeout=20) as response:
         return json.load(response)
 
 previous_push = health().get('notifications', {})
 request = urllib.request.Request(
     base + f'/deploy?uuid={app_id}', method='POST',
-    headers={'Authorization': 'Bearer ' + os.environ['COOLIFY_TOKEN']})
+    headers={'Authorization': 'Bearer ' + os.environ['COOLIFY_TOKEN'], 'User-Agent': 'Cinetra-Deployment/1.0', 'Accept': 'application/json'})
 with urllib.request.urlopen(request, timeout=30) as response:
     queued = json.load(response)
 print('Deployment queued: ' + queued['deployments'][0]['deployment_uuid'], flush=True)

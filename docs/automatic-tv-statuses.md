@@ -53,7 +53,7 @@ manual edits, concurrent changes, disabled writes and read-only preview behavior
 
 The preview image pins the runtime flag to `false` at Node startup; the release
 workflow verifies the exact live value after deployment without modifying Coolify
-environment settings (the deployment token has deploy-only access).
+environment settings or requiring permission to edit those settings.
 The live health response exposes `showStatus.automaticWritesEnabled: false` and
 `showStatus.running: false`; disabled episode reconciliation returns immediately,
 and the writer independently refuses writes. Web Push uses its existing scheduler.
