@@ -65,6 +65,7 @@ jobs:
         pnpm install --frozen-lockfile
         pnpm exec tsc --noEmit
         pnpm test:episode-toggle
+        pnpm test:library
         pnpm build
     - name: Deploy while preserving automatic statuses and Web Push
       env:

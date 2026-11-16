@@ -1,4 +1,3 @@
-import { toast } from "sonner";
 import { localeFor, localizedEpisodeLine, localizedShortDay } from "@/i18n/calendar";
 import { verifiedShowCounts, unavailableShowCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
@@ -12,6 +11,7 @@ import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
 import type { ShowType } from "@/types";
 import { posterSrc } from "@/lib/poster";
+import { createHomeTracking } from "@/lib/home-tracking";
 import { episodeCode, homeDashboard, savedPositionCode } from "@/lib/tracking";
 import { groupReleaseEvents, timeLabel } from "@/lib/upcoming-calendar";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
@@ -50,34 +50,31 @@ export default function WelcomePage() {
   const movieDiscovery = useMovieDiscovery();
   const upcomingMovies = useMemo(() => filterMovieReleases(movieDiscovery.data?.releases || [], "all", now).slice(0, 3), [movieDiscovery.data, now]);
 
+  const featuredId = useRef<string | null>(null);
+  const controller = useMemo(() => createHomeTracking({
+    read: () => Promise.all([ShowService.getAllShows(), ShowService.getLibraryTracking(true)]),
+    save: item => ShowService.setEpisodeWatched(item.showId, item.nextEpisode!.season, item.nextEpisode!.number, true),
+    publish: (library, progress) => { setShows(library); setTracking(progress); setError(""); },
+    pending: setBusy,
+  }), []);
   const load = useCallback(async () => {
-    try { const [library, progress] = await Promise.all([ShowService.getAllShows(), ShowService.getLibraryTracking()]); setShows(library); setTracking(progress); setError(""); }
+    try { await controller.load(); }
     catch { setError("Could not load your tracking dashboard."); }
     finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); window.addEventListener("tracking-updated", load); return () => window.removeEventListener("tracking-updated", load); }, [load]);
+  }, [controller]);
+  useEffect(() => {
+    void load();
+    window.addEventListener("tracking-updated", load);
+    return () => { controller.invalidate(); window.removeEventListener("tracking-updated", load); };
+  }, [load, controller]);
 
-  const dash = useMemo(() => homeDashboard(tracking), [tracking]);
+  const dash = useMemo(() => homeDashboard(tracking, 6, featuredId.current), [tracking]);
+  useEffect(() => { featuredId.current = dash.featured?.showId ?? null; }, [dash.featured?.showId]);
   const comingSoon = useMemo(() => groupReleaseEvents(upcoming.schedule?.releases || [], now).slice(0, 3), [upcoming.schedule, now]);
   const open = (showId: string, fixMatch = false) => { setEditMatch(fixMatch); setSelectedShow(showId); };
-  const nextPending = useRef(false);
   const markNext = async (item: TrackingSummary) => {
-    if (!item.nextEpisode || nextPending.current) return;
-    nextPending.current = true;
-    setBusy(item.showId);
-    const previous = tracking;
-    setTracking(items => items.map(row => row.showId === item.showId ? { ...row, nextEpisode: null } : row));
-    try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); }
-    catch {
-      setTracking(previous);
-      toast.error('Could not save episode. Your change was undone. Reload and try again.');
-      nextPending.current = false;
-      setBusy(null);
-      return;
-    }
-    // A failed refresh must never roll back a successful save.
-    try { setTracking(await ShowService.getLibraryTracking()); } catch { /* keep committed UI */ }
-    finally { nextPending.current = false; setBusy(null); }
+    try { await controller.mark(item); }
+    catch (error) { setError(error instanceof Error && error.message.startsWith("Episode saved.") ? error.message : "Could not save episode. Please try again."); }
   };
   const featured = dash.featured;
   const newShown = allNew ? dash.newEpisodes : dash.newEpisodes.slice(0, 3);
@@ -108,7 +105,7 @@ export default function WelcomePage() {
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{featured.progressPercent !== null ? `${featured.progressPercent}% · ` : ""}{featured.countDataAvailable ? `${featured.remainingCount} unwatched` : phrase(language, "Count unavailable")}</span>
             </div>
             <div className="mt-2 flex justify-end">
-              <Button size="sm" className="h-9 max-w-full gap-1 rounded-full px-3 text-xs" disabled={!!busy} onClick={() => markNext(featured)} aria-label={`Mark ${nextCode(featured)} of ${featured.name} watched`}><Check className="size-3.5" /><T>Mark next watched</T></Button>
+              <Button size="sm" className="h-9 max-w-full gap-1 rounded-full px-3 text-xs" disabled={!!busy} onClick={() => markNext(featured)} aria-label={`Mark ${nextCode(featured)} of ${featured.name} watched`}><Check className="size-3.5" />{busy === featured.showId ? "Updating…" : <T>Mark next watched</T>}</Button>
             </div>
           </div>
         </div> : <p className="mt-1 text-sm text-muted-foreground">{phrase(language, shows.length ? "You're caught up — no released episode is waiting." : "Add a show to start tracking.")} <Link to="/shows" className="text-primary"><T>Go to Shows</T></Link></p>}

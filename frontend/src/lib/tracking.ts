@@ -62,11 +62,12 @@ const statusRank = (s: TrackingSummary) => (s.status === "watching" ? 0 : !s.sta
  *   episodes are never "available"), excluding Dropped shows and the featured show;
  * - recent: real recorded watch timestamps only (saved positions carry no dates and are never shown as activity).
  */
-export function homeDashboard(tracking: TrackingSummary[], continueLimit = 6) {
+export function homeDashboard(tracking: TrackingSummary[], continueLimit = 6, preferredShowId: string | null = null) {
   const items = tracking.filter(item => item && typeof item === "object" && !item.error);
   const playable = items.filter(canContinueWatching)
     .sort((a, b) => latestWatch(b) - latestWatch(a) || statusRank(a) - statusRank(b) || b.newEpisodes - a.newEpisodes || a.name.localeCompare(b.name));
-  const featured = playable[0] || null;
+  const featured = playable.find(item => item.showId === preferredShowId) || playable[0] || null;
+  const remaining = playable.filter(item => item.showId !== featured?.showId);
   const newEpisodes = items
     .filter(item => item.status !== "dropped" && item.showId !== featured?.showId && item.countDataAvailable && item.remainingCount > 0 && (item.newEpisodes > 0 || !!item.newSeasonToWatch))
     .sort((a, b) => Number(!!b.newSeasonToWatch) - Number(!!a.newSeasonToWatch) || latestWatch(b) - latestWatch(a) || b.newEpisodes - a.newEpisodes || a.name.localeCompare(b.name));
@@ -77,7 +78,7 @@ export function homeDashboard(tracking: TrackingSummary[], continueLimit = 6) {
   // Totals add up only shows whose counts are verified (reliable released-episode metadata); others are left out.
   const verified = items.filter(item => item.countDataAvailable && item.progressPercent !== null);
   return {
-    featured, continueWatching: playable.slice(1, 1 + continueLimit), moreToContinue: Math.max(0, playable.length - 1 - continueLimit),
+    featured, continueWatching: remaining.slice(0, continueLimit), moreToContinue: Math.max(0, playable.length - 1 - continueLimit),
     newEpisodes, recent,
     watching: items.filter(item => item.status === "watching").length,
     episodesWatched: verified.length ? verified.reduce((n, item) => n + item.watchedCount, 0) : null,

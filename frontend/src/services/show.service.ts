@@ -93,8 +93,8 @@ export type StatusChange = { from: "watching" | "completed"; to: "watching" | "c
 export type StatusPreviewRow = { legacyCompletion: boolean; confirmationRequired: boolean; completionBaseline: string | null; explanation: string; released: number | null; watched: number | null; unwatched: string[]; showId: string; name: string; status: string | null; automatic: StatusChange | null; retroactive: StatusChange | null; completion: string; reopen: string; ambiguous: boolean };
 
 class ShowServiceClass extends ApiService {
-  async getLibraryTracking(): Promise<TrackingSummary[]> {
-    const response = await this.get<TrackingSummary[]>("/show/tracking");
+  async getLibraryTracking(fresh = false): Promise<TrackingSummary[]> {
+    const response = await this.get<TrackingSummary[]>("/show/tracking", fresh ? { params: { fresh: 1 } } : undefined);
     return response.data;
   }
 
