@@ -300,9 +300,13 @@ const positionCovers = (show: { seasonsWatched: number; episodesWatched: number 
  * previous state. Other episodes use individual EpisodeWatch records, as before. Each change runs in a transaction
  * that locks the show row, so concurrent taps cannot interleave.
  */
-export async function setEpisodeWatched(showId: string, userId: string, season: number, episode: number, watched: boolean) {
+export async function setEpisodeWatched(showId: string, userId: string, season: number, episode: number, watched: boolean, fast = false) {
   if (!validNumber(season, 1) || !validNumber(episode, 1) || typeof watched !== 'boolean') throw new EpisodeGuideError(400, 'Invalid episode update');
-  const { catalog } = await load(showId, userId);
+  const owner = await prisma.show.findFirst({ where: { id: showId, userId } });
+  if (!owner) throw new EpisodeGuideError(404, 'Show not found');
+  const cached = owner.tmdbId ? catalogCache.peek(`tmdb:${owner.tmdbId}`) : undefined;
+  if (fast && !cached) throw new EpisodeGuideError(409, 'Episode metadata expired. Reload the episode guide and retry.');
+  const catalog = cached ?? await catalogFor(owner);
   const found = catalog.episodes.find(e => e.season === season && e.number === episode);
   if (!found) throw new EpisodeGuideError(404, 'Episode not found');
   if (watched && (!found.airDate || found.airDate > today())) throw new EpisodeGuideError(400, 'Episode has not aired');
@@ -310,6 +314,7 @@ export async function setEpisodeWatched(showId: string, userId: string, season: 
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
     const show = await tx.show.findFirst({ where: { id: showId, userId } });
     if (!show) throw new EpisodeGuideError(404, 'Show not found');
+    if (show.tmdbId !== owner.tmdbId) throw new EpisodeGuideError(409, 'Series match changed. Reload the episode guide.');
     await protectUnrecordedCompletion(tx, show);
     const [explicit, unwatch] = await Promise.all([
       tx.episodeWatch.findUnique({ where: { showId_season_episode: { showId, season, episode } } }),
@@ -325,7 +330,7 @@ export async function setEpisodeWatched(showId: string, userId: string, season: 
       if (covered && !unwatch) await tx.episodeUnwatch.create({ data: { showId, season, episode } });
     }
   });
-  return getTrackingSummary(showId, userId);
+  if (!fast) return getTrackingSummary(showId, userId);
 }
 
 /** Mark every released, not yet watched regular episode of one season watched (same rules as single episodes). */

@@ -4,7 +4,7 @@ import { CreateShowDto, UpdateShowDto } from '../../modules/show/model/show.enti
 import { getEpisodeGuide, getTrackingSummary, getLibraryTracking, getUpcomingReleases, setEpisodeWatched, setSeasonWatched, importLegacyProgress, EpisodeGuideError, invalidateUpcoming, previewRematch, applyRematch, RematchConflictError } from '../../services/episode-guide.service';
 
 import { TMDBApiService } from "../../services/tmdb/tmdb-api.service";
-import { automaticStatusWritesEnabled, reconcileAfterAction, statusPreview } from "../../services/show-status.service";
+import { automaticStatusWritesEnabled, reconcileAfterAction, statusPreview, queueStatusReconciliation, statusReconciliationPending } from "../../services/show-status.service";
 
 const router = Router();
 const tmdb = new TMDBApiService();
@@ -111,15 +111,21 @@ router.get("/:id/episodes", async (req: Request<{id: string}>, res: Response) =>
   catch (error) { guideError(res, error); }
 });
 
-// After every watch action the personal status is re-evaluated (Watching <-> Completed only; see show-status.model).
-// The response carries the summary as it is after any automatic change, plus that change, if one happened.
+// Acknowledge the committed watch only; providers and reconciliation run separately.
+router.get('/:id/status-reconciliation', async (req: Request<{id: string}>, res: Response) => {
+  const show = await showModule.Queries.GetByIdQuery.execute(req.params.id, req.user.id);
+  if (!show) { res.sendStatus(404); return; }
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ pending: statusReconciliationPending(req.params.id, req.user.id), show });
+});
 router.put("/:id/episodes/:season/:episode", async (req: Request<{id: string; season: string; episode: string}>, res: Response) => {
+  const started = performance.now();
   try {
-    await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched);
-    const statusChange = await reconcileAfterAction(req.params.id, req.user.id);
-    res.json({ ...(await getTrackingSummary(req.params.id, req.user.id)), statusChange });
-  }
-  catch (error) { guideError(res, error); }
+    await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched, true);
+    res.setHeader('Server-Timing', `episode-save;dur=${(performance.now() - started).toFixed(1)}`);
+    res.json({ saved: true, watched: req.body.watched, statusChange: null });
+    void queueStatusReconciliation(req.params.id, req.user.id);
+  } catch (error) { guideError(res, error); }
 });
 
 router.post("/:id/seasons/:season/watched", async (req: Request<{id: string; season: string}>, res: Response) => {

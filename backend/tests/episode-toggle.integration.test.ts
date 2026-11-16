@@ -65,14 +65,15 @@ async function main() {
   const { TMDBApiService } = await import('../src/services/tmdb/tmdb-api.service');
   const stubbed = TMDBApiService.prototype as unknown as Record<string, unknown>;
   const find = (id: number) => { const s = tmdb.get(id); if (!s) throw Object.assign(new Error('not found'), { isAxiosError: true, response: { status: 404 } }); return s; };
-  stubbed.getShow = async (id: number) => { const s = find(id); return { name: s.name, original_name: s.name, overview: '', first_air_date: s.seasons[0]?.air_date, status: s.status, in_production: s.status !== 'Ended', seasons: s.seasons, next_episode_to_air: s.next ?? null, poster_path: null }; };
+  let providerDelay = 0;
+  stubbed.getShow = async (id: number) => { if (providerDelay) await new Promise(r => setTimeout(r, providerDelay)); const s = find(id); return { name: s.name, original_name: s.name, overview: '', first_air_date: s.seasons[0]?.air_date, status: s.status, in_production: s.status !== 'Ended', seasons: s.seasons, next_episode_to_air: s.next ?? null, poster_path: null }; };
   stubbed.getSeason = async (id: number, n: number) => ({ episodes: find(id).pages[n] || [] });
   stubbed.getExternalIds = async (id: number) => ({ tvdbId: find(id).tvdb, imdbId: null });
 
   const { prisma } = await import('../src/database/prisma');
   const { invalidateCatalog } = await import('../src/services/episode-guide.service');
   const { resetTvmazeCachesForTests } = await import('../src/services/tvmaze/tvmaze.service');
-  const { runShowStatusMonitor, statusPreview, evaluateShow, applyTransition, startShowStatusMonitor, showStatusMonitorStatus } = await import('../src/services/show-status.service');
+  const { runShowStatusMonitor, statusPreview, evaluateShow, applyTransition, startShowStatusMonitor, showStatusMonitorStatus, queueStatusReconciliation, reconcileAfterAction } = await import('../src/services/show-status.service');
   const { ShowPrismaRepository } = await import('../src/modules/show/infra/show-prisma.repository');
   const { securityModule } = await import('../src/modules/security');
   const express = (await import('express')).default;
@@ -92,7 +93,17 @@ async function main() {
     if (text) { try { json = JSON.parse(text); } catch { json = { message: text }; } }
     return { status: res.status, json };
   };
-  const mark = (showId: string, season: number, episode: number, watched: boolean, who = user.id) => call('PUT', `/show/${showId}/episodes/${season}/${episode}`, { watched }, who);
+  const mark = async (showId: string, season: number, episode: number, watched: boolean, who = user.id) => {
+    await call('GET', `/show/${showId}/episodes?season=${season}`, undefined, who);
+    const before = await prisma.show.findUnique({ where: { id: showId } });
+    const result = await call('PUT', `/show/${showId}/episodes/${season}/${episode}`, { watched }, who);
+    if (result.status !== 200) return result;
+    assert.equal(result.json.saved, true);
+    await queueStatusReconciliation(showId, who);
+    const after = await prisma.show.findUniqueOrThrow({ where: { id: showId } });
+    // Status now arrives separately, after the committed watch acknowledgement.
+    return { ...result, json: { ...result.json, status: after.status, statusChange: before?.status !== after.status ? { to: after.status } : null } };
+  };
   const markSeason = (showId: string, season: number) => call('POST', `/show/${showId}/seasons/${season}/watched`);
   const row = (id: string) => prisma.show.findUniqueOrThrow({ where: { id } });
   const summary = async (id: string) => (await call('GET', `/show/${id}/tracking`)).json;
@@ -106,6 +117,30 @@ async function main() {
   // Every field automatic statuses must never touch.
   const untouched = (s: Awaited<ReturnType<typeof row>>) => ({ seasonsWatched: s.seasonsWatched, episodesWatched: s.episodesWatched, favorite: s.favorite, tmdbId: s.tmdbId, name: s.name, posterURL: s.posterURL, overview: s.overview });
 
+  // Reproduce the old critical path with an 11-second provider; compare the real fast HTTP save.
+  const slow = await addShow('Slow provider', 4999, series('Slow provider', 6999, { 1: episodes(2, -50) }));
+  await call('GET', `/show/${slow.id}/episodes?season=1`);
+  providerDelay = 11_000;
+  const oldStarted = performance.now();
+  await reconcileAfterAction(slow.id, user.id);
+  const beforeMs = performance.now() - oldStarted;
+  const newStarted = performance.now();
+  const fast = await call('PUT', `/show/${slow.id}/episodes/1/1`, { watched: true });
+  const afterMs = performance.now() - newStarted;
+  assert.equal(fast.status, 200);
+  assert.ok(beforeMs >= 11_000);
+  assert.ok(afterMs < 1000, `save waited ${afterMs}ms`);
+  assert.equal(await prisma.episodeWatch.count({ where: { showId: slow.id } }), 1);
+  providerDelay = 0;
+  await queueStatusReconciliation(slow.id, user.id);
+  console.log(`Latency with 11s TMDB: old reconciliation gate ${beforeMs.toFixed(1)}ms; new committed HTTP save ${afterMs.toFixed(1)}ms`);
+  invalidateCatalog(4999);
+  const coldStarted = performance.now();
+  const cold = await call('PUT', `/show/${slow.id}/episodes/1/1`, { watched: false });
+  assert.equal(cold.status, 409, 'cold metadata fails promptly instead of waiting on TMDB');
+  assert.ok(performance.now() - coldStarted < 1000);
+  assert.equal(await prisma.episodeWatch.count({ where: { showId: slow.id } }), 1);
+
   // ===== 1. Lifecycle: 7/8 Watching -> finale -> Completed -> S2 announced -> S2 premieres -> Watching -> Completed =====
   const life = series('Lifecycle', 7001, { 1: episodes(8, -80) }, { status: 'Returning Series' });
   const lifeShow = await addShow('Lifecycle', 5001, life);
@@ -113,7 +148,7 @@ async function main() {
   assert.equal((await row(lifeShow.id)).status, 'watching', '7 of 8 watched: still Watching');
   const before = untouched(await row(lifeShow.id));
   const finale = await mark(lifeShow.id, 1, 8, true);
-  assert.deepEqual([finale.json.statusChange?.to, finale.json.status], ['completed', 'completed'], 'watching the finale completes it in the same request');
+  assert.deepEqual([finale.json.statusChange?.to, finale.json.status], ['completed', 'completed'], 'watching the finale completes it in the background');
   let s = await row(lifeShow.id);
   assert.deepEqual([s.status, s.completed, s.completedMonitorFrom instanceof Date], ['completed', true, true]);
   assert.deepEqual(untouched(s), before, 'only status fields changed');

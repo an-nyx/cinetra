@@ -178,3 +178,22 @@ export async function statusPreview(userId: string, now = new Date(), confirmedB
   });
   return rows;
 }
+
+// One worker per show. A new action during evaluation requests another pass; compare-and-set
+// in applyTransition rejects stale watch evidence. The periodic monitor recovers after restarts.
+const actionJobs = new Map<string, { dirty: boolean; done: Promise<void> }>();
+export function queueStatusReconciliation(showId: string, userId: string) {
+  const key = `${userId}:${showId}`;
+  const existing = actionJobs.get(key);
+  if (existing) { existing.dirty = true; return existing.done; }
+  const job = { dirty: true, done: Promise.resolve() };
+  actionJobs.set(key, job);
+  job.done = Promise.resolve().then(async () => {
+    try { while (job.dirty) { job.dirty = false; await reconcileAfterAction(showId, userId); } }
+    finally { actionJobs.delete(key); }
+  });
+  return job.done;
+}
+export function statusReconciliationPending(showId: string, userId: string) {
+  return actionJobs.has(`${userId}:${showId}`);
+}

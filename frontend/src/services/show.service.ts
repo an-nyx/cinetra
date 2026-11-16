@@ -166,7 +166,13 @@ class ShowServiceClass extends ApiService {
       : (await this.api.get('/show/status-preview', { timeout: 120_000 })).data;
   }
 
-  /** Returns the automatic status change this action caused (Watching <-> Completed), if any. */
+  /** Status reconciliation is read separately from the episode save acknowledgement. */
+  async getReconciliation(id: string): Promise<{ pending: boolean; show: ShowType }> {
+    const result = (await this.get<{ pending: boolean; show: ShowType }>(`/show/${id}/status-reconciliation`)).data;
+    if (!result.pending) ApiService.clearCache();
+    return result;
+  }
+
   async setEpisodeWatched(id: string, season: number, episode: number, watched: boolean): Promise<StatusChange | null> {
     const response = await this.put<{ statusChange?: StatusChange | null }>(`/show/${id}/episodes/${season}/${episode}`, { watched });
     return response.data?.statusChange ?? null;

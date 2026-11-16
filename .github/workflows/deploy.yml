@@ -59,7 +59,14 @@ jobs:
         export DATABASE_URL=postgresql://postgres:status-test@127.0.0.1:55439/cinetra_push_test_20261110
         pnpm prisma migrate deploy
         pnpm test:notifications
-    - name: Deploy and activate approved full-library reconciliation
+    - name: Verify optimistic episode UI and frontend build
+      working-directory: frontend
+      run: |
+        pnpm install --frozen-lockfile
+        pnpm exec tsc --noEmit
+        pnpm test:episode-toggle
+        pnpm build
+    - name: Deploy while preserving automatic statuses and Web Push
       env:
         CINETRA_URL: https://cinetra.aniskh.com
         COOLIFY_URL: ${{ secrets.COOLIFY_URL }}

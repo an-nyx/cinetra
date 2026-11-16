@@ -2,7 +2,7 @@ import { useLocalizedOverview } from "@/hooks/use-localized-overview";
 import { progressMessage, completionNotice, newSeasonMessage, nextEpisodeMessage, savedPositionDescription, watchCounts, watchRecordCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
 import { posterSrc } from "@/lib/poster";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { ShowService } from "@/services";
 import type { EpisodeGuide, StatusChange, TrackingSummary, TrackedEpisode } from "@/services/show.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ShowType } from "@/types/index.ts";
 import { Check, CalendarDays, Pencil, Play, Trash2, Tv } from "lucide-react";
 import EditShowMatch from "./EditShowMatch";
+
+import { createWatchMutation } from "@/lib/optimistic-watch.mjs";
 
 interface Props {
   selectedShow: string | null;
@@ -40,6 +42,44 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
   const [matchNotice, setMatchNotice] = useState("");
   const [statusNotice, setStatusNotice] = useState<StatusChange | null>(null);
 
+  const watchMutation = useRef(createWatchMutation());
+  const currentShow = useRef(selectedShow);
+  currentShow.current = selectedShow;
+  const watchVersion = useRef(0);
+  const toggleEpisode = async (episodeSeason: number, number: number, watched: boolean) => {
+    if (!selectedShow || busy || !guide) return;
+    const id = selectedShow;
+    const previous = guide;
+    const previousSummary = summary;
+    let version = 0;
+    await watchMutation.current({
+      optimistic: () => {
+        version = ++watchVersion.current;
+        setBusy(true); setError("");
+        if (watched && summary?.nextEpisode?.season === episodeSeason && summary.nextEpisode.number === number) setSummary({ ...summary, nextEpisode: null });
+        setGuide({ ...previous, episodes: previous.episodes.map(e => previous.season === episodeSeason && e.number === number ? { ...e, watched } : e) });
+      },
+      save: () => ShowService.setEpisodeWatched(id, episodeSeason, number, watched),
+      rollback: () => { if (currentShow.current === id && watchVersion.current === version) { setGuide(previous); setSummary(previousSummary); } },
+      failed: () => { if (currentShow.current === id && watchVersion.current === version) { setBusy(false); setError('Could not save episode. Your change was undone. Reload the guide and try again.'); } },
+      settled: () => {
+        if (currentShow.current !== id || watchVersion.current !== version) return;
+        setBusy(false);
+        window.dispatchEvent(new Event('tracking-updated'));
+        // Refresh separately from saving; failed reads never undo a committed watch.
+        const sync = async () => {
+          const result = await ShowService.getReconciliation(id);
+          if (currentShow.current !== id || watchVersion.current !== version) return;
+          setShows(items => items.map(item => item.id === id ? result.show : item));
+          if (result.pending) { window.setTimeout(() => { void sync().catch(() => {}); }, 1500); return; }
+          const [data, loaded] = await Promise.all([ShowService.getTrackingSummary(id), ShowService.getEpisodeGuide(id, episodeSeason)]);
+          if (currentShow.current === id && watchVersion.current === version) { setSummary(data); setGuide(loaded); window.dispatchEvent(new Event('tracking-updated')); }
+        };
+        void sync().catch(() => {});
+      },
+    });
+  };
+
   const refresh = async (id: string, selectedSeason?: number) => {
     const data = await ShowService.getTrackingSummary(id);
     setSummary(data);
@@ -51,6 +91,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
   };
 
   useEffect(() => {
+    watchVersion.current++;
     if (!selectedShow) { setGuide(null); setSummary(null); return; }
     let active = true;
     setBusy(true); setError(""); setGuide(null); setSummary(null); setEditing(false); setStatusNotice(null);
@@ -164,7 +205,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
             <div className="grid gap-3 sm:grid-cols-2">
               <section className="cinema-surface border-primary/30 bg-primary/5 p-5">
                 <p className="cinema-eyebrow mb-2"><T>Watch next</T></p>
-                {summary.nextEpisode ? <><h3 className="font-semibold">{code(summary.nextEpisode)} · {summary.nextEpisode.name}</h3><p className="mt-1 text-xs text-muted-foreground">{nextEpisodeMessage(language, summary.nextEpisode.airDate, summary.remainingCount)}</p><Button className="mt-4 w-full gap-2" disabled={busy} onClick={() => act(() => ShowService.setEpisodeWatched(summary.showId, summary.nextEpisode!.season, summary.nextEpisode!.number, true), summary.nextEpisode!.season)}><Play className="size-4" /><T>Mark next episode watched</T></Button></> : <p className="text-sm text-muted-foreground">{summary.viewingState === "fully_watched" ? phrase(language, "Final regular episode watched. The series is confirmed ended.") : summary.viewingState === "caught_up" ? phrase(language, "Caught up with currently released episodes; future episodes may follow.") : summary.guideAvailable ? phrase(language, "No released episode to track.") : phrase(language, "Episode guide unavailable. Your watched episodes are kept.")}</p>}
+                {summary.nextEpisode ? <><h3 className="font-semibold">{code(summary.nextEpisode)} · {summary.nextEpisode.name}</h3><p className="mt-1 text-xs text-muted-foreground">{nextEpisodeMessage(language, summary.nextEpisode.airDate, summary.remainingCount)}</p><Button className="mt-4 w-full gap-2" disabled={busy} onClick={() => toggleEpisode(summary.nextEpisode!.season, summary.nextEpisode!.number, true)}><Play className="size-4" /><T>Mark next episode watched</T></Button></> : <p className="text-sm text-muted-foreground">{summary.viewingState === "fully_watched" ? phrase(language, "Final regular episode watched. The series is confirmed ended.") : summary.viewingState === "caught_up" ? phrase(language, "Caught up with currently released episodes; future episodes may follow.") : summary.guideAvailable ? phrase(language, "No released episode to track.") : phrase(language, "Episode guide unavailable. Your watched episodes are kept.")}</p>}
               </section>
               <section className="cinema-surface p-5"><p className="cinema-eyebrow mb-2"><T>Last watched</T></p>
                 <p className="font-semibold">{summary.lastEpisode ? `${code(summary.lastEpisode)} · ${summary.lastEpisode.name}` : summary.legacyPosition ? phrase(language, 'Earlier progress, no watch dates') : phrase(language, 'No episodes logged yet')}</p>
@@ -184,7 +225,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
                 const codeLabel = code({ ...e, season });
                 // Every watched episode can be unmarked, including ones covered by earlier saved progress; the server
                 // records the change without rewriting that progress.
-                return <button key={e.number} type="button" aria-label={`${phrase(language, e.watched ? 'Mark not watched' : 'Mark watched')} ${codeLabel} ${e.name}`} aria-pressed={e.watched} disabled={busy || (!aired && !e.watched)} onClick={() => act(() => ShowService.setEpisodeWatched(summary.showId, season, e.number, !e.watched))} className="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card/50 px-3 py-3 text-left transition-[background-color,border-color] hover:border-primary/50 hover:bg-primary/5 disabled:cursor-default disabled:opacity-65">
+                return <button key={e.number} type="button" aria-label={`${phrase(language, e.watched ? 'Mark not watched' : 'Mark watched')} ${codeLabel} ${e.name}`} aria-pressed={e.watched} disabled={busy || (!aired && !e.watched)} onClick={() => toggleEpisode(season, e.number, !e.watched)} className="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card/50 px-3 py-3 text-left transition-[background-color,border-color] hover:border-primary/50 hover:bg-primary/5 disabled:cursor-default disabled:opacity-65">
                   <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${e.watched ? 'border-primary bg-primary text-primary-foreground' : ''}`}>{e.watched && <Check className="size-4" />}</span>
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{codeLabel} · {e.name}</span><span className="text-xs text-muted-foreground">{e.airDate || phrase(language, 'Air date TBA')}{e.watchSource === 'legacy' ? ` · ${phrase(language, 'From earlier progress')}` : ''}</span></span>
                   {!aired && <CalendarDays className="size-4 shrink-0 text-muted-foreground" />}

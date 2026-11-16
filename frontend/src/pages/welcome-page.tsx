@@ -1,7 +1,8 @@
+import { toast } from "sonner";
 import { localeFor, localizedEpisodeLine, localizedShortDay } from "@/i18n/calendar";
 import { verifiedShowCounts, unavailableShowCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router";
 import { AlertTriangle, Check, ChevronDown, ChevronRight, RefreshCw, Tv } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,12 +60,24 @@ export default function WelcomePage() {
   const dash = useMemo(() => homeDashboard(tracking), [tracking]);
   const comingSoon = useMemo(() => groupReleaseEvents(upcoming.schedule?.releases || [], now).slice(0, 3), [upcoming.schedule, now]);
   const open = (showId: string, fixMatch = false) => { setEditMatch(fixMatch); setSelectedShow(showId); };
+  const nextPending = useRef(false);
   const markNext = async (item: TrackingSummary) => {
-    if (!item.nextEpisode || busy) return;
+    if (!item.nextEpisode || nextPending.current) return;
+    nextPending.current = true;
     setBusy(item.showId);
-    try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); await load(); }
-    catch { setError(`Could not update ${item.name}.`); }
-    finally { setBusy(null); }
+    const previous = tracking;
+    setTracking(items => items.map(row => row.showId === item.showId ? { ...row, nextEpisode: null } : row));
+    try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); }
+    catch {
+      setTracking(previous);
+      toast.error('Could not save episode. Your change was undone. Reload and try again.');
+      nextPending.current = false;
+      setBusy(null);
+      return;
+    }
+    // A failed refresh must never roll back a successful save.
+    try { setTracking(await ShowService.getLibraryTracking()); } catch { /* keep committed UI */ }
+    finally { nextPending.current = false; setBusy(null); }
   };
   const featured = dash.featured;
   const newShown = allNew ? dash.newEpisodes : dash.newEpisodes.slice(0, 3);

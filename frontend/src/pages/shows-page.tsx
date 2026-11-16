@@ -1,6 +1,7 @@
+import { toast } from "sonner";
 import { T, phrase, useLanguage } from "@/i18n";
 import { useLocation, useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
 
@@ -79,10 +80,22 @@ export default function ShowsPage() {
     return () => window.removeEventListener('tracking-updated', refresh);
   }, [shows.length]);
 
+  const nextPending = useRef(false);
   const markNext = async (item: TrackingSummary) => {
-    if (!item.nextEpisode) return;
-    try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); setTracking(await ShowService.getLibraryTracking()); }
-    catch (error) { console.error('Could not mark next episode watched', error); }
+    if (!item.nextEpisode || nextPending.current) return;
+    nextPending.current = true;
+    const previous = tracking;
+    setTracking(items => items.map(row => row.showId === item.showId ? { ...row, nextEpisode: null } : row));
+    try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); }
+    catch {
+      setTracking(previous);
+      toast.error('Could not save episode. Your change was undone. Reload and try again.');
+      nextPending.current = false;
+      return;
+    }
+    // A failed refresh must never roll back a successful save.
+    try { setTracking(await ShowService.getLibraryTracking()); } catch { /* keep committed UI */ }
+    finally { nextPending.current = false; }
   };
 
 

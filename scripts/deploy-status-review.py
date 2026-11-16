@@ -1,4 +1,4 @@
-"""Approved full-library rollout. Credentials stay in the Actions runner environment."""
+"""Deploy while preserving existing full-library settings. Credentials stay in the Actions runner environment."""
 import json
 import os
 import sys
@@ -68,20 +68,9 @@ def main():
             time.sleep(10)
         raise RuntimeError('Coolify deployment timed out; activation halted')
 
-    # A failed build or migration cannot reach the activation step.
-    staged = deploy()
-    require(staged['showStatus']['mode'] == 'full-library', 'Unexpected status automation implementation')
-    print('Tested revision deployed; migrations and Web Push health verified.', flush=True)
-    settings = [{'key': key, 'value': value, 'is_buildtime': False,
-                 'is_runtime': True, 'is_preview': False, 'is_literal': True}
-                for key, value in [('TV_STATUS_RECONCILIATION_MODE', 'full-library'),
-                                   ('TV_STATUS_RECONCILIATION_ENABLED', 'true')]]
-    try:
-        request(api + '/applications/' + app + '/envs/bulk', 'PATCH', {'data': settings}, token)
-    except RuntimeError as error:
-        raise RuntimeError(f'Activation environment update blocked: {error}. '
-                           'Grant the existing COOLIFY_TOKEN application environment write permission, then rerun this workflow.') from None
+    # Deploy without changing production runtime settings. This release changes no schema.
     current = deploy()
+    print('Tested revision deployed; migrations and Web Push health verified.', flush=True)
     status = current['showStatus']
     require(status['automaticWritesEnabled'] is True and status['automaticWritesConfigured'] == 'true'
             and status['activationMode'] == 'full-library' and status['running'] is True,
