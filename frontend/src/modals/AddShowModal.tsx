@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { T } from "@/i18n";
 import { useEffect, useState } from "react";
 import { ShowService } from "@/services";
@@ -30,6 +31,7 @@ export default function AddShowModal({
   shows,
   setShows,
 }: AddShowModalProps) {
+  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearch] = useState<string>("");
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [searchResults, setSearchResult] = useState<SearchResult[]>([]);
@@ -53,22 +55,21 @@ export default function AddShowModal({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!show.name || !show.id) return;
+    if (saving || !show.name || !show.id) return;
+    setSaving(true);
 
     ShowService.createShow({ name: show.name, overview: show.overview, posterURL: show.posterURL, tmdbId: show.id })
       .then((newShow) => {
         setShows([newShow, ...shows]);
+        toast.success("Added to library");
+        closeModal();
       })
       .catch((err) => {
         console.error(err);
-        if (err.response?.status === 409) {
-          alert(
-            `the show you're trying to add already exists in your list.`,
-          );
-        }
+        toast.error(err.response?.status === 409 ? "Already in your library" : "Unable to add. Please try again.");
       })
       .finally(() => {
-        closeModal();
+        setSaving(false);
       });
   };
 
@@ -164,7 +165,7 @@ export default function AddShowModal({
             >
               <T>Cancel</T>
             </Button>
-            <Button type="submit" disabled={!show.name}><T>Add to library</T></Button>
+            <Button type="submit" disabled={saving || !show.name}>{saving ? "Adding…" : <T>Add to library</T>}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

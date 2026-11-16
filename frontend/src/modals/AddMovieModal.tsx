@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { T } from "@/i18n";
 import { useEffect, useState } from "react";
 import { MovieService } from "@/services";
@@ -30,6 +31,7 @@ export default function AddMovieModal({
   movies,
   setMovies,
 }: AddMovieModalProps) {
+  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearch] = useState<string>("");
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [searchResult, setSearchResult] = useState<SearchResult[]>([]);
@@ -65,23 +67,22 @@ export default function AddMovieModal({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!movie.name || !movie.id) return;
+    if (saving || !movie.name || !movie.id) return;
+    setSaving(true);
 
     MovieService.createMovie({ name: movie.name, overview: movie.overview, posterURL: movie.posterURL, tmdbId: movie.id })
       .then((newMovie) => {
         setMovies([newMovie, ...movies]);
+        toast.success("Added to library");
+        closeModal();
         window.dispatchEvent(new Event("movies-updated"));
       })
       .catch((err) => {
         console.error(err);
-        if (err.response?.status === 409) {
-          alert(
-            `the movie you're trying to add already exists in your list.`,
-          );
-        }
+        toast.error(err.response?.status === 409 ? "Already in your library" : "Unable to add. Please try again.");
       })
       .finally(() => {
-        closeModal();
+        setSaving(false);
       });
   };
 
@@ -165,7 +166,7 @@ export default function AddMovieModal({
             >
               <T>Cancel</T>
             </Button>
-            <Button type="submit" disabled={!movie.name}><T>Add to library</T></Button>
+            <Button type="submit" disabled={saving || !movie.name}>{saving ? "Adding…" : <T>Add to library</T>}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

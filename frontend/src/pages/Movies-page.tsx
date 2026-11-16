@@ -1,3 +1,4 @@
+import LibraryFloatingActions from "@/components/library-floating-actions";
 import { T, phrase, useLanguage } from "@/i18n";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
@@ -75,6 +76,7 @@ export default function MoviesPage() {
 
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
+      <LibraryFloatingActions onUpdated={() => { MovieService.getAllMovies().then(setMovies); }} />
       <div className="library-heading mb-2 flex flex-col gap-2 sm:mb-7 sm:gap-5">
         <div className="hidden sm:block"><p className="cinema-eyebrow mb-2"><T>Your library</T></p><h1 className="text-4xl font-semibold tracking-tight"><T>Movies</T><span className="ml-3 text-base font-normal text-muted-foreground">{movies.length}</span></h1></div>
         <div className={`${controlsOpen ? "flex" : "hidden"} min-w-0 items-center gap-2 sm:flex`}>

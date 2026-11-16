@@ -1,3 +1,4 @@
+import LibraryFloatingActions from "@/components/library-floating-actions";
 import { toast } from "sonner";
 import { T, phrase, useLanguage } from "@/i18n";
 import { useLocation, useNavigate } from "react-router";
@@ -101,6 +102,7 @@ export default function ShowsPage() {
 
   return (
     <div className="library-page mx-auto w-full max-w-7xl px-4 py-2 sm:py-6 md:px-8 md:py-8">
+      <LibraryFloatingActions onUpdated={() => { ShowService.getAllShows().then(setShows); }} />
       <div className={`library-heading flex flex-col gap-2 sm:mb-7 sm:gap-5 ${controlsOpen ? 'mb-2' : 'mb-0'}`}>
         <div className="hidden sm:block"><p className="cinema-eyebrow mb-2 hidden sm:block"><T>Your collection</T></p><h1 className="text-2xl font-semibold tracking-tight sm:text-4xl"><T>TV shows</T><span className="ml-3 text-sm font-normal text-muted-foreground sm:text-base">{shows.length}</span></h1><p className="mt-2 hidden text-sm text-muted-foreground sm:block"><T>Your stories, right where you left them.</T></p></div>
 
