@@ -5,7 +5,7 @@ import { Heart, Tv } from "lucide-react";
 import { ShowType } from "@/types";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
-import { nextEpisodeCode, viewingStateLabel } from "@/lib/tracking";
+import { nextEpisodeCode } from "@/lib/tracking";
 import { posterSrc } from "@/lib/poster";
 import { personalStatus, personalStatusColors, personalStatusLabels } from "@/lib/show-library";
 
@@ -72,9 +72,9 @@ export default function Show({
         <p className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs leading-4 text-muted-foreground" title={tracking?.progressPercent == null ? (tracking ? progressMessage(language, tracking)?.detail : undefined) : undefined}>{tracking && !tracking.error && <>
           {tracking.progressPercent !== null
             ? <span className="truncate font-semibold text-foreground" title={watchCounts(language, tracking.watchedCount, tracking.releasedCount)}>{tracking.progressPercent}% · {tracking.watchedCount}/{tracking.releasedCount} {phrase(language, "Watched")}</span>
-            : <span className="truncate">{progressMessage(language, tracking)?.label || phrase(language, viewingStateLabel(tracking))}</span>}
+            : <span className="truncate">{progressMessage(language, tracking)?.label || phrase(language, "Progress unverified")}</span>}
         </>}</p>
-        <p className="truncate text-xs leading-4 text-muted-foreground">{tracking && !tracking.error && (nextEpisodeCode(tracking) ? `${phrase(language, "Next")} ${nextEpisodeCode(tracking)}` : phrase(language, viewingStateLabel(tracking)))}</p>
+        <p className="truncate text-xs leading-4 text-muted-foreground">{tracking && !tracking.error && nextEpisodeCode(tracking) ? `${phrase(language, "Next")} ${nextEpisodeCode(tracking)}` : null}</p>
         <div className="flex min-w-0 items-center">{tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="min-h-5 max-w-full truncate text-left text-xs font-semibold leading-4 text-primary hover:underline" onClick={() => onMarkNext(tracking)}><T>Mark next watched</T> <span aria-hidden="true">→</span></button>}</div>
       </div>
       <button type="button" className="absolute right-1.5 top-1.5 flex size-10 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary" aria-label={favoriteTitle(language, name, favorite)} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}><Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} /></button>
