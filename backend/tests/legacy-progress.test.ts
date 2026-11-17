@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { buildTrackingSummary, mergeShowEpisodes, type Catalog } from '../src/services/tracking-summary.model';
 import { calculateLegacyCoverage, calculateTrackingProgress, mergeEpisodeWatchState, type EpisodeCatalog } from '../src/services/legacy-progress.model';
 import { resolveTMDBRequestAuth } from '../src/services/tmdb/tmdb-auth';
 
@@ -132,3 +133,52 @@ function effective(c: EpisodeCatalog, season: number, episode: number, explicit:
 }
 
 console.log('legacy progress and TMDB authentication tests passed');
+
+// Effective summary: checkpoint union records minus legacy unwatch exceptions.
+// Checkpoints and input history are immutable; next means earliest gap, not latest recorded episode + 1.
+{
+  const base = catalog([4, 4]);
+  const c: Catalog = { ...base, source: 'TMDB', broadcastStatus: 'Returning Series', inProduction: true, nextEpisodeAnnounced: false,
+    episodes: base.episodes.map(e => ({ ...e, name: '', runtime: null, airTimestamp: null })) };
+  const show = { id: 'mixed', name: 'Mixed', posterURL: null, status: 'watching', completed: false, seasonsWatched: 1, episodesWatched: 3 };
+  const watches = [2, 4].map(episode => ({ season: 1, episode, watchedAt: new Date('2025-01-01') }));
+  watches.push({ season: 2, episode: 2, watchedAt: new Date('2025-01-02') });
+  const exceptions = [{ season: 1, episode: 1 }];
+  const before = JSON.stringify({ show, watches, exceptions, c });
+  const result = buildTrackingSummary(show, c, null, watches, today, null, exceptions);
+  assert.equal(result.watchedCount, 4, 'legacy 2,3 plus explicit 2,4 and S2E2: union without double count, excluding S1E1');
+  assert.equal(result.remainingCount, 4);
+  assert.equal(result.progressPercent, 50);
+  assert.deepEqual([result.nextEpisode!.season, result.nextEpisode!.number], [1, 1], 'unwatch exception is the first gap despite later history');
+  const merged = mergeShowEpisodes(show, c, watches, today, exceptions).episodes;
+  assert.equal(merged.find(e => e.season === 1 && e.number === 2)!.watchSource, 'both');
+  assert.equal(merged.find(e => e.season === 1 && e.number === 1)!.watched, false);
+  assert.equal(merged.filter(e => e.watched).length, result.watchedCount, 'guide and summary agree');
+  assert.equal(JSON.stringify({ show, watches, exceptions, c }), before, 'no checkpoint/history mutation');
+  const restored = buildTrackingSummary(show, c, null, [...watches, { season: 1, episode: 1, watchedAt: new Date('2025-01-03') }], today);
+  assert.equal(restored.watchedCount, 5);
+  assert.deepEqual([restored.nextEpisode!.season, restored.nextEpisode!.number], [2, 1], 'restoring gap advances across season boundary');
+}
+
+// Exhaustive independent set specification for all valid mixed states of a three-episode season.
+{
+  const base = catalog([3]);
+  const c: Catalog = { ...base, source: 'TMDB', episodes: base.episodes.map(e => ({ ...e, name: '', runtime: null, airTimestamp: null })) };
+  for (let checkpoint = 0; checkpoint <= 3; checkpoint++) {
+    for (let watchMask = 0; watchMask < 8; watchMask++) {
+      for (let unwatchMask = 0; unwatchMask < 8; unwatchMask++) {
+        if (watchMask & unwatchMask) continue; // writes keep these records mutually exclusive
+        const show = { id: 'matrix', name: 'Matrix', posterURL: null, status: 'watching', completed: false, seasonsWatched: checkpoint ? 1 : 0, episodesWatched: checkpoint };
+        const watches = [1, 2, 3].filter(n => watchMask & (1 << (n - 1))).map(episode => ({ season: 1, episode, watchedAt: new Date('2025-01-01') }));
+        const exceptions = [1, 2, 3].filter(n => n <= checkpoint && (unwatchMask & (1 << (n - 1)))).map(episode => ({ season: 1, episode }));
+        const expected = [1, 2, 3].filter(n => (watchMask & (1 << (n - 1))) || (n <= checkpoint && !(unwatchMask & (1 << (n - 1)))));
+        const next = [1, 2, 3].find(n => !expected.includes(n)) ?? null;
+        const result = buildTrackingSummary(show, c, null, watches, today, null, exceptions);
+        assert.equal(result.watchedCount, expected.length);
+        assert.equal(result.remainingCount, 3 - expected.length);
+        assert.equal(result.nextEpisode?.number ?? null, next);
+        assert.equal(result.progressPercent, Math.round(expected.length / 3 * 100));
+      }
+    }
+  }
+}

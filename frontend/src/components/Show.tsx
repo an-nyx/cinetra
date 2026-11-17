@@ -1,11 +1,11 @@
 import { openTitle, favoriteTitle } from "@/i18n/labels";
-import { progressMessage } from "@/i18n/tracking";
+import { progressMessage, watchCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
 import { Heart, Tv } from "lucide-react";
 import { ShowType } from "@/types";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
-import { nextEpisodeCode, savedPositionCode, viewingStateLabel } from "@/lib/tracking";
+import { nextEpisodeCode, viewingStateLabel } from "@/lib/tracking";
 import { posterSrc } from "@/lib/poster";
 import { personalStatus, personalStatusColors, personalStatusLabels } from "@/lib/show-library";
 
@@ -65,16 +65,16 @@ export default function Show({
         </button>
         {tracking?.newSeasonToWatch && <button type="button" onClick={() => setSelectedShow(id)} className="absolute inset-x-0 bottom-0 min-h-10 bg-black/80 px-1 text-center text-[11px] leading-4 text-white"><span className="block truncate font-semibold"><T>New season to watch</T></span><span className="block truncate">S{tracking.newSeasonToWatch.season} · {tracking.newSeasonToWatch.count} unwatched</span></button>}
       </div>
-      {/* Fixed rows keep every card the same height: title, personal status, progress, and the optional action. */}
-      <div className="grid min-w-0 grid-rows-[1.25rem_1rem_1rem_1.25rem] gap-px px-2.5 py-1 sm:grid-rows-[2.5rem_1.25rem_1.25rem_2.5rem] sm:gap-0.5 sm:px-3 sm:py-2">
+      {/* Fixed rows keep every card the same height: title, personal status, effective progress, next episode, and optional action. */}
+      <div className="grid min-w-0 grid-rows-[1.25rem_1rem_1rem_1rem_1.25rem] gap-px px-2.5 py-1 sm:grid-rows-[2.5rem_1.25rem_1.25rem_1.25rem_2.5rem] sm:gap-0.5 sm:px-3 sm:py-2">
         <button type="button" onClick={() => setSelectedShow(id)} title={name} className="block min-w-0 truncate text-left text-sm font-semibold leading-5 text-foreground hover:text-primary sm:line-clamp-2 sm:whitespace-normal sm:text-base"><bdi>{name}</bdi></button>
         <p className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs leading-4 text-muted-foreground" title={`${phrase(language, "Personal status")}: ${phrase(language, personalStatusLabels[savedStatus])}`}><span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ backgroundColor: borderColor || 'currentColor' }} /><span className="truncate">{phrase(language, personalStatusLabels[savedStatus])}</span></p>
         <p className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs leading-4 text-muted-foreground" title={tracking?.progressPercent == null ? (tracking ? progressMessage(language, tracking)?.detail : undefined) : undefined}>{tracking && !tracking.error && <>
           {tracking.progressPercent !== null
-            ? <span className="shrink-0 font-semibold text-foreground">{tracking.progressPercent}%</span>
+            ? <span className="truncate font-semibold text-foreground" title={watchCounts(language, tracking.watchedCount, tracking.releasedCount)}>{tracking.progressPercent}% · {tracking.watchedCount}/{tracking.releasedCount} {phrase(language, "Watched")}</span>
             : <span className="truncate">{progressMessage(language, tracking)?.label || phrase(language, viewingStateLabel(tracking))}</span>}
-          {(nextEpisodeCode(tracking) || savedPositionCode(tracking)) && <><span aria-hidden="true">•</span><span className="truncate">{nextEpisodeCode(tracking) ? `${phrase(language, "Next")} ${nextEpisodeCode(tracking)}` : `${phrase(language, "Saved")} ${savedPositionCode(tracking)}`}</span></>}
         </>}</p>
+        <p className="truncate text-xs leading-4 text-muted-foreground">{tracking && !tracking.error && (nextEpisodeCode(tracking) ? `${phrase(language, "Next")} ${nextEpisodeCode(tracking)}` : phrase(language, viewingStateLabel(tracking)))}</p>
         <div className="flex min-w-0 items-center">{tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="min-h-5 max-w-full truncate text-left text-xs font-semibold leading-4 text-primary hover:underline" onClick={() => onMarkNext(tracking)}><T>Mark next watched</T> <span aria-hidden="true">→</span></button>}</div>
       </div>
       <button type="button" className="absolute right-1.5 top-1.5 flex size-10 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary" aria-label={favoriteTitle(language, name, favorite)} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}><Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} /></button>

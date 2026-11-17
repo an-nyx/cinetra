@@ -168,3 +168,12 @@ test('a failed write leaves confirmed progress intact and allows retry', async (
   await flow.mark(initial[0]);
   assert.equal(busy, null);
 });
+
+test('effective progress labels ignore outdated checkpoints and keep gaps as next unwatched', async () => {
+  const { positionDetails } = await import('../src/lib/tracking.ts');
+  const mixed = summary('mixed', { legacyPosition: { fullSeasons: 1, episodesInNextSeason: 2 }, watchedCount: 7, releasedCount: 10, nextEpisode: { season: 1, number: 3 } });
+  assert.equal(positionDetails(mixed), '7/10 episodes watched · Next S01E03');
+  assert.equal(positionDetails(summary('caught', { viewingState: 'caught_up', nextEpisode: null, watchedCount: 10 })), '10/10 episodes watched · Caught up');
+  const unknown = positionDetails(summary('unknown', { progressPercent: null, viewingState: 'needs_review', nextEpisode: null, legacyPosition: { fullSeasons: 9, episodesInNextSeason: 99 } }));
+  assert.equal(unknown, 'Needs review');
+});

@@ -2,12 +2,9 @@ import type { TrackingSummary } from "@/services/show.service";
 
 /**
  * Shared viewing-state presentation for Shows, Home, Continue watching and Details.
- * The saved position and the next episode are separate facts: each is labelled on its own and one never replaces the other.
+ * Effective watched counts and next unwatched episode are authoritative; raw checkpoints are not current progress.
  */
 export const episodeCode = (season: number, episode: number) => `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
-
-export const savedPositionCode = (s: TrackingSummary) =>
-  s.legacyPosition ? episodeCode(s.legacyPosition.fullSeasons, s.legacyPosition.episodesInNextSeason) : null;
 
 export const nextEpisodeCode = (s: TrackingSummary) => (s.nextEpisode ? episodeCode(s.nextEpisode.season, s.nextEpisode.number) : null);
 
@@ -23,13 +20,13 @@ export function viewingStateLabel(s: TrackingSummary) {
   }
 }
 
-/** "Saved S02E04 · Next S02E05": whichever of the two facts exist, always both when both exist. */
+/** Effective progress only; a legacy checkpoint is never presented as the current episode. */
 export function positionDetails(s: TrackingSummary) {
   const parts: string[] = [];
-  const saved = savedPositionCode(s);
+  if (s.progressPercent !== null) parts.push(`${s.watchedCount}/${s.releasedCount} episodes watched`);
   const next = nextEpisodeCode(s);
-  if (saved) parts.push(`Saved ${saved}`);
   if (next) parts.push(`Next ${next}`);
+  else parts.push(viewingStateLabel(s));
   return parts.join(" · ");
 }
 
@@ -43,7 +40,7 @@ export function canContinueWatching(s: TrackingSummary) {
 /** Shows whose saved progress cannot be placed on episodes. Their saved positions are preserved and shown, not hidden. */
 export function attentionReason(s: TrackingSummary): string | null {
   if (s.error || s.status === "dropped") return null;
-  if (s.viewingState === "needs_review") return `Saved position ${savedPositionCode(s) ?? ""} does not fit the episode data`.replace("  ", " ");
+  if (s.viewingState === "needs_review") return "The saved checkpoint conflicts with episode data. Effective progress needs review.";
   if (!s.guideAvailable && (s.legacyPosition || s.explicitWatchedCount > 0)) return s.metadataError || "Episode data unavailable";
   return null;
 }

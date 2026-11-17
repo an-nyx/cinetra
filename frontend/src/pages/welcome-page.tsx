@@ -1,5 +1,5 @@
 import { localeFor, localizedEpisodeLine, localizedShortDay } from "@/i18n/calendar";
-import { verifiedShowCounts, unavailableShowCounts } from "@/i18n/tracking";
+import { watchCounts, verifiedShowCounts, unavailableShowCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router";
@@ -12,7 +12,7 @@ import type { TrackingSummary } from "@/services/show.service";
 import type { ShowType } from "@/types";
 import { posterSrc } from "@/lib/poster";
 import { createHomeTracking } from "@/lib/home-tracking";
-import { episodeCode, homeDashboard, savedPositionCode } from "@/lib/tracking";
+import { episodeCode, homeDashboard } from "@/lib/tracking";
 import { groupReleaseEvents, timeLabel } from "@/lib/upcoming-calendar";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
 import { filterMovieReleases } from "@/lib/movie-calendar";
@@ -99,7 +99,7 @@ export default function WelcomePage() {
           <div className="min-w-0 flex-1">
             <button type="button" onClick={() => open(featured.showId)} className="block max-w-full text-left"><span className="line-clamp-2 break-words text-base font-semibold leading-snug hover:text-primary">{featured.name}</span></button>
             <p className="mt-0.5 truncate text-xs text-muted-foreground"><span className="font-medium text-foreground/90"><T>Next</T> {nextCode(featured)}</span>{featured.nextEpisode?.name ? ` · ${featured.nextEpisode.name}` : ""}</p>
-            {savedPositionCode(featured) && <p className="truncate text-[11px] text-muted-foreground"><T>Saved</T> {savedPositionCode(featured)}</p>}
+            {featured.progressPercent !== null && <p className="truncate text-[11px] text-muted-foreground">{watchCounts(language, featured.watchedCount, featured.releasedCount)}</p>}
             <div className="mt-1.5 flex items-center gap-2">
               {featured.progressPercent !== null && <div className="mini-progress min-w-8 flex-1" role="progressbar" aria-label={phrase(language, "Released episodes watched") } aria-valuenow={featured.progressPercent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${featured.progressPercent}%` }} /></div>}
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{featured.progressPercent !== null ? `${featured.progressPercent}% · ` : ""}{featured.countDataAvailable ? `${featured.remainingCount} unwatched` : phrase(language, "Count unavailable")}</span>
