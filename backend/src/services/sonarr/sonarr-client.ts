@@ -45,6 +45,10 @@ export type SonarrSeriesResource = {
   titleSlug?: string; remotePoster?: string; images?: SonarrImage[]; seasons?: SonarrSeason[]; seriesType?: string; network?: string;
   path?: string; [key: string]: unknown;
 };
+export type SonarrEpisodeResource = {
+  id?: number; seriesId?: number; seasonNumber: number; episodeNumber: number; title?: string; airDateUtc?: string | null; hasFile?: boolean; monitored?: boolean;
+  [key: string]: unknown;
+};
 export type SonarrRootFolder = { id: number; path: string; accessible?: boolean; freeSpace?: number };
 export type SonarrQualityProfile = { id: number; name: string };
 
@@ -83,6 +87,25 @@ export class SonarrClient {
   }
   seriesByTvdbId(tvdbId: number) { return this.call<SonarrSeriesResource[]>(() => this.http.get('/series', { params: { tvdbId } })); }
   addSeries(payload: Record<string, unknown>) { return this.call<SonarrSeriesResource>(() => this.http.post('/series', payload, { timeout: 30_000 })); }
+  seriesById(seriesId: number) { return this.call<SonarrSeriesResource>(() => this.http.get(`/series/${positiveId(seriesId)}`)); }
+  episodes(seriesId: number) { return this.call<SonarrEpisodeResource[]>(() => this.http.get('/episode', { params: { seriesId: positiveId(seriesId) }, timeout: 20_000 })); }
+  /** Turns monitoring on (never off: Cinetra only adds to what Sonarr monitors) for exactly these episode IDs. */
+  monitorEpisodes(episodeIds: number[]) {
+    return this.call<SonarrEpisodeResource[]>(() => this.http.put('/episode/monitor', { episodeIds: episodeIds.map(positiveId), monitored: true }, { timeout: 30_000 }));
+  }
+  /** Series/season flags only; without monitoringOptions Sonarr does not change any episode. */
+  seasonPass(body: { series: Array<{ id: number; monitored?: true; seasons: Array<{ seasonNumber: number; monitored: true }> }> }) {
+    return this.call<unknown>(() => this.http.post('/seasonpass', body, { timeout: 30_000 }));
+  }
+  /** Searches exactly these episode IDs. */
+  searchEpisodes(episodeIds: number[]) {
+    return this.call<{ id?: number }>(() => this.http.post('/command', { name: 'EpisodeSearch', episodeIds: episodeIds.map(positiveId) }, { timeout: 30_000 }));
+  }
+}
+
+function positiveId(value: number) {
+  if (!Number.isInteger(value) || value <= 0) throw new SonarrError('rejected');
+  return value;
 }
 
 function toSonarrError(error: unknown): SonarrError {

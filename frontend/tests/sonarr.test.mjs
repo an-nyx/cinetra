@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, displayYear, formatFreeSpace, initialForm, mayDownload, monitorDescriptions,
-  monitorLabels, panelView, validateForm, withMonitor,
+  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, displayYear, episodeRequest, fill, formatFreeSpace, initialForm, modeDescriptions, modeLabels,
+  panelView, planIsEmpty, planSelection, reloadAfter, requestErrorMessage, seasonSelection, selectionProblem, stateLabels, toggle, toggleMany, validateForm,
+  visibleSeasons, withoutSpecials,
 } from '../src/lib/sonarr.ts';
 
 const series = { title: 'Breaking Bad', year: 2008, tvdbId: 81189, posterUrl: null, network: 'AMC', seasonCount: 5, source: 'tmdb_external_ids' };
@@ -33,10 +34,10 @@ test('panel: loading, hidden, add, exists and non-blocking notices', () => {
 
 test('form: safe defaults, remembered folder/profile, never remembered monitoring', () => {
   const fresh = initialForm(options, null);
-  assert.deepEqual(fresh, { rootFolderId: 2, qualityProfileId: null, monitor: 'none', monitorNewItems: 'none', searchForMissingEpisodes: false });
+  assert.deepEqual(fresh, { rootFolderId: 2, qualityProfileId: null, monitorNewItems: 'none' });
   assert.equal(validateForm(fresh, options), 'Choose a quality profile.');
   const rememberedForm = initialForm(options, { rootFolderId: 2, qualityProfileId: 4, monitor: 'all' });
-  assert.equal(rememberedForm.qualityProfileId, 4); assert.equal(rememberedForm.monitor, 'none');
+  assert.equal(rememberedForm.qualityProfileId, 4); assert.equal('monitor' in rememberedForm, false);
   // A remembered folder that is now inaccessible or gone is not reused.
   assert.equal(initialForm({ ...options, rootFolders: [...options.rootFolders, { id: 9, path: '/tv2', accessible: true, freeSpace: 1 }] }, { rootFolderId: 3 }).rootFolderId, null);
   assert.equal(initialForm(options, { qualityProfileId: 99 }).qualityProfileId, null);
@@ -44,24 +45,16 @@ test('form: safe defaults, remembered folder/profile, never remembered monitorin
 });
 
 test('form: validation mirrors the server', () => {
-  const ok = { rootFolderId: 2, qualityProfileId: 4, monitor: 'none', monitorNewItems: 'none', searchForMissingEpisodes: false };
+  const ok = { rootFolderId: 2, qualityProfileId: 4, monitorNewItems: 'none' };
   assert.equal(validateForm(ok, null), 'Loading Sonarr options…');
   assert.equal(validateForm({ ...ok, rootFolderId: 3 }, options), 'Choose a root folder.');
-  assert.equal(validateForm({ ...ok, monitor: 'bogus' }, options), 'Choose a monitoring option.');
-  assert.equal(validateForm({ ...ok, searchForMissingEpisodes: true }, options), 'Searching needs monitored episodes.');
   assert.equal(validateForm(ok, { ...options, rootFolders: [] }), 'Sonarr has no accessible root folder.');
   assert.equal(validateForm(ok, { ...options, qualityProfiles: [] }), 'Sonarr has no quality profiles.');
+  assert.equal(validateForm(ok, options), null);
 });
 
-test('monitoring selections: "none" turns searching off; download warning when anything is monitored', () => {
-  const base = { rootFolderId: 2, qualityProfileId: 4, monitor: 'future', monitorNewItems: 'none', searchForMissingEpisodes: true };
-  assert.equal(withMonitor(base, 'none').searchForMissingEpisodes, false);
-  assert.equal(withMonitor(base, 'all').searchForMissingEpisodes, true);
-  assert.equal(mayDownload({ ...base, monitor: 'none', searchForMissingEpisodes: false }), false);
-  assert.equal(mayDownload({ ...base, monitor: 'none', searchForMissingEpisodes: false, monitorNewItems: 'all' }), true);
-  assert.equal(mayDownload({ ...base, searchForMissingEpisodes: false }), true);
-  assert.deepEqual(addRequest(base, 81189), { tvdbId: 81189, rootFolderId: 2, qualityProfileId: 4, monitor: 'future', monitorNewItems: 'none', searchForMissingEpisodes: true });
-  for (const option of options.monitorOptions) { assert.ok(monitorLabels[option]); assert.ok(monitorDescriptions[option]); }
+test('adding never monitors or searches: the request step decides', () => {
+  assert.deepEqual(addRequest({ rootFolderId: 2, qualityProfileId: 4, monitorNewItems: 'all' }, 81189), { tvdbId: 81189, rootFolderId: 2, qualityProfileId: 4, monitor: 'none', monitorNewItems: 'all', searchForMissingEpisodes: false });
 });
 
 test('submission: one request at a time; a retry works after failure', async () => {
@@ -113,13 +106,15 @@ test('free space formatting', () => {
 
 test('translations exist for every Sonarr message', () => {
   const lib = fs.readFileSync(new URL('../src/lib/sonarr.ts', import.meta.url), 'utf8');
-  const panel = fs.readFileSync(new URL('../src/components/sonarr-panel.tsx', import.meta.url), 'utf8');
+  const panel = ['../src/components/sonarr-panel.tsx', '../src/components/sonarr-episodes.tsx'].map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8')).join('\n');
   const literals = new Set();
   for (const match of lib.matchAll(/(?:message|return|: )\s*"([A-Z][^"]{2,})"/g)) literals.add(match[1]);
   for (const match of panel.matchAll(/<T>(?:\{")?([^<"]+?)(?:"\})?<\/T>/g)) literals.add(match[1]);
   for (const match of panel.matchAll(/phrase\(language, "([^"]+)"\)/g)) literals.add(match[1]);
-  for (const text of [...Object.values(monitorLabels), ...Object.values(monitorDescriptions)]) literals.add(text);
-  assert.ok(literals.size > 40);
+  for (const match of panel.matchAll(/\? "([A-Z][^"]+)" : "([A-Z][^"]+)"/g)) { literals.add(match[1]); literals.add(match[2]); }
+  for (const text of [...Object.values(modeLabels), ...Object.values(modeDescriptions), ...Object.values(stateLabels)]) literals.add(text);
+  for (const code of ['selection_changed', 'identity_changed', 'not_in_sonarr', 'episodes_pending', 'empty_selection', 'in_progress', 'not_applied', 'uncertain', 'partial', 'unverified', 'search_failed', 'unmatched', 'timeout', 'unavailable', 'not_configured', 'forbidden', 'invalid_request', undefined]) literals.add(requestErrorMessage(code, 500));
+  assert.ok(literals.size > 80);
   for (const text of literals) {
     const entry = phrases[text];
     assert.ok(Array.isArray(entry) && entry.length === 2 && entry.every(value => value.trim()), `missing translation: ${text}`);
@@ -127,7 +122,7 @@ test('translations exist for every Sonarr message', () => {
 });
 
 test('security and separation: the browser never talks to Sonarr or touches viewing data', () => {
-  const files = ['../src/lib/sonarr.ts', '../src/components/sonarr-panel.tsx', '../src/services/sonarr.service.ts'].map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
+  const files = ['../src/lib/sonarr.ts', '../src/components/sonarr-panel.tsx', '../src/components/sonarr-episodes.tsx', '../src/services/sonarr.service.ts'].map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
   for (const source of files) {
     assert.ok(!/X-Api-Key|apikey|SONARR_API_KEY|VITE_SONARR/i.test(source), 'no Sonarr credentials in frontend code');
     assert.ok(!/\/api\/v3|sonarr\.aniskh\.com/i.test(source), 'no direct Sonarr API access');
@@ -135,4 +130,98 @@ test('security and separation: the browser never talks to Sonarr or touches view
   }
   const modal = fs.readFileSync(new URL('../src/modals/MovieModal.tsx', import.meta.url), 'utf8');
   assert.ok(!/Sonarr/i.test(modal), 'no Sonarr actions on movies');
+});
+
+/* ---------- Episode requests ---------- */
+
+const PAST = '2026-01-10T02:00:00.000Z';
+const e = (id, seasonNumber, episodeNumber, state = 'missing', monitored = false) => ({ id, seasonNumber, episodeNumber, title: `S${seasonNumber}E${episodeNumber}`, airDateUtc: state === 'unreleased' ? null : PAST, monitored, state });
+const view = (overrides = {}) => ({
+  tvdbId: 81189, seriesMonitored: false, sonarrUrl: 'https://sonarr.example.test/series/breaking-bad', pending: false, checkedAt: PAST,
+  seasons: [
+    { seasonNumber: 0, monitored: false, flag: true, episodes: [e(900, 0, 1)] },
+    { seasonNumber: 1, monitored: false, flag: true, episodes: [e(1001, 1, 1, 'downloaded'), e(1002, 1, 2), e(1003, 1, 3)] },
+    { seasonNumber: 2, monitored: false, flag: true, episodes: [e(2001, 2, 1), e(2002, 2, 2, 'unreleased')] },
+    { seasonNumber: 3, monitored: false, flag: true, episodes: [e(3001, 3, 1, 'unreleased')] },
+  ],
+  ...overrides,
+});
+const sel = (overrides) => ({ mode: 'seasons', seasons: [], episodeIds: [], search: false, ...overrides });
+
+test('plan: entire series excludes specials; search off by default', () => {
+  const plan = planSelection(view(), sel({ mode: 'series' }));
+  assert.deepEqual(plan.monitorIds.sort(), [1001, 1002, 1003, 2001, 2002, 3001]);
+  assert.deepEqual(plan.seasonNumbers, [1, 2, 3]);
+  assert.equal(plan.enableSeries, true);
+  assert.deepEqual(plan.searchIds, []);
+  assert.equal(plan.searchable, 3);
+  assert.deepEqual(planSelection(view(), sel({ mode: 'series', search: true })).searchIds.sort(), [1002, 1003, 2001]);
+});
+
+test('plan: multiple seasons; existing monitoring is counted, never removed', () => {
+  const v = view({ seriesMonitored: true });
+  v.seasons[1].monitored = true; v.seasons[1].episodes[0].monitored = true;
+  v.seasons[2].episodes[1].monitored = true; // outside the selection
+  const plan = planSelection(v, sel({ seasons: [1, 3], search: true }));
+  assert.deepEqual(plan.monitorIds, [1002, 1003, 3001]);
+  assert.deepEqual(plan.seasonNumbers, [3], 'season 1 flag is already on');
+  assert.equal(plan.enableSeries, false); assert.equal(plan.alsoActivated, 0);
+  assert.deepEqual(plan.searchIds, [1002, 1003]);
+  assert.equal(plan.counts.monitored, 1);
+});
+
+test('plan: specific episodes search only selected, released, missing ones', () => {
+  const v = view(); v.seasons[2].episodes[0].monitored = true;
+  const plan = planSelection(v, sel({ mode: 'episodes', episodeIds: [1001, 1003, 2002], search: true }));
+  assert.deepEqual(plan.monitorIds, [1001, 1003, 2002]);
+  assert.deepEqual(plan.seasonNumbers, [], 'no season flags for single episodes');
+  assert.deepEqual(plan.searchIds, [1003]);
+  assert.equal(plan.alsoActivated, 1, 'warns about the already-flagged episode that series monitoring would activate');
+  const request = episodeRequest(v, sel({ mode: 'episodes', episodeIds: [1001, 1003, 2002], search: true }), plan);
+  assert.deepEqual(request, { tvdbId: 81189, mode: 'episodes', episodeIds: [1001, 1003, 2002], search: true, expected: { monitor: 3, seasons: 0, search: 1, enableSeries: true } });
+});
+
+test('requests: mode-specific bodies and an honest confirmation', () => {
+  const v = view();
+  const series = sel({ mode: 'series', seasons: [1], episodeIds: [1002] });
+  assert.deepEqual(episodeRequest(v, series, planSelection(v, series)), { tvdbId: 81189, mode: 'series', search: false, expected: { monitor: 6, seasons: 3, search: 0, enableSeries: true } }, 'leftover picks of other modes are not sent');
+  const seasons = sel({ seasons: [3, 1], episodeIds: [1002] });
+  assert.deepEqual(episodeRequest(v, seasons, planSelection(v, seasons)).seasons, [1, 3]);
+  const noSearchable = sel({ mode: 'episodes', episodeIds: [1001], search: true });
+  assert.equal(episodeRequest(v, noSearchable, planSelection(v, noSearchable)).search, false, 'search is not requested when nothing is searchable');
+});
+
+test('selection problems block confirmation', () => {
+  const v = view();
+  assert.equal(selectionProblem(null, sel({}), null), 'Loading episodes…');
+  assert.equal(selectionProblem({ ...v, pending: true }, sel({}), null), 'Sonarr is still loading episodes.');
+  assert.equal(selectionProblem(v, sel({}), planSelection(v, sel({}))), 'Choose at least one season.');
+  assert.equal(selectionProblem(v, sel({ mode: 'episodes' }), planSelection(v, sel({ mode: 'episodes' }))), 'Choose at least one episode.');
+  const done = view({ seriesMonitored: true }); for (const season of done.seasons) { season.monitored = true; for (const episode of season.episodes) episode.monitored = true; }
+  const plan = planSelection(done, sel({ seasons: [1] }));
+  assert.ok(planIsEmpty(plan));
+  assert.equal(selectionProblem(done, sel({ seasons: [1] }), plan), 'Everything selected is already monitored.');
+  assert.equal(selectionProblem(done, sel({ seasons: [1], search: true }), planSelection(done, sel({ seasons: [1], search: true }))), null, 'searching an already-monitored selection is allowed');
+});
+
+test('picker helpers: specials hidden by default, tri-state seasons, toggles', () => {
+  const v = view();
+  assert.deepEqual(visibleSeasons(v, false).map(season => season.seasonNumber), [1, 2, 3]);
+  assert.deepEqual(visibleSeasons(v, true).map(season => season.seasonNumber), [0, 1, 2, 3]);
+  assert.deepEqual(withoutSpecials(v, sel({ seasons: [0, 1], episodeIds: [900, 1002] })), sel({ seasons: [1], episodeIds: [1002] }));
+  assert.equal(seasonSelection(v.seasons[1], []), 'none');
+  assert.equal(seasonSelection(v.seasons[1], [1002]), 'some');
+  assert.equal(seasonSelection(v.seasons[1], [1001, 1002, 1003]), 'all');
+  assert.deepEqual(toggle([1, 2], 2, false), [1]);
+  assert.deepEqual(toggle([1], 1, true), [1]);
+  assert.deepEqual(toggleMany([1], [2, 3], true), [1, 2, 3]);
+  assert.equal(fill('Season {n}', { n: 2 }), 'Season 2');
+  assert.equal(fill('{x} stays', {}), '{x} stays');
+});
+
+test('request errors: clear messages; stale states reload before retrying', () => {
+  assert.match(requestErrorMessage('selection_changed', 409), /Nothing was changed/);
+  assert.match(requestErrorMessage('search_failed', 502), /Monitoring is saved/);
+  assert.match(requestErrorMessage(undefined, 429), /Too many/);
+  assert.ok(reloadAfter('selection_changed') && reloadAfter('partial') && !reloadAfter('forbidden'));
 });

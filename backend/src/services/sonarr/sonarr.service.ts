@@ -3,6 +3,7 @@ import {
   MONITOR_OPTIONS, SAFE_DEFAULTS, buildAddPayload, chooseQualityProfile, chooseRootFolder, chooseSonarrMatch, findExisting,
   isAlreadyAddedRejection, posterOf, seriesLink, type AddRequest, type ExternalIds, type MatchRejection, type MatchSource,
 } from './sonarr-match.model';
+import { cleanEpisodes, matchesConfirmation, planRequest, seasonPassBody, seasonViews, type EpisodeRequest } from './sonarr-episodes.model';
 
 /**
  * Sonarr download management for Cinetra library shows. Completely separate from viewing progress: nothing here reads
@@ -210,7 +211,130 @@ export function createSonarrService(deps: SonarrDeps) {
     }
   }
 
-  return { status, getOptions, add, clearCaches: () => { lookups.clear(); existing.clear(); options.clear(); } };
+  /** The verified, existing Sonarr series for a library show (fresh read), or a clear refusal. Read-only. */
+  async function existingSeries(client: SonarrClient, show: LibraryShow, tvdbId?: number) {
+    if (!show.tmdbId) throw new SonarrRequestError(409, 'no_tmdb_link', 'Link this show to TMDB to manage it in Sonarr.');
+    let match;
+    try { match = await resolve(client, show as LibraryShow & { tmdbId: number }); }
+    catch (error) { if (error instanceof SonarrError) throw unavailable(error); throw error; }
+    if (!match.ok) throw new SonarrRequestError(422, 'unmatched', 'Cinetra could not verify the matching Sonarr series, so nothing was changed.', { reason: match.reason });
+    if (tvdbId !== undefined && match.tvdbId !== tvdbId) throw new SonarrRequestError(409, 'identity_changed', 'The matching series changed since you opened this dialog. Nothing was changed; please review it again.');
+    let found;
+    try { found = await existingFor(client, match.tvdbId, true); }
+    catch (error) { if (error instanceof SonarrError) throw unavailable(error); throw error; }
+    if (!found || !Number.isInteger(found.id)) throw new SonarrRequestError(409, 'not_in_sonarr', 'This series is not in Sonarr yet.');
+    return { match, series: found, seriesId: found.id as number };
+  }
+
+  const readEpisodes = async (client: SonarrClient, seriesId: number) => {
+    const episodes = await client.episodes(seriesId);
+    if (!Array.isArray(episodes)) throw new SonarrError('bad_response');
+    return cleanEpisodes(episodes, seriesId);
+  };
+
+  function episodesView(series: SonarrSeriesResource, episodes: ReturnType<typeof cleanEpisodes>, tvdbId: number, client: SonarrClient) {
+    return {
+      tvdbId,
+      seriesMonitored: series.monitored === true,
+      sonarrUrl: seriesLink(client.baseUrl, series),
+      // Sonarr fills in episodes shortly after a series is added: the dialog waits while this is true.
+      pending: episodes.length === 0,
+      seasons: seasonViews(series, episodes, now()),
+      checkedAt: new Date(now()).toISOString(),
+    };
+  }
+
+  /** Seasons and episodes exactly as Sonarr has them (Sonarr IDs and numbering), with file / missing / unreleased state. */
+  async function episodes(showId: string, userId: string) {
+    const client = await requireClient(userId);
+    const show = await owned(showId, userId);
+    const { match, series, seriesId } = await existingSeries(client, show);
+    let list;
+    try { list = await readEpisodes(client, seriesId); }
+    catch (error) { if (error instanceof SonarrError) throw unavailable(error); throw error; }
+    return episodesView(series, list, match.tvdbId, client);
+  }
+
+  /**
+   * Monitor exactly the confirmed selection, and optionally search its released, missing episodes. Order matters:
+   * 1. turn on the selected episodes' flags (only those IDs), 2. turn on the requested seasons' flags and series monitoring
+   * if needed (no episode cascade), 3. re-read Sonarr and verify, 4. only then search the selected missing episodes.
+   * Nothing is ever unmonitored, deleted or re-downloaded, and no other Sonarr setting is sent.
+   */
+  async function requestEpisodes(showId: string, userId: string, request: EpisodeRequest) {
+    const client = await requireClient(userId);
+    const show = await owned(showId, userId);
+    if (inFlight.has(request.tvdbId)) throw new SonarrRequestError(409, 'in_progress', 'Another Sonarr change for this series is in progress. Please wait.');
+    inFlight.add(request.tvdbId);
+    try {
+      const { match, series, seriesId } = await existingSeries(client, show, request.tvdbId);
+      let list;
+      try { list = await readEpisodes(client, seriesId); }
+      catch (error) { if (error instanceof SonarrError) throw unavailable(error); throw error; }
+      if (!list.length) throw new SonarrRequestError(409, 'episodes_pending', 'Sonarr is still loading this series\' episodes. Try again in a moment.');
+      const plan = planRequest(series, list, request, now());
+      if (!plan.ok) {
+        if (plan.code === 'empty_selection') throw new SonarrRequestError(422, 'empty_selection', 'The selection has no episodes in Sonarr. Nothing was changed.');
+        throw new SonarrRequestError(409, 'selection_changed', 'Sonarr\'s episode list changed. Nothing was changed; please review the selection again.');
+      }
+      if (!matchesConfirmation(plan, request.expected)) throw new SonarrRequestError(409, 'selection_changed', 'Sonarr\'s episode list changed. Nothing was changed; please review the selection again.');
+
+      const done = { episodes: false, flags: false, search: false };
+      if (plan.monitorIds.length) {
+        try { await client.monitorEpisodes(plan.monitorIds); done.episodes = true; }
+        catch (error) {
+          if (error instanceof SonarrError && error.code === 'timeout') throw new SonarrRequestError(504, 'uncertain', 'Sonarr did not confirm in time. Some episodes may be monitored: check again before retrying. No search was started.');
+          if (error instanceof SonarrError) throw new SonarrRequestError(502, 'not_applied', 'Sonarr refused the change. Nothing was changed.');
+          throw error;
+        }
+      }
+      if (plan.enableSeries || plan.seasonNumbers.length) {
+        try { await client.seasonPass(seasonPassBody(seriesId, plan)); done.flags = true; }
+        catch (error) {
+          if (!(error instanceof SonarrError)) throw error;
+          throw new SonarrRequestError(502, 'partial', done.episodes
+            ? 'The episodes are marked monitored, but Sonarr did not confirm series or season monitoring. No search was started. Try again: nothing else is changed.'
+            : 'Sonarr did not confirm series or season monitoring. No search was started. Try again: nothing else is changed.', { applied: done });
+        }
+      }
+
+      // Verify from Sonarr itself before any search.
+      let freshSeries: SonarrSeriesResource, freshEpisodes;
+      try { [freshSeries, freshEpisodes] = await Promise.all([client.seriesById(seriesId), readEpisodes(client, seriesId)]); }
+      catch (error) {
+        if (!(error instanceof SonarrError)) throw error;
+        throw new SonarrRequestError(502, 'unverified', 'The change was sent, but Sonarr could not be re-checked, so no search was started. Check again in a moment.', { applied: done });
+      }
+      const monitoredNow = new Set(freshEpisodes.filter(episode => episode.monitored === true).map(episode => episode.id as number));
+      const seasonsNow = new Map((freshSeries.seasons || []).map(season => [season.seasonNumber, season.monitored === true]));
+      const verified = freshSeries.monitored === true && plan.selectedIds.every(id => monitoredNow.has(id)) && plan.seasonNumbers.every(number => seasonsNow.get(number) === true);
+      if (!verified) throw new SonarrRequestError(502, 'unverified', 'Sonarr did not report the requested monitoring, so no search was started. Check the series in Sonarr.', { applied: done });
+
+      if (plan.searchIds.length) {
+        try { await client.searchEpisodes(plan.searchIds); done.search = true; }
+        catch (error) {
+          if (!(error instanceof SonarrError)) throw error;
+          throw new SonarrRequestError(error.code === 'timeout' ? 504 : 502, 'search_failed', error.code === 'timeout'
+            ? 'Monitoring is saved. Sonarr did not confirm the search in time; it may still have started.'
+            : 'Monitoring is saved, but Sonarr could not start the search. Sonarr will still pick up monitored episodes from its RSS feeds.', { applied: done });
+        }
+      }
+      existing.delete(String(match.tvdbId));
+      return {
+        requested: true,
+        monitored: plan.monitorIds.length,
+        alreadyMonitored: plan.counts.alreadyMonitored,
+        seasons: plan.seasonNumbers,
+        seriesMonitoringEnabled: plan.enableSeries,
+        searched: plan.searchIds.length,
+        view: episodesView(freshSeries, freshEpisodes, match.tvdbId, client),
+      };
+    } finally {
+      inFlight.delete(request.tvdbId);
+    }
+  }
+
+  return { status, getOptions, add, episodes, requestEpisodes, clearCaches: () => { lookups.clear(); existing.clear(); options.clear(); } };
 }
 
 /* ---------- Production wiring ---------- */

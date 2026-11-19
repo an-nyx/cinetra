@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { AlertTriangle, Check, ExternalLink, Info, Loader2, Plus, RotateCw, Tv } from "lucide-react";
+import { Check, ExternalLink, Info, ListChecks, Loader2, Plus, RotateCw, Tv } from "lucide-react";
 import { T, phrase, useLanguage } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SonarrService } from "@/services/sonarr.service";
 import { posterSrc } from "@/lib/poster";
+import RequestEpisodesDialog from "@/components/sonarr-episodes";
 import {
-  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, displayYear, formatFreeSpace, initialForm, mayDownload, monitorDescriptions,
-  monitorLabels, panelView, validateForm, withMonitor, type AddForm, type SeriesSummary, type SonarrOptions, type SonarrStatus,
+  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, displayYear, formatFreeSpace, initialForm, panelView, validateForm,
+  type AddForm, type SeriesSummary, type SonarrOptions, type SonarrStatus,
 } from "@/lib/sonarr";
 
 /**
- * "Add to Sonarr" for a library TV show. Download management only: it never changes Cinetra's watched episodes,
+ * "Add to Sonarr" / "Request episodes" for a library TV show. Download management only: it never changes Cinetra's watched episodes,
  * progress, status, favorites or ratings. The browser talks to Cinetra's backend only.
  */
 const statusCache = createStatusCache();
@@ -30,6 +31,7 @@ export default function SonarrPanel({ showId, cinetraPosterURL }: { showId: stri
   const [loadFailed, setLoadFailed] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [requesting, setRequesting] = useState<false | "existing" | "added">(false);
 
   useEffect(() => {
     const cached = statusCache.get(showId);
@@ -52,20 +54,22 @@ export default function SonarrPanel({ showId, cinetraPosterURL }: { showId: stri
     <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" /><span>{phrase(language, view.message)}{view.retry && <> <button type="button" className="inline-flex min-h-6 items-center gap-1 font-medium text-primary hover:underline" onClick={() => setAttempt(value => value + 1)}><RotateCw aria-hidden="true" className="size-3" /><T>Retry</T></button></>}</span>
   </p>;
   if (view.kind === "exists") return <div className="flex flex-wrap items-center gap-2">
-    <span className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary"><Check aria-hidden="true" className="size-4" /><T>Already in Sonarr</T></span>
+    <Button type="button" variant="outline" size="sm" className="gap-2 border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" onClick={() => setRequesting("existing")}><ListChecks aria-hidden="true" className="size-4" /><T>Request episodes</T></Button>
+    <span className="inline-flex h-8 items-center gap-1 text-xs text-muted-foreground"><Check aria-hidden="true" className="size-3.5 text-primary" /><T>In Sonarr</T></span>
     <Button asChild variant="ghost" size="sm" className="gap-1.5 text-primary hover:text-primary"><a href={view.sonarrUrl} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" className="size-4" /><T>Open in Sonarr</T></a></Button>
+    <RequestEpisodesDialog open={!!requesting} onOpenChange={value => { if (!value) setRequesting(false); }} showId={showId} series={view.series} justAdded={requesting === "added"} />
   </div>;
 
   return <>
     <Button type="button" variant="outline" size="sm" className="gap-2 border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" onClick={() => setConfirming(true)}><Plus aria-hidden="true" className="size-4" /><T>Add to Sonarr</T></Button>
     <ConfirmAddDialog open={confirming} onOpenChange={setConfirming} showId={showId} series={view.series} cinetraPosterURL={cinetraPosterURL}
-      onDone={next => { updateStatus(next); setConfirming(false); }} onRecheck={() => setAttempt(value => value + 1)} />
+      onDone={(next, added) => { updateStatus(next); setConfirming(false); if (next.state === "exists") setRequesting(added ? "added" : "existing"); }} onRecheck={() => setAttempt(value => value + 1)} />
   </>;
 }
 
 function ConfirmAddDialog({ open, onOpenChange, showId, series, cinetraPosterURL, onDone, onRecheck }: {
   open: boolean; onOpenChange: (open: boolean) => void; showId: string; series: SeriesSummary; cinetraPosterURL: string | null;
-  onDone: (status: SonarrStatus) => void; onRecheck: () => void;
+  onDone: (status: SonarrStatus, added: boolean) => void; onRecheck: () => void;
 }) {
   const { language } = useLanguage();
   const [options, setOptions] = useState<SonarrOptions | null>(null);
@@ -94,11 +98,11 @@ function ConfirmAddDialog({ open, onOpenChange, showId, series, cinetraPosterURL
       try {
         const result = await SonarrService.addSeries(showId, addRequest(form, series.tvdbId));
         remember(form);
-        onDone(result.status);
-        toast.success(phrase(language, "Added to Sonarr"), { description: phrase(language, form.monitor === "none" ? "Nothing is monitored, so nothing will download." : "Sonarr will handle downloads for monitored episodes.") });
+        onDone(result.status, true);
+        toast.success(phrase(language, "Added to Sonarr"), { description: phrase(language, "Nothing is monitored yet. Choose what to request next.") });
       } catch (caught) {
         const { code, status, data } = errorOf(caught);
-        if (code === "already_exists" && data?.status?.state === "exists") { onDone(data.status); toast(phrase(language, "This series is already in Sonarr.")); return; }
+        if (code === "already_exists" && data?.status?.state === "exists") { onDone(data.status, false); toast(phrase(language, "This series is already in Sonarr.")); return; }
         if (code === "uncertain" || code === "identity_changed") onRecheck();
         setError(addErrorMessage(code, status));
       } finally { setSubmitting(false); }
@@ -109,11 +113,11 @@ function ConfirmAddDialog({ open, onOpenChange, showId, series, cinetraPosterURL
   const usableFolders = options?.rootFolders.filter(folder => folder.accessible) || [];
 
   return <Dialog open={open} onOpenChange={value => { if (!submitting) onOpenChange(value); }}>
-    <DialogContent className="gap-0 sm:max-w-lg" onInteractOutside={event => { if (submitting) event.preventDefault(); }}>
+    <DialogContent className="grid-cols-[minmax(0,1fr)] gap-0 sm:max-w-lg" onInteractOutside={event => { if (submitting) event.preventDefault(); }}>
       <DialogHeader className="pr-10 text-left">
         <p className="cinema-eyebrow"><T>Sonarr</T></p>
         <DialogTitle className="text-xl"><T>Add to Sonarr</T></DialogTitle>
-        <DialogDescription><T>Review the series and choose how Sonarr should manage it.</T></DialogDescription>
+        <DialogDescription><T>Step 1 of 2: add the series with nothing monitored. Next, choose exactly which seasons or episodes to request.</T></DialogDescription>
       </DialogHeader>
 
       <div className="mt-4 flex gap-3 rounded-2xl border bg-card/60 p-3">
@@ -145,27 +149,13 @@ function ConfirmAddDialog({ open, onOpenChange, showId, series, cinetraPosterURL
         </div>
         {!usableFolders.length && <p className="text-xs text-destructive"><T>Sonarr has no accessible root folder.</T></p>}
 
-        <label className="block text-sm font-medium"><T>Monitor episodes</T>
-          <select className={fieldClass} value={form.monitor} disabled={submitting} onChange={event => setForm(withMonitor(form, event.target.value as AddForm["monitor"]))}>
-            {options.monitorOptions.map(option => <option key={option} value={option}>{phrase(language, monitorLabels[option])}{option === options.defaults.monitor ? ` (${phrase(language, "default")})` : ""}</option>)}
-          </select>
-          <span className="mt-1.5 block text-xs font-normal text-muted-foreground">{phrase(language, monitorDescriptions[form.monitor])}</span>
-        </label>
-
-        <div className="space-y-2 rounded-xl border bg-card/40 p-3">
+        <div className="rounded-xl border bg-card/40 p-3">
           <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
             <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-[var(--primary)]" checked={form.monitorNewItems === "all"} disabled={submitting} onChange={event => setForm({ ...form, monitorNewItems: event.target.checked ? "all" : "none" })} />
             <span><span className="font-medium"><T>Monitor new seasons</T></span><span className="block text-xs text-muted-foreground"><T>Seasons added later are monitored automatically.</T></span></span>
           </label>
-          <label className={`flex min-h-11 items-start gap-3 text-sm ${form.monitor === "none" ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-            <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-[var(--primary)]" checked={form.searchForMissingEpisodes} disabled={submitting || form.monitor === "none"} onChange={event => setForm({ ...form, searchForMissingEpisodes: event.target.checked })} />
-            <span><span className="font-medium"><T>Search for missing episodes now</T></span><span className="block text-xs text-muted-foreground">{phrase(language, form.monitor === "none" ? "Requires monitored episodes." : "Sonarr starts searching immediately after adding.")}</span></span>
-          </label>
         </div>
-
-        {mayDownload(form)
-          ? <p role="note" className="flex gap-2 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-xs leading-5"><AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-400" /><span><T>{"Monitored episodes can be downloaded automatically, now or later, using Sonarr's existing indexers and download clients."}</T></span></p>
-          : <p role="note" className="flex gap-2 rounded-xl border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span><T>Nothing will be monitored or downloaded. You can change monitoring later in Sonarr.</T></span></p>}
+        <p role="note" className="flex gap-2 rounded-xl border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span><T>Adding monitors nothing and starts no search. Nothing downloads until you confirm a request in the next step.</T></span></p>
         <p className="text-xs text-muted-foreground"><T>Your Cinetra progress and status stay unchanged: downloaded episodes are never marked watched.</T></p>
       </div>}
 
@@ -175,7 +165,7 @@ function ConfirmAddDialog({ open, onOpenChange, showId, series, cinetraPosterURL
         <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}><T>Cancel</T></Button>
         <Button type="button" className="gap-2" disabled={!form || !!invalid || submitting} title={invalid ? phrase(language, invalid) : undefined} onClick={submit}>
           {submitting ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Plus aria-hidden="true" className="size-4" />}
-          {phrase(language, submitting ? "Adding…" : "Confirm and add")}
+          {phrase(language, submitting ? "Adding…" : "Add and choose episodes")}
         </Button>
       </div>
       {form && invalid && !submitting && options && <p className="mt-2 text-right text-xs text-muted-foreground">{phrase(language, invalid)}</p>}

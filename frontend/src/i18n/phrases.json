@@ -1546,5 +1546,305 @@
   "TMDB is unavailable, so the Sonarr match can't be verified right now.": [
     "TMDB est indisponible : la correspondance Sonarr ne peut pas être vérifiée pour le moment.",
     "TMDB غير متاح، لذا لا يمكن التحقق من مطابقة Sonarr حاليًا."
+  ],
+  "Entire series": [
+    "Série entière",
+    "المسلسل كاملًا"
+  ],
+  "Specific seasons": [
+    "Saisons précises",
+    "مواسم محددة"
+  ],
+  "Specific episodes": [
+    "Épisodes précis",
+    "حلقات محددة"
+  ],
+  "Every episode of every regular season. Specials are not included.": [
+    "Tous les épisodes de toutes les saisons régulières. Les épisodes spéciaux ne sont pas inclus.",
+    "كل حلقات جميع المواسم العادية. الحلقات الخاصة غير مشمولة."
+  ],
+  "Every episode of the seasons you pick.": [
+    "Tous les épisodes des saisons choisies.",
+    "كل حلقات المواسم التي تختارها."
+  ],
+  "Only the episodes you pick.": [
+    "Uniquement les épisodes choisis.",
+    "الحلقات التي تختارها فقط."
+  ],
+  "Loading episodes…": [
+    "Chargement des épisodes…",
+    "جارٍ تحميل الحلقات…"
+  ],
+  "Sonarr is still loading episodes.": [
+    "Sonarr charge encore les épisodes.",
+    "لا يزال Sonarr يحمّل الحلقات."
+  ],
+  "Choose at least one season.": [
+    "Choisissez au moins une saison.",
+    "اختر موسمًا واحدًا على الأقل."
+  ],
+  "Choose at least one episode.": [
+    "Choisissez au moins un épisode.",
+    "اختر حلقة واحدة على الأقل."
+  ],
+  "The selection has no episodes.": [
+    "La sélection ne contient aucun épisode.",
+    "لا يحتوي التحديد على أي حلقة."
+  ],
+  "Everything selected is already monitored.": [
+    "Tout ce qui est sélectionné est déjà surveillé.",
+    "كل ما حددته مراقَب بالفعل."
+  ],
+  "On disk": [
+    "Sur disque",
+    "على القرص"
+  ],
+  "Missing": [
+    "Manquant",
+    "مفقودة"
+  ],
+  "Not released": [
+    "Pas encore sorti",
+    "لم تُعرض بعد"
+  ],
+  "Sonarr's episode list changed. Nothing was changed; review the selection and confirm again.": [
+    "La liste d'épisodes de Sonarr a changé. Rien n'a été modifié ; vérifiez la sélection et confirmez à nouveau.",
+    "تغيّرت قائمة حلقات Sonarr. لم يتغيّر شيء؛ راجع التحديد ثم أكّد مجددًا."
+  ],
+  "The matching series changed. Nothing was changed; please review it again.": [
+    "La série correspondante a changé. Rien n'a été modifié ; vérifiez-la à nouveau.",
+    "تغيّر المسلسل المطابق. لم يتغيّر شيء؛ يُرجى مراجعته مجددًا."
+  ],
+  "This series is no longer in Sonarr.": [
+    "Cette série n'est plus dans Sonarr.",
+    "لم يعد هذا المسلسل في Sonarr."
+  ],
+  "Sonarr is still loading episodes. Try again in a moment.": [
+    "Sonarr charge encore les épisodes. Réessayez dans un instant.",
+    "لا يزال Sonarr يحمّل الحلقات. حاول مجددًا بعد لحظات."
+  ],
+  "Another Sonarr change for this series is in progress. Please wait.": [
+    "Une autre modification Sonarr est en cours pour cette série. Patientez.",
+    "هناك تغيير آخر في Sonarr لهذا المسلسل قيد التنفيذ. يُرجى الانتظار."
+  ],
+  "Sonarr refused the change. Nothing was changed.": [
+    "Sonarr a refusé la modification. Rien n'a été modifié.",
+    "رفض Sonarr التغيير. لم يتغيّر شيء."
+  ],
+  "Sonarr did not confirm in time. Some episodes may be monitored: check again before retrying. No search was started.": [
+    "Sonarr n'a pas confirmé à temps. Certains épisodes sont peut-être surveillés : vérifiez avant de réessayer. Aucune recherche n'a été lancée.",
+    "لم يؤكّد Sonarr في الوقت المحدد. قد تكون بعض الحلقات مراقَبة: تحقّق قبل إعادة المحاولة. لم يبدأ أي بحث."
+  ],
+  "The episodes are marked monitored, but Sonarr did not confirm series or season monitoring. No search was started. Try again.": [
+    "Les épisodes sont surveillés, mais Sonarr n'a pas confirmé la surveillance de la série ou des saisons. Aucune recherche n'a été lancée. Réessayez.",
+    "تم تعليم الحلقات كمراقَبة، لكن Sonarr لم يؤكّد مراقبة المسلسل أو المواسم. لم يبدأ أي بحث. حاول مجددًا."
+  ],
+  "Sonarr did not confirm the new monitoring, so no search was started. Check again in a moment.": [
+    "Sonarr n'a pas confirmé la nouvelle surveillance, donc aucune recherche n'a été lancée. Vérifiez dans un instant.",
+    "لم يؤكّد Sonarr المراقبة الجديدة، لذا لم يبدأ أي بحث. تحقّق مجددًا بعد لحظات."
+  ],
+  "Monitoring is saved, but the search could not be started. Sonarr will still pick up monitored episodes from its RSS feeds.": [
+    "La surveillance est enregistrée, mais la recherche n'a pas pu être lancée. Sonarr récupérera quand même les épisodes surveillés via ses flux RSS.",
+    "تم حفظ المراقبة، لكن تعذّر بدء البحث. سيلتقط Sonarr الحلقات المراقَبة من خلاصات RSS على أي حال."
+  ],
+  "Cinetra could not verify the matching Sonarr series, so nothing was changed.": [
+    "Cinetra n'a pas pu vérifier la série Sonarr correspondante, donc rien n'a été modifié.",
+    "تعذّر على Cinetra التحقق من مسلسل Sonarr المطابق، لذا لم يتغيّر شيء."
+  ],
+  "Sonarr is unavailable right now. Try again in a moment.": [
+    "Sonarr est indisponible pour le moment. Réessayez dans un instant.",
+    "Sonarr غير متاح حاليًا. حاول مجددًا بعد لحظات."
+  ],
+  "Check the selection and try again.": [
+    "Vérifiez la sélection et réessayez.",
+    "تحقّق من التحديد وحاول مجددًا."
+  ],
+  "Could not update Sonarr. Nothing was changed in Cinetra.": [
+    "Impossible de mettre à jour Sonarr. Rien n'a été modifié dans Cinetra.",
+    "تعذّر تحديث Sonarr. لم يتغيّر شيء في Cinetra."
+  ],
+  "Request episodes": [
+    "Demander des épisodes",
+    "طلب حلقات"
+  ],
+  "In Sonarr": [
+    "Dans Sonarr",
+    "في Sonarr"
+  ],
+  "Step 1 of 2: add the series with nothing monitored. Next, choose exactly which seasons or episodes to request.": [
+    "Étape 1 sur 2 : ajouter la série sans rien surveiller. Ensuite, choisissez précisément les saisons ou épisodes à demander.",
+    "الخطوة 1 من 2: أضف المسلسل دون مراقبة أي شيء. بعدها اختر بدقة المواسم أو الحلقات المطلوبة."
+  ],
+  "Adding monitors nothing and starts no search. Nothing downloads until you confirm a request in the next step.": [
+    "L'ajout ne surveille rien et ne lance aucune recherche. Rien n'est téléchargé tant que vous n'avez pas confirmé une demande à l'étape suivante.",
+    "الإضافة لا تراقب أي شيء ولا تبدأ أي بحث. لن يُنزَّل شيء حتى تؤكّد طلبًا في الخطوة التالية."
+  ],
+  "Choose exactly what Sonarr should monitor.": [
+    "Choisissez précisément ce que Sonarr doit surveiller.",
+    "اختر بدقة ما يجب أن يراقبه Sonarr."
+  ],
+  "Added to Sonarr with nothing monitored. Now choose what to request.": [
+    "Ajoutée à Sonarr sans rien surveiller. Choisissez maintenant ce que vous voulez demander.",
+    "أُضيف إلى Sonarr دون مراقبة أي شيء. اختر الآن ما تريد طلبه."
+  ],
+  "Loading episodes from Sonarr…": [
+    "Chargement des épisodes depuis Sonarr…",
+    "جارٍ تحميل الحلقات من Sonarr…"
+  ],
+  "Sonarr is loading the episodes…": [
+    "Sonarr charge les épisodes…",
+    "يحمّل Sonarr الحلقات…"
+  ],
+  "Check again": [
+    "Vérifier à nouveau",
+    "تحقّق مجددًا"
+  ],
+  "Numbering follows Sonarr.": [
+    "La numérotation suit Sonarr.",
+    "الترقيم وفق Sonarr."
+  ],
+  "Show specials": [
+    "Afficher les épisodes spéciaux",
+    "إظهار الحلقات الخاصة"
+  ],
+  "Season 0 is excluded unless you choose it.": [
+    "La saison 0 est exclue sauf si vous la choisissez.",
+    "الموسم 0 مستبعد ما لم تختره."
+  ],
+  "Monitored": [
+    "Surveillé",
+    "مراقَب"
+  ],
+  "Select missing": [
+    "Sélectionner les manquants",
+    "تحديد المفقودة"
+  ],
+  "Untitled": [
+    "Sans titre",
+    "بلا عنوان"
+  ],
+  "Summary": [
+    "Récapitulatif",
+    "الملخص"
+  ],
+  "Series monitoring will be turned on (required for downloads).": [
+    "La surveillance de la série sera activée (nécessaire aux téléchargements).",
+    "سيتم تفعيل مراقبة المسلسل (مطلوبة للتنزيل)."
+  ],
+  "Nothing is monitored yet. Choose what to request next.": [
+    "Rien n'est encore surveillé. Choisissez maintenant ce que vous voulez demander.",
+    "لا شيء مراقَب بعد. اختر ما تريد طلبه."
+  ],
+  "Episodes newly monitored: {n}": [
+    "Épisodes nouvellement surveillés : {n}",
+    "حلقات أصبحت مراقَبة: {n}"
+  ],
+  "Searching now: {n}": [
+    "Recherche en cours : {n}",
+    "قيد البحث الآن: {n}"
+  ],
+  "Sonarr updated": [
+    "Sonarr mis à jour",
+    "تم تحديث Sonarr"
+  ],
+  "What to request": [
+    "Que demander",
+    "ما الذي تطلبه"
+  ],
+  "Searches only the {n} released episodes in this selection that have no file.": [
+    "Recherche uniquement les {n} épisodes sortis de cette sélection qui n'ont pas de fichier.",
+    "يبحث فقط عن الحلقات المعروضة في هذا التحديد التي لا ملف لها ({n})."
+  ],
+  "Nothing in this selection is both released and missing.": [
+    "Aucun épisode de cette sélection n'est à la fois sorti et manquant.",
+    "لا توجد في هذا التحديد حلقة معروضة ومفقودة في آن واحد."
+  ],
+  "Specials": [
+    "Épisodes spéciaux",
+    "حلقات خاصة"
+  ],
+  "Season {n}": [
+    "Saison {n}",
+    "الموسم {n}"
+  ],
+  "Episodes: {n}": [
+    "Épisodes : {n}",
+    "الحلقات: {n}"
+  ],
+  "On disk: {n}": [
+    "Sur disque : {n}",
+    "على القرص: {n}"
+  ],
+  "Missing: {n}": [
+    "Manquants : {n}",
+    "مفقودة: {n}"
+  ],
+  "Not released: {n}": [
+    "Pas encore sortis : {n}",
+    "لم تُعرض بعد: {n}"
+  ],
+  "Regular seasons: {n}": [
+    "Saisons régulières : {n}",
+    "المواسم العادية: {n}"
+  ],
+  "Select every episode of {season}": [
+    "Sélectionner tous les épisodes de : {season}",
+    "تحديد كل حلقات {season}"
+  ],
+  "No air date yet": [
+    "Pas encore de date de diffusion",
+    "لا يوجد تاريخ عرض بعد"
+  ],
+  "Episodes to monitor: {n}": [
+    "Épisodes à surveiller : {n}",
+    "حلقات ستُراقَب: {n}"
+  ],
+  "already monitored: {n}": [
+    "déjà surveillés : {n}",
+    "مراقَبة مسبقًا: {n}"
+  ],
+  "Seasons set to monitored: {seasons}. Episodes Sonarr adds to them later are monitored too.": [
+    "Saisons surveillées : {seasons}. Les épisodes que Sonarr y ajoutera plus tard seront aussi surveillés.",
+    "مواسم ستُراقَب: {seasons}. الحلقات التي يضيفها Sonarr إليها لاحقًا ستُراقَب أيضًا."
+  ],
+  "{n} other episodes were already marked monitored in Sonarr and become active too. Cinetra leaves them as they are.": [
+    "{n} autres épisodes étaient déjà marqués comme surveillés dans Sonarr et deviennent actifs aussi. Cinetra n'y touche pas.",
+    "هناك {n} حلقات أخرى معلَّمة كمراقَبة في Sonarr مسبقًا وستصبح نشطة أيضًا. لا يغيّرها Cinetra."
+  ],
+  "Search now: {n} released, missing episodes. Nothing else is searched.": [
+    "Recherche immédiate : {n} épisodes sortis et manquants. Rien d'autre n'est recherché.",
+    "بحث الآن: {n} حلقات معروضة ومفقودة. لن يُبحث عن أي شيء آخر."
+  ],
+  "No search now. Sonarr grabs monitored episodes as they appear in its RSS feeds.": [
+    "Pas de recherche maintenant. Sonarr récupère les épisodes surveillés dès qu'ils apparaissent dans ses flux RSS.",
+    "لا بحث الآن. يلتقط Sonarr الحلقات المراقَبة عند ظهورها في خلاصات RSS."
+  ],
+  "In this selection: {d} on disk, {m} missing, {u} not released yet.": [
+    "Dans cette sélection : {d} sur disque, {m} manquants, {u} pas encore sortis.",
+    "في هذا التحديد: {d} على القرص، {m} مفقودة، {u} لم تُعرض بعد."
+  ],
+  "Add and choose episodes": [
+    "Ajouter et choisir les épisodes",
+    "إضافة واختيار الحلقات"
+  ],
+  "Nothing is unmonitored, deleted or re-downloaded. Your Cinetra progress is unchanged.": [
+    "Rien n'est désactivé, supprimé ou retéléchargé. Votre progression Cinetra reste inchangée.",
+    "لا يُلغى رصد أي شيء ولا يُحذف ولا يُعاد تنزيله. يبقى تقدمك في Cinetra دون تغيير."
+  ],
+  "Updating Sonarr…": [
+    "Mise à jour de Sonarr…",
+    "جارٍ تحديث Sonarr…"
+  ],
+  "Confirm and monitor": [
+    "Confirmer et surveiller",
+    "تأكيد ومراقبة"
+  ],
+  "Confirm, monitor and search": [
+    "Confirmer, surveiller et rechercher",
+    "تأكيد ومراقبة وبحث"
+  ],
+  "Select episodes to see what can be searched.": [
+    "Sélectionnez des épisodes pour voir ce qui peut être recherché.",
+    "حدّد حلقات لترى ما يمكن البحث عنه."
   ]
 }
