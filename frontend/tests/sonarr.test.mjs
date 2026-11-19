@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, formatFreeSpace, initialForm, mayDownload, monitorDescriptions,
+  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, displayYear, formatFreeSpace, initialForm, mayDownload, monitorDescriptions,
   monitorLabels, panelView, validateForm, withMonitor,
 } from '../src/lib/sonarr.ts';
 
@@ -95,6 +95,13 @@ test('errors: every server code has a clear message; HTTP status never leaks a S
   assert.match(addErrorMessage(undefined, 429), /Too many/);
   assert.match(addErrorMessage(undefined, undefined), /Nothing was changed in Cinetra/);
   assert.match(addErrorMessage('uncertain', 504), /may still have been added/);
+});
+
+test('year is not repeated when Sonarr already puts it in the title', () => {
+  assert.equal(displayYear({ title: 'Dark Matter (2024)', year: 2024 }), null);
+  assert.equal(displayYear({ title: 'Dark Matter', year: 2024 }), 2024);
+  assert.equal(displayYear({ title: 'Doctor Who (2005)', year: 2023 }), 2023);
+  assert.equal(displayYear({ title: 'Untitled', year: null }), null);
 });
 
 test('free space formatting', () => {

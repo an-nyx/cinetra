@@ -121,6 +121,11 @@ export function addErrorMessage(code: string | undefined, status: number | undef
   }
 }
 
+/** Sonarr disambiguates remakes in the title itself ("Dark Matter (2024)"): don't show the year twice. */
+export function displayYear(series: Pick<SeriesSummary, "title" | "year">): number | null {
+  return series.year && !series.title.includes(`(${series.year})`) ? series.year : null;
+}
+
 export function formatFreeSpace(bytes: number | null): string | null {
   if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return null;
   const units = ["B", "KB", "MB", "GB", "TB", "PB"];

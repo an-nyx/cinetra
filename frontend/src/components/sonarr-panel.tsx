@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SonarrService } from "@/services/sonarr.service";
 import { posterSrc } from "@/lib/poster";
 import {
-  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, formatFreeSpace, initialForm, mayDownload, monitorDescriptions,
+  addErrorMessage, addRequest, createStatusCache, createSubmitGuard, displayYear, formatFreeSpace, initialForm, mayDownload, monitorDescriptions,
   monitorLabels, panelView, validateForm, withMonitor, type AddForm, type SeriesSummary, type SonarrOptions, type SonarrStatus,
 } from "@/lib/sonarr";
 
@@ -119,7 +119,7 @@ function ConfirmAddDialog({ open, onOpenChange, showId, series, cinetraPosterURL
       <div className="mt-4 flex gap-3 rounded-2xl border bg-card/60 p-3">
         {poster ? <img src={poster} alt="" className="h-24 w-16 shrink-0 rounded-lg object-cover" onError={() => setPosterFailed(true)} /> : <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Tv className="size-5" /></div>}
         <div className="min-w-0 space-y-1">
-          <p className="font-semibold leading-snug"><bdi>{series.title}</bdi>{series.year ? <span className="font-normal text-muted-foreground"> ({series.year})</span> : null}</p>
+          <p className="font-semibold leading-snug"><bdi>{series.title}</bdi>{displayYear(series) ? <span className="font-normal text-muted-foreground"> ({displayYear(series)})</span> : null}</p>
           <p className="text-xs text-muted-foreground">{[series.network, series.seasonCount ? `${series.seasonCount} ${phrase(language, series.seasonCount === 1 ? "season" : "seasons")}` : null].filter(Boolean).join(" · ")}</p>
           <p className="text-xs text-muted-foreground"><bdi dir="ltr">TVDB {series.tvdbId}</bdi> · {phrase(language, series.source === "tmdb_external_ids" ? "Verified from TMDB's TVDB mapping" : "Verified from Sonarr's TMDB mapping")}</p>
         </div>
