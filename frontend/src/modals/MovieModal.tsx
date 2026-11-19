@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { MovieType } from "@/types/index.ts";
 import { Trash2, Calendar, Clock, Star } from "lucide-react";
+import RadarrPanel from "@/components/radarr-panel";
 
 interface MovieModalProps {
   selectedMovie: string | null;
@@ -168,6 +169,9 @@ export default function MovieModal({
           {watches.length > 0 && <p className="text-xs text-muted-foreground">{movieWatchHistory(language, watches.length, formatDate(watches[0].watchedAt))}</p>}
           {trackingError && <p role="alert" className="text-xs text-destructive">{phrase(language, trackingError)}</p>}
         </div>
+
+        {/* Radarr is download management only: it never reads or changes this movie's status, watches or rating. */}
+        {movie.id && movie.id === selectedMovie && <RadarrPanel key={`${movie.id}:${movie.tmdbId ?? ''}`} movieId={movie.id} cinetraPosterURL={movie.posterURL || null} />}
 
         {/* Metadata and Actions */}
         <div>

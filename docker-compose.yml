@@ -49,6 +49,9 @@ services:
       # Sonarr ("Add to Sonarr"): optional and server-side only; never use VITE_* variables for these.
       SONARR_URL: ${SONARR_URL:-}
       SONARR_API_KEY: ${SONARR_API_KEY:-}
+      # Radarr ("Add to Radarr"): optional and server-side only; never use VITE_* variables for these.
+      RADARR_URL: ${RADARR_URL:-}
+      RADARR_API_KEY: ${RADARR_API_KEY:-}
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
     depends_on:
       migrate:

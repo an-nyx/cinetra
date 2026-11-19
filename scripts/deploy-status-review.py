@@ -24,17 +24,19 @@ def request(url, method='GET', data=None, token=None):
         raise RuntimeError(f'{method} API request rejected: HTTP {error.code}') from None
 
 
-def sync_runtime_env(api, app, token):
-    """Upsert optional runtime-only variables (SONARR_URL, SONARR_API_KEY) into the Coolify application before deploying.
+def sync_runtime_env(api, app, token, prefix='SONARR', label='Sonarr'):
+    """Upsert optional runtime-only variables (<prefix>_URL, <prefix>_API_KEY; Sonarr by default, also used for Radarr)
+    into the Coolify application before deploying.
 
     Values come from GitHub Actions secrets and are sent only to the Coolify API. Nothing but variable names and
     actions is printed; API responses (which may contain other variables' values) are never printed.
     """
-    wanted = {key: os.environ.get(key, '').strip() for key in ('SONARR_URL', 'SONARR_API_KEY')}
+    url_key, api_key = prefix + '_URL', prefix + '_API_KEY'
+    wanted = {key: os.environ.get(key, '').strip() for key in (url_key, api_key)}
     if not all(wanted.values()):
-        print('Sonarr runtime variables not provided; leaving Coolify environment unchanged.', flush=True)
+        print(label + ' runtime variables not provided; leaving Coolify environment unchanged.', flush=True)
         return False
-    require(wanted['SONARR_URL'].startswith('https://'), 'SONARR_URL must be an https:// URL')
+    require(wanted[url_key].startswith('https://'), url_key + ' must be an https:// URL')
     application = request(api + '/applications/' + app, token=token)
     require(application.get('build_pack') != 'dockercompose',
             'Compose build pack: variables must also be referenced in the compose file')
@@ -53,7 +55,7 @@ def sync_runtime_env(api, app, token):
         request(api + '/applications/' + app + '/envs', 'PATCH' if current else 'POST', body, token=token)
         print(f'Coolify variable {key}: {"updated" if current else "created"} (runtime only)', flush=True)
     keys = {env.get('key') for env in request(api + '/applications/' + app + '/envs', token=token) if isinstance(env, dict) and not env.get('is_preview')}
-    require(all(key in keys for key in wanted), 'Coolify did not store the Sonarr variables')
+    require(all(key in keys for key in wanted), 'Coolify did not store the ' + label + ' variables')
     return True
 
 
@@ -71,6 +73,22 @@ def verify_sonarr(health):
             return
         time.sleep(5)
     raise RuntimeError('Sonarr connectivity check did not run after deployment')
+
+
+def verify_radarr(health):
+    """Read-only: the new process reports a successful Radarr check (status, root folders, quality profiles)."""
+    for _ in range(30):
+        radarr = health().get('radarr') or {}
+        if radarr.get('checkedAt'):
+            require(radarr.get('configured') is True, 'Radarr variables are not configured in the running app: '
+                    + str(radarr.get('configError')))
+            require(radarr.get('connected') is True, 'Production cannot reach Radarr: ' + str(radarr.get('error')))
+            require((radarr.get('rootFolders') or 0) > 0 and (radarr.get('qualityProfiles') or 0) > 0,
+                    'Radarr returned no root folders or quality profiles')
+            print('Radarr connectivity verified: ' + json.dumps({k: radarr[k] for k in ('connected', 'rootFolders', 'qualityProfiles')}), flush=True)
+            return
+        time.sleep(5)
+    raise RuntimeError('Radarr connectivity check did not run after deployment')
 
 
 def require(condition, message):
@@ -117,12 +135,15 @@ def main():
             time.sleep(10)
         raise RuntimeError('Coolify deployment timed out; activation halted')
 
-    # Only the optional Sonarr variables may be added/updated; every other runtime setting is left untouched.
+    # Only the optional Sonarr and Radarr variables may be added/updated; every other runtime setting is left untouched.
     sonarr_configured = sync_runtime_env(api, app, token)
+    radarr_configured = sync_runtime_env(api, app, token, 'RADARR', 'Radarr')
     current = deploy()
     print('Tested revision deployed; migrations and Web Push health verified.', flush=True)
     if sonarr_configured:
         verify_sonarr(health)
+    if radarr_configured:
+        verify_radarr(health)
     status = current['showStatus']
     require(status['automaticWritesEnabled'] is True and status['automaticWritesConfigured'] == 'true'
             and status['activationMode'] == 'full-library' and status['running'] is True,

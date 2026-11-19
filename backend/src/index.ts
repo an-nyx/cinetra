@@ -8,6 +8,7 @@ import { warmCaches } from "./services/episode-guide.service";
 import { startNotificationScheduler } from "./services/notifications/notification-scheduler";
 import { startShowStatusMonitor } from "./services/show-status.service";
 import { startSonarrMonitor } from "./services/sonarr/sonarr.service";
+import { startRadarrMonitor } from "./services/radarr/radarr.service";
 
 const app = express();
 
@@ -49,4 +50,6 @@ app.listen(port, () => {
   startShowStatusMonitor();
   // Sonarr: a read-only connectivity check (system status, root folders, quality profiles) for /api/v1/health.
   startSonarrMonitor();
+  // Radarr: the same read-only connectivity check, reported separately.
+  startRadarrMonitor();
 });
