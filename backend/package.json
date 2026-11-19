@@ -14,7 +14,9 @@
     "notify:run-local": "ts-node scripts/run-episode-notifier.ts",
     "vapid:generate": "ts-node scripts/generate-vapid-keys.ts",
     "test:movie-status": "ts-node tests/movie-status.integration.test.ts",
-    "test:sonarr": "ts-node tests/sonarr.test.ts && ts-node tests/sonarr-episodes.test.ts"
+    "test:sonarr": "ts-node tests/sonarr.test.ts && ts-node tests/sonarr-episodes.test.ts",
+    "test:stats": "ts-node tests/cinema-stats.test.ts",
+    "test:stats-integration": "ts-node tests/cinema-stats.integration.test.ts"
   },
   "keywords": [],
   "author": "",

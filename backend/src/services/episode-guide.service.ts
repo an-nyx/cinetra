@@ -33,7 +33,7 @@ export class EpisodeGuideError extends Error {
 
 const validNumber = (value: unknown, minimum: number) => typeof value === 'number' && Number.isInteger(value) && value >= minimum;
 
-async function catalogFor(show: { name: string; tmdbId: number | null }, fresh = false): Promise<Catalog> {
+export async function catalogFor(show: { name: string; tmdbId: number | null }, fresh = false): Promise<Catalog> {
   if (!show.tmdbId) throw new EpisodeGuideError(404, 'TMDB match required to load episode metadata');
   const tmdbId = show.tmdbId;
   const provider = fresh ? new TMDBApiService() : tmdb;

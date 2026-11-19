@@ -18,6 +18,7 @@ import UpcomingPage from "./pages/upcoming-page.tsx";
 import { AuthProvider } from "./context/auth-context.tsx";
 import { ThemeProvider } from "./components/theme-provider.tsx";
 import HomePage from "./pages/home-page.tsx";
+import StatsPage from "./pages/stats-page.tsx";
 import { LanguageProvider, T } from "./i18n";
 
 const router = createBrowserRouter([
@@ -47,6 +48,16 @@ const router = createBrowserRouter([
         element: <MoviesPage />,
       },
     ],
+  },
+  {
+    // My Cinema Stats: a standalone screen with its own back button, so the four bottom tabs stay exactly as they are.
+    path: "/stats",
+    errorElement: <RouteRecovery />,
+    element: (
+      <ProtectedRoute>
+        <StatsPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/login",

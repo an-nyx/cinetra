@@ -5,6 +5,7 @@ import movieRouter from "./movie";
 import userRouter from "./user";
 import notificationsRouter from "./notifications";
 import sonarrRouter from "./sonarr";
+import statsRouter from "./stats";
 import { protectedRoute } from "../../middlewares/protectedRoute";
 import { getHealth } from "../../services/episode-guide.service";
 import { notificationSchedulerStatus } from "../../services/notifications/notification-scheduler";
@@ -27,5 +28,6 @@ router.use("/movie", protectedRoute, movieRouter);
 router.use("/user", userRouter);
 router.use("/notifications", protectedRoute, notificationsRouter);
 router.use("/sonarr", protectedRoute, sonarrRouter);
+router.use("/stats", protectedRoute, statsRouter);
 
 export default router;

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router";
-import { LogOut, UserRound } from "lucide-react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router";
+import { ChartNoAxesColumn, LogOut, UserRound } from "lucide-react";
 import MobileDock from "@/components/mobile-dock";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useLanguage } from "@/i18n";
+import { statsText } from "@/i18n/stats";
 import { ModeToggle } from "@/components/mode-toggle";
 import BrandLogo from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,8 @@ const destinations = [
 ] as const;
 
 export default function HomePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const navigate = useNavigate();
   const [accountOpen, setAccountOpen] = useState(false);
   return (
     <div className="flex min-h-svh min-w-0 flex-col">
@@ -40,6 +42,7 @@ export default function HomePage() {
                 <Button variant="outline" size="icon" aria-label={t("accountMenu")} className="rounded-full"><UserRound className="size-5" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate("/stats")}><ChartNoAxesColumn />{statsText(language, "title")}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setAccountOpen(true)}><UserRound />{t("account")}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { AuthService.logout(); window.location.assign("/login"); }}><LogOut />{t("logout")}</DropdownMenuItem>
               </DropdownMenuContent>
