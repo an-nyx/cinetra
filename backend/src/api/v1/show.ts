@@ -121,9 +121,13 @@ router.get('/:id/status-reconciliation', async (req: Request<{id: string}>, res:
 router.put("/:id/episodes/:season/:episode", async (req: Request<{id: string; season: string; episode: string}>, res: Response) => {
   const started = performance.now();
   try {
-    await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched, true);
+    // The confirmed summary and season guide come from the committed rows and the cached catalog (no provider call),
+    // so the client shows saved progress without waiting for status reconciliation or a library reload.
+    const saved = await setEpisodeWatched(req.params.id, req.user.id, Number(req.params.season), Number(req.params.episode), req.body.watched, true);
+    const state = saved && 'summary' in saved ? saved : null;
     res.setHeader('Server-Timing', `episode-save;dur=${(performance.now() - started).toFixed(1)}`);
-    res.json({ saved: true, watched: req.body.watched, statusChange: null });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ saved: true, watched: req.body.watched, statusChange: null, summary: state?.summary ?? null, guide: state?.guide ?? null });
     void queueStatusReconciliation(req.params.id, req.user.id);
   } catch (error) { guideError(res, error); }
 });

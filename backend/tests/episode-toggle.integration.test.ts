@@ -99,6 +99,13 @@ async function main() {
     const result = await call('PUT', `/show/${showId}/episodes/${season}/${episode}`, { watched }, who);
     if (result.status !== 200) return result;
     assert.equal(result.json.saved, true);
+    // The acknowledgement carries the confirmed progress: identical to a fresh read (status fields are reconciled
+    // separately, in the background, so they are compared with the pre-save row).
+    const [fresh, guide] = await Promise.all([call('GET', `/show/${showId}/tracking`, undefined, who), call('GET', `/show/${showId}/episodes?season=${season}`, undefined, who)]);
+    const progressOnly = ({ status: _s, statusProgressNote: _n, newSeasonToWatch: _w, ...rest }: any) => rest;
+    assert.deepEqual(progressOnly(result.json.summary), progressOnly(fresh.json), 'save response summary matches a fresh read');
+    assert.equal(result.json.summary.status, before?.status || (before?.completed ? 'completed' : null), 'save response does not wait for status reconciliation');
+    assert.deepEqual(result.json.guide, guide.json, 'save response guide matches a fresh read');
     await queueStatusReconciliation(showId, who);
     const after = await prisma.show.findUniqueOrThrow({ where: { id: showId } });
     // Status now arrives separately, after the committed watch acknowledgement.
@@ -128,6 +135,8 @@ async function main() {
   const fast = await call('PUT', `/show/${slow.id}/episodes/1/1`, { watched: true });
   const afterMs = performance.now() - newStarted;
   assert.equal(fast.status, 200);
+  assert.deepEqual([fast.json.summary.watchedCount, fast.json.summary.nextEpisode?.season, fast.json.summary.nextEpisode?.number, fast.json.summary.progressPercent], [1, 1, 2, 50], 'confirmed progress returned without waiting for TMDB');
+  assert.deepEqual(fast.json.guide.episodes.map((e: { watched: boolean }) => e.watched), [true, false]);
   assert.ok(beforeMs >= 11_000);
   assert.ok(afterMs < 1000, `save waited ${afterMs}ms`);
   assert.equal(await prisma.episodeWatch.count({ where: { showId: slow.id } }), 1);

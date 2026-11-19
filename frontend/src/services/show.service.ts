@@ -87,6 +87,8 @@ export interface TrackingSummary {
   error?: string | null;
 }
 
+/** A committed episode save. Summary and guide are null when the server could not build them without a reload. */
+export type EpisodeSaveResult = { statusChange: StatusChange | null; summary: TrackingSummary | null; guide: EpisodeGuide | null };
 /** An automatic personal-status change made by the server after a watch action. */
 export type StatusChange = { from: "watching" | "completed"; to: "watching" | "completed"; reason: string };
 /** One show in the read-only automatic-status preview. */
@@ -173,9 +175,10 @@ class ShowServiceClass extends ApiService {
     return result;
   }
 
-  async setEpisodeWatched(id: string, season: number, episode: number, watched: boolean): Promise<StatusChange | null> {
-    const response = await this.put<{ statusChange?: StatusChange | null }>(`/show/${id}/episodes/${season}/${episode}`, { watched });
-    return response.data?.statusChange ?? null;
+  /** Saves one episode. The answer carries the committed progress (summary and that season's guide) when available. */
+  async setEpisodeWatched(id: string, season: number, episode: number, watched: boolean): Promise<EpisodeSaveResult> {
+    const response = await this.put<{ statusChange?: StatusChange | null; summary?: TrackingSummary | null; guide?: EpisodeGuide | null }>(`/show/${id}/episodes/${season}/${episode}`, { watched });
+    return { statusChange: response.data?.statusChange ?? null, summary: response.data?.summary ?? null, guide: response.data?.guide ?? null };
   }
 
   async markSeasonWatched(id: string, season: number): Promise<StatusChange | null> {

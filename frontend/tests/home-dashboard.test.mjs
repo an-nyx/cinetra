@@ -177,3 +177,30 @@ test('effective progress labels ignore outdated checkpoints and keep gaps as nex
   const unknown = positionDetails(summary('unknown', { progressPercent: null, viewingState: 'needs_review', nextEpisode: null, legacyPosition: { fullSeasons: 9, episodesInNextSeason: 99 } }));
   assert.equal(unknown, 'Needs review');
 });
+
+test('Home applies the confirmed summary from the save: no library reload, and a slower earlier read cannot revert it', async () => {
+  const { trackingTick } = await import('../src/lib/tracking-sync.ts');
+  let current = [], busy = null, reads = 0;
+  const slow = deferred();
+  const advanced = summary('a', { watchedCount: 6, remainingCount: 4, progressPercent: 60, nextEpisode: { season: 1, number: 7 } });
+  const flow = createHomeTracking({
+    read: () => { reads++; return reads === 1 ? Promise.resolve([[], [summary('a'), summary('b')]]) : slow.promise; },
+    save: async () => ({ statusChange: null, summary: advanced, guide: null }),
+    publish: (_, rows) => { current = rows; }, pending: value => { busy = value; },
+  });
+  await flow.load();
+  await flow.mark(current[0]);
+  assert.equal(reads, 1, 'no full library reload after a confirmed save');
+  assert.equal(current[0].nextEpisode.number, 7);
+  assert.equal(current[0].progressPercent, 60);
+  assert.equal(busy, null);
+  // Watch Room confirmation while a library read that started earlier is still in flight.
+  const pendingRead = flow.load();
+  const fromWatchRoom = summary('a', { watchedCount: 7, remainingCount: 3, progressPercent: 70, nextEpisode: { season: 1, number: 8 } });
+  assert.equal(flow.apply({ summary: fromWatchRoom, started: trackingTick(), confirmed: trackingTick() }), true);
+  assert.equal(current[0].nextEpisode.number, 8, 'patched in place');
+  slow.resolve([[], [summary('a'), summary('b')]]);
+  await pendingRead;
+  assert.equal(current[0].nextEpisode.number, 8, 'older read did not bring S01E06 back');
+  assert.equal(current[1].showId, 'b');
+});

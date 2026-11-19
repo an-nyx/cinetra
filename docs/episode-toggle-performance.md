@@ -36,3 +36,26 @@ DATABASE_URL=postgresql://postgres:status-test@127.0.0.1:55439/cinetra_status_te
 Run frontend regression: npm run test:episode-toggle.
 
 No deployment performed.
+
+Watch Room next-episode delay (2026-11-19)
+
+Root cause: the episode save was already fast, but the Watch Room cleared "Watch next" and only showed the new next
+episode and progress after polling status reconciliation every 1.5 s until it finished, then refetching the summary
+and guide. Reconciliation always reads TMDB and TVMaze fresh (show, every season, identity, schedule), and TVMaze calls
+share one process-wide throttle (18 per 10 s) with Upcoming builds and the status monitor. Each tap also fired
+`tracking-updated` twice, so Home reloaded the full library twice and Upcoming refetched twice.
+
+Fix: the save response now includes the confirmed summary and that season's guide, built from the committed rows and
+the catalog the save was validated against (no provider call). The Watch Room shows the following episode and
+progress immediately when the loaded season makes it certain (otherwise "Updating next episode…"), replaces it with the
+confirmed summary, and rolls back on failure. Confirmed summaries patch Home, Continue watching and the show cards in
+place through one event. A monotonic per-tab clock prevents an older save or an earlier library read from overwriting
+newer progress. Reconciliation is still polled, off the critical path, and reloads only when the status changed.
+
+Local measurements (40-show library, TMDB 250 ms and TVMaze 300 ms per request, Chromium with iPhone 14 emulation):
+- Watch Room next episode + progress visible: 3,160-3,170 ms before, 14-16 ms after (first frame after the tap).
+- With a cold Upcoming build competing for TVMaze, reconciliation took 19.9 s; before, "Watch next" stayed empty for
+  the whole 15 s sample window; after, the UI was unaffected (14 ms).
+- Home behind the Watch Room: ~80 ms before (full library reload) and ~60-80 ms after (patched from the save response).
+- Requests per Watch Room tap: 12 before, 4 after (1 save + 3 lightweight reconciliation polls).
+- Home "Mark next watched": 3 requests before (save, /show, /show/tracking), 1 after.

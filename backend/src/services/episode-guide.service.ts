@@ -331,6 +331,23 @@ export async function setEpisodeWatched(showId: string, userId: string, season: 
     }
   });
   if (!fast) return getTrackingSummary(showId, userId);
+  // The write is committed: a failed read here must never turn the acknowledgement into an error.
+  return savedEpisodeState(showId, userId, owner.tmdbId, season, catalog).catch(() => null);
+}
+
+/**
+ * The confirmed progress after an episode change, read after the commit and built from the catalog the change was
+ * validated against: database reads only, never a provider call. Null when the show was re-linked meanwhile (the
+ * client then reloads normally).
+ */
+async function savedEpisodeState(showId: string, userId: string, tmdbId: number | null, season: number, catalog: Catalog) {
+  const show = await prisma.show.findFirst({ where: { id: showId, userId } });
+  if (!show || show.tmdbId !== tmdbId) return null;
+  const [watches, unwatches] = await Promise.all([prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(showId)]);
+  const now = today();
+  const summary = buildTrackingSummary(show, catalog, null, watches, now, null, unwatches);
+  const { episodes } = mergeShowEpisodes(show, catalog, watches, now, unwatches);
+  return { summary, guide: { seasons: catalog.seasons, season, episodes: episodes.filter(e => e.season === season), watched: watches } };
 }
 
 /** Mark every released, not yet watched regular episode of one season watched (same rules as single episodes). */

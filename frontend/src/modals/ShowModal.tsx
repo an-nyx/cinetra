@@ -4,7 +4,7 @@ import { T, phrase, useLanguage } from "@/i18n";
 import { posterSrc } from "@/lib/poster";
 import { useEffect, useState, useRef } from "react";
 import { ShowService } from "@/services";
-import type { EpisodeGuide, StatusChange, TrackingSummary, TrackedEpisode } from "@/services/show.service";
+import type { EpisodeGuide, EpisodeSaveResult, StatusChange, TrackingSummary, TrackedEpisode } from "@/services/show.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ShowType } from "@/types/index.ts";
@@ -13,6 +13,7 @@ import EditShowMatch from "./EditShowMatch";
 import SonarrPanel from "@/components/sonarr-panel";
 
 import { createWatchMutation } from "@/lib/optimistic-watch.mjs";
+import { optimisticSummary, publishConfirmedSummary, trackingTick } from "@/lib/tracking-sync";
 
 interface Props {
   selectedShow: string | null;
@@ -47,36 +48,65 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
   const currentShow = useRef(selectedShow);
   currentShow.current = selectedShow;
   const watchVersion = useRef(0);
+  const [nextPending, setNextPending] = useState(false);
   const toggleEpisode = async (episodeSeason: number, number: number, watched: boolean) => {
     if (!selectedShow || busy || !guide) return;
     const id = selectedShow;
     const previous = guide;
     const previousSummary = summary;
+    const statusBefore = show ? `${show.status ?? ''}:${show.completed}` : null;
+    const isCurrent = () => currentShow.current === id && watchVersion.current === version;
     let version = 0;
+    let started = 0;
+    let saved: EpisodeSaveResult | null = null;
+    // Automatic Watching <-> Completed runs on the server after the save, off the critical path. Only a real status
+    // change reloads anything; otherwise the confirmed save is already shown everywhere.
+    const followStatus = async (): Promise<void> => {
+      const result = await ShowService.getReconciliation(id);
+      if (!isCurrent()) return;
+      if (result.pending) { window.setTimeout(() => { void followStatus().catch(() => {}); }, 1500); return; }
+      setShows(items => items.map(item => item.id === id ? result.show : item));
+      if (`${result.show.status ?? ''}:${result.show.completed}` === statusBefore) return;
+      const read = trackingTick();
+      const data = await ShowService.getTrackingSummary(id);
+      if (!isCurrent()) return;
+      setSummary(data);
+      publishConfirmedSummary({ summary: data, started: read, confirmed: read });
+      window.dispatchEvent(new Event('tracking-updated'));
+    };
     await watchMutation.current({
       optimistic: () => {
         version = ++watchVersion.current;
+        started = trackingTick();
         setBusy(true); setError("");
-        if (watched && summary?.nextEpisode?.season === episodeSeason && summary.nextEpisode.number === number) setSummary({ ...summary, nextEpisode: null });
+        if (previousSummary) {
+          const immediate = optimisticSummary(previousSummary, previous, episodeSeason, number, watched, today());
+          setSummary(immediate.summary); setNextPending(immediate.nextPending);
+        }
         setGuide({ ...previous, episodes: previous.episodes.map(e => previous.season === episodeSeason && e.number === number ? { ...e, watched } : e) });
       },
-      save: () => ShowService.setEpisodeWatched(id, episodeSeason, number, watched),
-      rollback: () => { if (currentShow.current === id && watchVersion.current === version) { setGuide(previous); setSummary(previousSummary); } },
-      failed: () => { if (currentShow.current === id && watchVersion.current === version) { setBusy(false); setError('Could not save episode. Your change was undone. Reload the guide and try again.'); } },
+      save: async () => { saved = await ShowService.setEpisodeWatched(id, episodeSeason, number, watched); },
+      rollback: () => { if (isCurrent()) { setGuide(previous); setSummary(previousSummary); setNextPending(false); } },
+      failed: () => { if (isCurrent()) { setBusy(false); setError('Could not save episode. Your change was undone. Reload the guide and try again.'); } },
       settled: () => {
-        if (currentShow.current !== id || watchVersion.current !== version) return;
+        if (!isCurrent()) return;
         setBusy(false);
-        window.dispatchEvent(new Event('tracking-updated'));
-        // Refresh separately from saving; failed reads never undo a committed watch.
-        const sync = async () => {
-          const result = await ShowService.getReconciliation(id);
-          if (currentShow.current !== id || watchVersion.current !== version) return;
-          setShows(items => items.map(item => item.id === id ? result.show : item));
-          if (result.pending) { window.setTimeout(() => { void sync().catch(() => {}); }, 1500); return; }
-          const [data, loaded] = await Promise.all([ShowService.getTrackingSummary(id), ShowService.getEpisodeGuide(id, episodeSeason)]);
-          if (currentShow.current === id && watchVersion.current === version) { setSummary(data); setGuide(loaded); window.dispatchEvent(new Event('tracking-updated')); }
-        };
-        void sync().catch(() => {});
+        const confirmed = saved as EpisodeSaveResult | null;
+        if (confirmed?.summary) {
+          // The save answered with the committed progress: no refetch, and Home/cards patch the same summary.
+          setSummary(confirmed.summary); setNextPending(false);
+          if (confirmed.guide?.season === previous.season) setGuide(confirmed.guide);
+          publishConfirmedSummary({ summary: confirmed.summary, started, confirmed: trackingTick() });
+        } else {
+          // Older server or re-linked show: read the committed state once. A failed read never undoes the save.
+          const read = trackingTick();
+          void Promise.all([ShowService.getTrackingSummary(id), ShowService.getEpisodeGuide(id, previous.season)]).then(([data, loaded]) => {
+            if (!isCurrent()) return;
+            setSummary(data); setGuide(loaded); setNextPending(false);
+            publishConfirmedSummary({ summary: data, started: read, confirmed: read });
+          }).catch(() => { if (isCurrent()) { setNextPending(false); setError('Episode saved. Reopen this show to refresh its progress.'); } });
+        }
+        void followStatus().catch(() => {});
       },
     });
   };
@@ -95,7 +125,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
     watchVersion.current++;
     if (!selectedShow) { setGuide(null); setSummary(null); return; }
     let active = true;
-    setBusy(true); setError(""); setGuide(null); setSummary(null); setEditing(false); setStatusNotice(null);
+    setBusy(true); setError(""); setGuide(null); setSummary(null); setNextPending(false); setEditing(false); setStatusNotice(null);
     ShowService.getTrackingSummary(selectedShow).then(async data => {
       if (!active) return;
       setSummary(data);
@@ -210,7 +240,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
             <div className="grid gap-3 sm:grid-cols-2">
               <section className="cinema-surface border-primary/30 bg-primary/5 p-5">
                 <p className="cinema-eyebrow mb-2"><T>Watch next</T></p>
-                {summary.nextEpisode ? <><h3 className="font-semibold">{code(summary.nextEpisode)} · {summary.nextEpisode.name}</h3><p className="mt-1 text-xs text-muted-foreground">{nextEpisodeMessage(language, summary.nextEpisode.airDate, summary.remainingCount)}</p><Button className="mt-4 w-full gap-2" disabled={busy} onClick={() => toggleEpisode(summary.nextEpisode!.season, summary.nextEpisode!.number, true)}><Play className="size-4" /><T>Mark next episode watched</T></Button></> : <p className="text-sm text-muted-foreground">{summary.viewingState === "fully_watched" ? phrase(language, "Final regular episode watched. The series is confirmed ended.") : summary.viewingState === "caught_up" ? phrase(language, "Caught up with currently released episodes; future episodes may follow.") : summary.guideAvailable ? phrase(language, "No released episode to track.") : phrase(language, "Episode guide unavailable. Your watched episodes are kept.")}</p>}
+                {summary.nextEpisode ? <><h3 className="font-semibold">{code(summary.nextEpisode)} · {summary.nextEpisode.name}</h3><p className="mt-1 text-xs text-muted-foreground">{nextEpisodeMessage(language, summary.nextEpisode.airDate, summary.remainingCount)}</p><Button className="mt-4 w-full gap-2" disabled={busy} onClick={() => toggleEpisode(summary.nextEpisode!.season, summary.nextEpisode!.number, true)}><Play className="size-4" /><T>Mark next episode watched</T></Button></> : nextPending ? <p role="status" className="text-sm text-muted-foreground"><T>Updating next episode…</T></p> : <p className="text-sm text-muted-foreground">{summary.viewingState === "fully_watched" ? phrase(language, "Final regular episode watched. The series is confirmed ended.") : summary.viewingState === "caught_up" ? phrase(language, "Caught up with currently released episodes; future episodes may follow.") : summary.guideAvailable ? phrase(language, "No released episode to track.") : phrase(language, "Episode guide unavailable. Your watched episodes are kept.")}</p>}
               </section>
               <section className="cinema-surface p-5"><p className="cinema-eyebrow mb-2"><T>Last watched</T></p>
                 <p className="font-semibold">{summary.lastEpisode ? `${code(summary.lastEpisode)} · ${summary.lastEpisode.name}` : summary.legacyPosition ? phrase(language, 'Earlier progress, no watch dates') : phrase(language, 'No episodes logged yet')}</p>

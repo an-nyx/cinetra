@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
+import { createConfirmedSummaries, onConfirmedSummary, trackingTick } from "@/lib/tracking-sync";
 
 import ShowModal from "../modals/ShowModal.tsx";
 import AddShowModal from "../modals/AddShowModal.tsx";
@@ -74,23 +75,38 @@ export default function ShowsPage() {
     loadShows();
   }, []);
 
+  // Confirmed saves (here or in the Watch Room) patch one card; a library read that started earlier cannot undo them.
+  const confirmed = useRef(createConfirmedSummaries());
   useEffect(() => {
-    const refresh = () => { ShowService.getLibraryTracking().then(setTracking).catch(() => {}); };
+    let latest = 0;
+    const refresh = () => {
+      const started = latest = trackingTick();
+      ShowService.getLibraryTracking().then(rows => { if (started === latest) setTracking(confirmed.current.merge(rows, started)); }).catch(() => {});
+    };
     refresh();
     window.addEventListener('tracking-updated', refresh);
-    return () => window.removeEventListener('tracking-updated', refresh);
+    const stopConfirmed = onConfirmedSummary(update => { if (confirmed.current.accept(update)) setTracking(rows => confirmed.current.merge(rows)); });
+    return () => { latest = -1; stopConfirmed(); window.removeEventListener('tracking-updated', refresh); };
   }, [shows.length]);
 
   const nextPending = useRef(false);
   const markNext = async (item: TrackingSummary) => {
     if (!item.nextEpisode || nextPending.current) return;
     nextPending.current = true;
+    const started = trackingTick();
     const previous = tracking;
     setTracking(items => items.map(row => row.showId === item.showId ? { ...row, nextEpisode: null } : row));
-    try { await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); }
+    let saved;
+    try { saved = await ShowService.setEpisodeWatched(item.showId, item.nextEpisode.season, item.nextEpisode.number, true); }
     catch {
       setTracking(previous);
       toast.error('Could not save episode. Your change was undone. Reload and try again.');
+      nextPending.current = false;
+      return;
+    }
+    if (saved.summary) {
+      const update = { summary: saved.summary, started, confirmed: trackingTick() };
+      if (confirmed.current.accept(update)) setTracking(rows => confirmed.current.merge(rows));
       nextPending.current = false;
       return;
     }

@@ -12,6 +12,7 @@ import type { TrackingSummary } from "@/services/show.service";
 import type { ShowType } from "@/types";
 import { posterSrc } from "@/lib/poster";
 import { createHomeTracking } from "@/lib/home-tracking";
+import { onConfirmedSummary } from "@/lib/tracking-sync";
 import { episodeCode, homeDashboard } from "@/lib/tracking";
 import { groupReleaseEvents, timeLabel } from "@/lib/upcoming-calendar";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
@@ -65,7 +66,9 @@ export default function WelcomePage() {
   useEffect(() => {
     void load();
     window.addEventListener("tracking-updated", load);
-    return () => { controller.invalidate(); window.removeEventListener("tracking-updated", load); };
+    // Saves confirmed in the Watch Room patch that show in place: no library reload, no flicker.
+    const stopConfirmed = onConfirmedSummary(update => { controller.apply(update); });
+    return () => { controller.invalidate(); stopConfirmed(); window.removeEventListener("tracking-updated", load); };
   }, [load, controller]);
 
   const dash = useMemo(() => homeDashboard(tracking, 6, featuredId.current), [tracking]);
