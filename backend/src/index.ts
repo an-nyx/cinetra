@@ -7,6 +7,7 @@ import apiRoutes from "./api/v1";
 import { warmCaches } from "./services/episode-guide.service";
 import { startNotificationScheduler } from "./services/notifications/notification-scheduler";
 import { startShowStatusMonitor } from "./services/show-status.service";
+import { startSonarrMonitor } from "./services/sonarr/sonarr.service";
 
 const app = express();
 
@@ -46,4 +47,6 @@ app.listen(port, () => {
   startNotificationScheduler();
   // Automatic Watching <-> Completed statuses: completed shows reopen when a verified new episode premieres.
   startShowStatusMonitor();
+  // Sonarr: a read-only connectivity check (system status, root folders, quality profiles) for /api/v1/health.
+  startSonarrMonitor();
 });

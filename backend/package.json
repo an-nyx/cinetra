@@ -13,7 +13,8 @@
     "test:notifications": "ts-node tests/episode-alerts.test.ts && ts-node tests/push-notifications.integration.test.ts",
     "notify:run-local": "ts-node scripts/run-episode-notifier.ts",
     "vapid:generate": "ts-node scripts/generate-vapid-keys.ts",
-    "test:movie-status": "ts-node tests/movie-status.integration.test.ts"
+    "test:movie-status": "ts-node tests/movie-status.integration.test.ts",
+    "test:sonarr": "ts-node tests/sonarr.test.ts"
   },
   "keywords": [],
   "author": "",

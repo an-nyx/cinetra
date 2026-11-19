@@ -46,6 +46,9 @@ services:
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       # The new-episode scheduler runs only when this is "enabled".
       NOTIFICATIONS_SCHEDULER: ${NOTIFICATIONS_SCHEDULER:-disabled}
+      # Sonarr ("Add to Sonarr"): optional and server-side only; never use VITE_* variables for these.
+      SONARR_URL: ${SONARR_URL:-}
+      SONARR_API_KEY: ${SONARR_API_KEY:-}
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
     depends_on:
       migrate:

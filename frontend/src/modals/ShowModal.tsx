@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ShowType } from "@/types/index.ts";
 import { Check, CalendarDays, Pencil, Play, Trash2, Tv } from "lucide-react";
 import EditShowMatch from "./EditShowMatch";
+import SonarrPanel from "@/components/sonarr-panel";
 
 import { createWatchMutation } from "@/lib/optimistic-watch.mjs";
 
@@ -179,7 +180,11 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
               {statusNotice && <p role="status" className="text-xs text-primary">{phrase(language, statusNotice.to === 'completed' ? 'Marked Completed automatically: every released episode is watched.' : 'Back to Watching automatically.')}</p>}
               <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">{localizedOverview.loading ? phrase(language, 'Loading description…') : localizedOverview.overview || phrase(language, language === 'en' ? 'No overview available.' : 'Description unavailable in this language.')}</p>
               {summary && <p className="text-xs text-muted-foreground">{summary.countDataAvailable ? watchCounts(language, summary.watchedCount, summary.releasedCount) : phrase(language, 'Episode counts unavailable; your watched episodes are kept.')}</p>}
-              <Button type="button" variant="outline" size="sm" className="gap-2" disabled={busy} onClick={() => { setMatchNotice(""); setEditingMatch(true); }}><Pencil className="size-4" /><T>Edit show</T></Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" className="gap-2" disabled={busy} onClick={() => { setMatchNotice(""); setEditingMatch(true); }}><Pencil className="size-4" /><T>Edit show</T></Button>
+                {/* Sonarr is download management only: it never reads or changes this show's viewing data. */}
+                <SonarrPanel key={`${show.id}:${show.tmdbId ?? ''}`} showId={show.id} cinetraPosterURL={show.posterURL || null} />
+              </div>
             </div>
           </div>}
           {error && <div role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{phrase(language, error)}</div>}

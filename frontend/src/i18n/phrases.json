@@ -1242,5 +1242,309 @@
   "No verified episode guide is available for this show. Your watched episodes are kept.": [
     "Aucun guide d’épisodes vérifié pour cette série. Vos épisodes vus sont conservés.",
     "لا يتوفر دليل حلقات موثّق لهذا المسلسل. الحلقات التي شاهدتها محفوظة."
+  ],
+  "Sonarr": [
+    "Sonarr",
+    "Sonarr"
+  ],
+  "Add to Sonarr": [
+    "Ajouter à Sonarr",
+    "إضافة إلى Sonarr"
+  ],
+  "Added to Sonarr": [
+    "Ajoutée à Sonarr",
+    "تمت الإضافة إلى Sonarr"
+  ],
+  "Already in Sonarr": [
+    "Déjà dans Sonarr",
+    "موجود في Sonarr"
+  ],
+  "Open in Sonarr": [
+    "Ouvrir dans Sonarr",
+    "فتح في Sonarr"
+  ],
+  "Sonarr status unavailable right now.": [
+    "Statut Sonarr indisponible pour le moment.",
+    "حالة Sonarr غير متاحة حاليًا."
+  ],
+  "Sonarr is not configured on this server.": [
+    "Sonarr n'est pas configuré sur ce serveur.",
+    "لم يتم إعداد Sonarr على هذا الخادم."
+  ],
+  "Link this show to TMDB to add it to Sonarr.": [
+    "Liez cette série à TMDB pour l'ajouter à Sonarr.",
+    "اربط هذا المسلسل بـ TMDB لإضافته إلى Sonarr."
+  ],
+  "No verified TVDB match for this show, so it can't be added to Sonarr.": [
+    "Aucune correspondance TVDB vérifiée pour cette série : impossible de l'ajouter à Sonarr.",
+    "لا توجد مطابقة TVDB موثّقة لهذا المسلسل، لذا لا يمكن إضافته إلى Sonarr."
+  ],
+  "Sonarr couldn't find this show's TVDB series, so it can't be added.": [
+    "Sonarr ne trouve pas la série TVDB correspondante : impossible de l'ajouter.",
+    "لم يعثر Sonarr على مسلسل TVDB المطابق، لذا لا يمكن إضافته."
+  ],
+  "Several Sonarr series match this show. Nothing will be added automatically.": [
+    "Plusieurs séries Sonarr correspondent. Rien ne sera ajouté automatiquement.",
+    "تطابق عدة مسلسلات في Sonarr هذا المسلسل. لن تتم إضافة أي شيء تلقائيًا."
+  ],
+  "TMDB and Sonarr disagree about this show's identity. Nothing will be added automatically.": [
+    "TMDB et Sonarr ne s'accordent pas sur l'identité de cette série. Rien ne sera ajouté automatiquement.",
+    "يختلف TMDB وSonarr حول هوية هذا المسلسل. لن تتم إضافة أي شيء تلقائيًا."
+  ],
+  "Sonarr rejected the server's credentials.": [
+    "Sonarr a refusé les identifiants du serveur.",
+    "رفض Sonarr بيانات اعتماد الخادم."
+  ],
+  "Sonarr is unavailable right now.": [
+    "Sonarr est indisponible pour le moment.",
+    "Sonarr غير متاح حاليًا."
+  ],
+  "None": [
+    "Aucun",
+    "لا شيء"
+  ],
+  "Future episodes": [
+    "Épisodes à venir",
+    "الحلقات القادمة"
+  ],
+  "Missing episodes": [
+    "Épisodes manquants",
+    "الحلقات المفقودة"
+  ],
+  "Existing episodes": [
+    "Épisodes existants",
+    "الحلقات الموجودة"
+  ],
+  "Recent episodes": [
+    "Épisodes récents",
+    "الحلقات الحديثة"
+  ],
+  "Pilot episode": [
+    "Épisode pilote",
+    "الحلقة التجريبية"
+  ],
+  "First season": [
+    "Première saison",
+    "الموسم الأول"
+  ],
+  "Last season": [
+    "Dernière saison",
+    "الموسم الأخير"
+  ],
+  "All episodes": [
+    "Tous les épisodes",
+    "كل الحلقات"
+  ],
+  "Nothing is monitored. Sonarr will not search for or download any episode.": [
+    "Rien n'est surveillé. Sonarr ne cherchera ni ne téléchargera aucun épisode.",
+    "لا تتم مراقبة أي شيء. لن يبحث Sonarr عن أي حلقة ولن ينزّلها."
+  ],
+  "Episodes that haven't aired yet.": [
+    "Épisodes pas encore diffusés.",
+    "الحلقات التي لم تُعرض بعد."
+  ],
+  "Released episodes without files, and future episodes.": [
+    "Épisodes diffusés sans fichier, et épisodes à venir.",
+    "الحلقات المعروضة بلا ملفات، والحلقات القادمة."
+  ],
+  "Episodes that already have files, and future episodes.": [
+    "Épisodes ayant déjà un fichier, et épisodes à venir.",
+    "الحلقات التي لها ملفات بالفعل، والحلقات القادمة."
+  ],
+  "Episodes aired in the last 90 days, and future episodes.": [
+    "Épisodes diffusés ces 90 derniers jours, et épisodes à venir.",
+    "الحلقات المعروضة خلال آخر 90 يومًا، والحلقات القادمة."
+  ],
+  "Only the first episode of the series.": [
+    "Seulement le premier épisode de la série.",
+    "الحلقة الأولى من المسلسل فقط."
+  ],
+  "Every episode of the first season.": [
+    "Tous les épisodes de la première saison.",
+    "كل حلقات الموسم الأول."
+  ],
+  "Every episode of the latest season.": [
+    "Tous les épisodes de la dernière saison.",
+    "كل حلقات الموسم الأخير."
+  ],
+  "Every episode except specials.": [
+    "Tous les épisodes, sauf les spéciaux.",
+    "كل الحلقات باستثناء الحلقات الخاصة."
+  ],
+  "Loading Sonarr options…": [
+    "Chargement des options Sonarr…",
+    "جارٍ تحميل خيارات Sonarr…"
+  ],
+  "Sonarr has no accessible root folder.": [
+    "Sonarr n'a aucun dossier racine accessible.",
+    "لا يوجد في Sonarr مجلد جذر متاح."
+  ],
+  "Sonarr has no quality profiles.": [
+    "Sonarr n'a aucun profil de qualité.",
+    "لا توجد في Sonarr ملفات تعريف للجودة."
+  ],
+  "Choose a root folder.": [
+    "Choisissez un dossier racine.",
+    "اختر مجلدًا جذرًا."
+  ],
+  "Choose a quality profile.": [
+    "Choisissez un profil de qualité.",
+    "اختر ملف تعريف للجودة."
+  ],
+  "Choose a monitoring option.": [
+    "Choisissez une option de surveillance.",
+    "اختر خيار المراقبة."
+  ],
+  "Searching needs monitored episodes.": [
+    "La recherche nécessite des épisodes surveillés.",
+    "يتطلب البحث حلقات مراقَبة."
+  ],
+  "This series is already in Sonarr.": [
+    "Cette série est déjà dans Sonarr.",
+    "هذا المسلسل موجود بالفعل في Sonarr."
+  ],
+  "This series is already being added. Please wait.": [
+    "Cette série est déjà en cours d'ajout. Patientez.",
+    "تجري إضافة هذا المسلسل بالفعل. يرجى الانتظار."
+  ],
+  "The matching series changed. Nothing was added; please review it again.": [
+    "La série correspondante a changé. Rien n'a été ajouté ; vérifiez à nouveau.",
+    "تغيّر المسلسل المطابق. لم تتم إضافة أي شيء؛ يرجى المراجعة مجددًا."
+  ],
+  "Cinetra could not verify the matching Sonarr series, so nothing was added.": [
+    "Cinetra n'a pas pu vérifier la série Sonarr correspondante : rien n'a été ajouté.",
+    "تعذّر على Cinetra التحقق من مسلسل Sonarr المطابق، لذا لم تتم إضافة أي شيء."
+  ],
+  "The selected root folder is not available in Sonarr.": [
+    "Le dossier racine choisi n'est pas disponible dans Sonarr.",
+    "المجلد الجذر المحدد غير متاح في Sonarr."
+  ],
+  "The selected quality profile does not exist in Sonarr.": [
+    "Le profil de qualité choisi n'existe pas dans Sonarr.",
+    "ملف تعريف الجودة المحدد غير موجود في Sonarr."
+  ],
+  "Sonarr did not confirm in time. The series may still have been added: check again before retrying.": [
+    "Sonarr n'a pas confirmé à temps. La série a peut-être été ajoutée : vérifiez avant de réessayer.",
+    "لم يؤكد Sonarr في الوقت المحدد. ربما أُضيف المسلسل: تحقق قبل إعادة المحاولة."
+  ],
+  "Sonarr did not respond in time. Try again in a moment.": [
+    "Sonarr n'a pas répondu à temps. Réessayez dans un instant.",
+    "لم يستجب Sonarr في الوقت المحدد. أعد المحاولة بعد قليل."
+  ],
+  "Sonarr rejected the addition. Nothing was added.": [
+    "Sonarr a refusé l'ajout. Rien n'a été ajouté.",
+    "رفض Sonarr الإضافة. لم تتم إضافة أي شيء."
+  ],
+  "Sonarr is not available for this account.": [
+    "Sonarr n'est pas disponible pour ce compte.",
+    "Sonarr غير متاح لهذا الحساب."
+  ],
+  "Check the selected options and try again.": [
+    "Vérifiez les options choisies et réessayez.",
+    "تحقق من الخيارات المحددة وأعد المحاولة."
+  ],
+  "Too many requests. Try again in a moment.": [
+    "Trop de requêtes. Réessayez dans un instant.",
+    "طلبات كثيرة جدًا. أعد المحاولة بعد قليل."
+  ],
+  "Could not add the series to Sonarr. Nothing was changed in Cinetra.": [
+    "Impossible d'ajouter la série à Sonarr. Rien n'a changé dans Cinetra.",
+    "تعذّرت إضافة المسلسل إلى Sonarr. لم يتغير شيء في Cinetra."
+  ],
+  "Nothing is monitored, so nothing will download.": [
+    "Rien n'est surveillé : rien ne sera téléchargé.",
+    "لا تتم مراقبة أي شيء، لذا لن يتم تنزيل أي شيء."
+  ],
+  "Sonarr will handle downloads for monitored episodes.": [
+    "Sonarr gérera les téléchargements des épisodes surveillés.",
+    "سيتولى Sonarr تنزيل الحلقات المراقَبة."
+  ],
+  "Review the series and choose how Sonarr should manage it.": [
+    "Vérifiez la série et choisissez comment Sonarr doit la gérer.",
+    "راجع المسلسل واختر كيف يديره Sonarr."
+  ],
+  "season": [
+    "saison",
+    "موسم"
+  ],
+  "seasons": [
+    "saisons",
+    "مواسم"
+  ],
+  "Verified from TMDB's TVDB mapping": [
+    "Vérifiée via la correspondance TVDB de TMDB",
+    "تم التحقق عبر ربط TMDB بـ TVDB"
+  ],
+  "Verified from Sonarr's TMDB mapping": [
+    "Vérifiée via la correspondance TMDB de Sonarr",
+    "تم التحقق عبر ربط Sonarr بـ TMDB"
+  ],
+  "Root folder": [
+    "Dossier racine",
+    "المجلد الجذر"
+  ],
+  "Choose…": [
+    "Choisir…",
+    "اختر…"
+  ],
+  "free": [
+    "libres",
+    "متاحة"
+  ],
+  "unavailable": [
+    "indisponible",
+    "غير متاح"
+  ],
+  "Quality profile": [
+    "Profil de qualité",
+    "ملف تعريف الجودة"
+  ],
+  "Monitor episodes": [
+    "Épisodes surveillés",
+    "مراقبة الحلقات"
+  ],
+  "default": [
+    "par défaut",
+    "افتراضي"
+  ],
+  "Monitor new seasons": [
+    "Surveiller les nouvelles saisons",
+    "مراقبة المواسم الجديدة"
+  ],
+  "Seasons added later are monitored automatically.": [
+    "Les saisons ajoutées plus tard sont surveillées automatiquement.",
+    "تتم مراقبة المواسم المضافة لاحقًا تلقائيًا."
+  ],
+  "Search for missing episodes now": [
+    "Rechercher les épisodes manquants maintenant",
+    "البحث عن الحلقات المفقودة الآن"
+  ],
+  "Requires monitored episodes.": [
+    "Nécessite des épisodes surveillés.",
+    "يتطلب حلقات مراقَبة."
+  ],
+  "Sonarr starts searching immediately after adding.": [
+    "Sonarr lance la recherche dès l'ajout.",
+    "يبدأ Sonarr البحث فور الإضافة."
+  ],
+  "Monitored episodes can be downloaded automatically, now or later, using Sonarr's existing indexers and download clients.": [
+    "Les épisodes surveillés peuvent être téléchargés automatiquement, maintenant ou plus tard, via les indexeurs et clients de téléchargement déjà configurés dans Sonarr.",
+    "يمكن تنزيل الحلقات المراقَبة تلقائيًا، الآن أو لاحقًا، باستخدام المفهرسات وبرامج التنزيل المعدّة مسبقًا في Sonarr."
+  ],
+  "Nothing will be monitored or downloaded. You can change monitoring later in Sonarr.": [
+    "Rien ne sera surveillé ni téléchargé. Vous pourrez modifier la surveillance plus tard dans Sonarr.",
+    "لن تتم مراقبة أو تنزيل أي شيء. يمكنك تغيير المراقبة لاحقًا في Sonarr."
+  ],
+  "Your Cinetra progress and status stay unchanged: downloaded episodes are never marked watched.": [
+    "Votre progression et votre statut Cinetra restent inchangés : un épisode téléchargé n'est jamais marqué comme vu.",
+    "يبقى تقدمك وحالتك في Cinetra دون تغيير: لا تُعلَّم الحلقات المنزّلة كمُشاهَدة أبدًا."
+  ],
+  "Confirm and add": [
+    "Confirmer et ajouter",
+    "تأكيد وإضافة"
+  ],
+  "TMDB is unavailable, so the Sonarr match can't be verified right now.": [
+    "TMDB est indisponible : la correspondance Sonarr ne peut pas être vérifiée pour le moment.",
+    "TMDB غير متاح، لذا لا يمكن التحقق من مطابقة Sonarr حاليًا."
   ]
 }
