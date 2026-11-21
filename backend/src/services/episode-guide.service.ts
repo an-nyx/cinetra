@@ -2,7 +2,10 @@ import { prisma } from '../database/prisma';
 import axios from 'axios';
 import { TMDBApiService } from './tmdb/tmdb-api.service';
 import { type EpisodeMetadata } from './legacy-progress.model';
-import { buildTrackingSummary, catalogFromTMDB, mergeShowEpisodes, toBroadcastStatus, type Catalog, type MetadataFailure, type UnwatchRecord } from './tracking-summary.model';
+import { buildTrackingSummary, catalogFromTMDB, mergeShowEpisodes, toBroadcastStatus, withReleaseTimes, type Catalog, type MetadataFailure, type UnwatchRecord } from './tracking-summary.model';
+import { isEpisodeReleased, type ReleaseSchedule, type ReleaseSource } from './release-rule.model';
+import { loadReleaseOverrides, releaseOverridesFor } from './release-overrides.service';
+import { addDays } from './release-override.model';
 import { calculateLegacyCoverage, calculateTrackingProgress, episodeKey } from './legacy-progress.model';
 import { TMDB_AUTH_CONFIGURATION_ERROR } from './tmdb/tmdb-auth';
 import { checkForUpdates, getSchedule, resolveIdentity, tvmazeCacheStats } from './tvmaze/tvmaze.service';
@@ -14,7 +17,11 @@ import { analyzeRematchProgress, summarizeSeries } from './rematch.model';
 
 const tmdb = new TMDBApiService();
 const today = () => new Date().toISOString().slice(0, 10);
+/** The exact instant release eligibility is judged at (release-rule.model). */
+const now = () => new Date().toISOString();
 type Episode = EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; watchedAt: Date | null; episodeType?: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null };
+/** How long a catalog load waits for TVMaze release timing before using the conservative TMDB date fallback. */
+const RELEASE_TIMING_WAIT_MS = 1500;
 // Catalogs: fresh for 1 hour, then served stale (up to 24 hours) while one background refresh runs.
 const catalogCache = new SWRCache<Catalog>({ freshMs: 60 * 60_000, staleMs: 24 * 60 * 60_000, retryMs: 5 * 60_000 });
 // Upcoming per user: fresh for 5 minutes, then served stale (up to 6 hours) while it rebuilds in the background.
@@ -33,7 +40,7 @@ export class EpisodeGuideError extends Error {
 
 const validNumber = (value: unknown, minimum: number) => typeof value === 'number' && Number.isInteger(value) && value >= minimum;
 
-export async function catalogFor(show: { name: string; tmdbId: number | null }, fresh = false): Promise<Catalog> {
+export async function catalogFor(show: { name: string; tmdbId: number | null; overview?: string | null }, fresh = false): Promise<Catalog> {
   if (!show.tmdbId) throw new EpisodeGuideError(404, 'TMDB match required to load episode metadata');
   const tmdbId = show.tmdbId;
   const provider = fresh ? new TMDBApiService() : tmdb;
@@ -42,9 +49,54 @@ export async function catalogFor(show: { name: string; tmdbId: number | null }, 
     const numbers = (details.seasons || []).filter(s => s.season_number > 0).map(s => s.season_number);
     // A page that fails for a season that has not aired yet must not break released progress (see catalogFromTMDB).
     const settled = await Promise.allSettled(numbers.map(n => provider.getSeason(tmdbId, n)));
-    return catalogFromTMDB(details, settled.map((r, i) => ({ season: numbers[i], data: r.status === 'fulfilled' ? r.value : null })), today());
+    const catalog = catalogFromTMDB(details, settled.map((r, i) => ({ season: numbers[i], data: r.status === 'fulfilled' ? r.value : null })), today());
+    const timing = releaseSchedule(tmdbId, show.name, show.overview ?? null);
+    // Fresh loads serve background status reconciliation (never a page): they wait for TVMaze, so status decisions use
+    // the exact premiere rather than a temporary fallback. Page loads never wait longer than the deadline.
+    let timer: NodeJS.Timeout | undefined;
+    const ready = fresh ? await timing
+      : await Promise.race([timing, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), RELEASE_TIMING_WAIT_MS); })]).finally(() => clearTimeout(timer));
+    const overrides = releaseOverridesFor(tmdbId);
+    if (ready) return withReleaseTimes(catalog, ...ready, overrides);
+    // TVMaze is slow (cold caches after a restart, rate limit): pages never wait on it and nothing is released early.
+    // Once it answers, the cached catalog is marked stale so the next read re-times it in the background.
+    if (!fresh) void timing.then(([schedule]) => { if (schedule) catalogCache.expire(`tmdb:${tmdbId}`); });
+    return withReleaseTimes(catalog, null, null, 'TVMaze timing pending', overrides);
   };
   return fresh ? loadCatalog() : catalogCache.get(`tmdb:${tmdbId}`, loadCatalog);
+}
+
+/**
+ * The verified TVMaze schedule used to time episode releases, or null with the reason TMDB dates alone decide.
+ * Same identity and cached schedules as Upcoming, notifications and automatic statuses, but stricter: only an
+ * identity proven by TheTVDB/IMDb IDs and a schedule whose last refresh succeeded. Never throws: TVMaze problems only
+ * make releases later (TMDB date fallback), never break or advance tracking.
+ */
+async function releaseSchedule(tmdbId: number, name: string, overview: string | null): Promise<[ReleaseSchedule | null, number | null, string]> {
+  try {
+    // Only TheTVDB/IMDb-proven identities time releases, so never start TVMaze's title search from here.
+    const ids = await tmdb.getExternalIds(tmdbId);
+    if (!ids.tvdbId && !ids.imdbId) return [null, null, 'TMDB lists no TheTVDB or IMDb ID'];
+    const identity = await resolveShowIdentity(tmdbId, { name, overview });
+    if (identity.status !== 'verified') return [null, null, `TVMaze identity ${identity.reason}`];
+    if (identity.method !== 'external_id') return [null, identity.tvmazeId, 'TVMaze identity matched by title only'];
+    const schedule = await getSchedule(identity.tvmazeId);
+    if (schedule.stale) return [null, identity.tvmazeId, 'TVMaze schedule is stale'];
+    return [{ show: schedule.show, episodes: schedule.episodes }, identity.tvmazeId, 'verified'];
+  } catch { return [null, null, 'TVMaze unavailable']; }
+}
+
+/**
+ * Cinetra's effective release instant for one episode, as every tracking page sees it (the cached catalog, timed by
+ * release-rule.model). `numberingVerified` says whether TVMaze's season/episode numbers are known to mean the same
+ * episodes as TMDB's for this series (only then may a TVMaze record be paired with this TMDB episode by number).
+ * Throws when the catalog cannot be loaded; callers decide what "unknown" means for them.
+ */
+export async function effectiveRelease(show: { name: string; tmdbId: number; overview?: string | null }, season: number, number: number):
+  Promise<{ found: boolean; releaseAt: string | null; releaseSource: ReleaseSource | null; numberingVerified: boolean }> {
+  const catalog = await catalogFor(show);
+  const episode = catalog.episodes.find(e => e.season === season && e.number === number);
+  return { found: !!episode, releaseAt: episode?.releaseAt ?? null, releaseSource: episode?.releaseSource ?? null, numberingVerified: catalog.releaseTiming?.source === 'tvmaze' };
 }
 
 /**
@@ -63,7 +115,7 @@ async function load(showId: string, userId: string) {
   const show = await prisma.show.findFirst({ where: { id: showId, userId } });
   if (!show) throw new EpisodeGuideError(404, 'Show not found');
   const [catalog, watches, unwatches] = await Promise.all([catalogFor(show), prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(showId)]);
-  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today(), unwatches);
+  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, now(), unwatches);
   return { show, catalog, episodes, watches, unwatches, legacy };
 }
 
@@ -73,9 +125,11 @@ async function load(showId: string, userId: string) {
  */
 export async function trackingState(show: ShowRow, fresh = false) {
   const [catalog, watches, unwatches] = await Promise.all([catalogFor(show, fresh), prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(show.id)]);
-  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today(), unwatches);
-  const progress = calculateTrackingProgress(episodes, catalog, legacy.needsReview, toBroadcastStatus(catalog.broadcastStatus), catalog.inProduction, catalog.nextEpisodeAnnounced, today(), true);
-  return { catalog, episodes, watches, unwatches, progress, today: today() };
+  const at = now();
+  const { legacy, episodes } = mergeShowEpisodes(show, catalog, watches, at, unwatches);
+  const progress = calculateTrackingProgress(episodes, catalog, legacy.needsReview, toBroadcastStatus(catalog.broadcastStatus), catalog.inProduction, catalog.nextEpisodeAnnounced, at, true);
+  // `today` (a UTC date) is what automatic statuses compare TMDB dates with; their own TVMaze verification is unchanged.
+  return { catalog, episodes, watches, unwatches, progress, today: at.slice(0, 10) };
 }
 
 /** Distinguish a missing association from authentication, not-found and transient TMDB failures. */
@@ -98,7 +152,7 @@ async function summarize(show: ShowRow, watches: { season: number; episode: numb
     metadataError = error instanceof Error ? error.message : 'TMDB metadata unavailable';
     metadataFailure = classifyMetadataFailure(error);
   }
-  return buildTrackingSummary(show, catalog, metadataError, watches, today(), metadataFailure, unwatches);
+  return buildTrackingSummary(show, catalog, metadataError, watches, now(), metadataFailure, unwatches);
 }
 
 export async function getTrackingSummary(showId: string, userId: string) {
@@ -181,8 +235,34 @@ async function upcomingOutcome(show: UpcomingShowRow, linkedTmdbIds: ReadonlySet
   try {
     const schedule = await getSchedule(identity.tvmazeId);
     const { episodes, excluded } = selectScheduledEpisodes(schedule.episodes, cutoff);
-    return { kind: 'scheduled', show: library, tvmaze: schedule.show, method: identity.method, tmdbBasis, episodes, excluded, stale: schedule.stale };
+    if (tmdbBasis !== 'linked') return { kind: 'scheduled', show: library, tvmaze: schedule.show, method: identity.method, tmdbBasis, episodes, excluded, stale: schedule.stale };
+    // An episode whose TVMaze date has passed stays listed while Cinetra has not released it yet (conservative
+    // fallback), so it is never missing from both Upcoming and Home. Counts keep the usual cutoff.
+    const now = new Date().toISOString();
+    const recent = selectScheduledEpisodes(schedule.episodes, addDays(cutoff, -2)).episodes;
+    const timed = (await withCatalogReleaseTimes({ name: show.name, tmdbId, overview: show.overview }, recent))
+      .filter(e => e.airDate >= cutoff || (!!e.releaseAt && e.releaseAt > now));
+    return { kind: 'scheduled', show: library, tvmaze: schedule.show, method: identity.method, tmdbBasis, episodes: timed, excluded, stale: schedule.stale };
   } catch { return { kind: 'unavailable', show: library, provider: 'TVMaze' }; }
+}
+
+/** How long an Upcoming build waits for one show's TMDB catalog before listing its dates without release times. */
+const UPCOMING_CATALOG_WAIT_MS = 3000;
+/**
+ * Pair TVMaze's scheduled episodes with Cinetra's effective release instants (the cached TMDB catalog), so Upcoming
+ * shows the same availability as Home and the Watch Room. Only when TVMaze's numbering is verified against TMDB for
+ * this series; otherwise, or when the catalog is unavailable, releases keep their TVMaze date alone (as before).
+ */
+async function withCatalogReleaseTimes<E extends { season: number; number: number }>(show: { name: string; tmdbId: number; overview: string | null }, episodes: E[]) {
+  const none = () => episodes.map(e => ({ ...e, releaseAt: null, releaseSource: null }));
+  if (!episodes.length) return none();
+  let timer: NodeJS.Timeout | undefined;
+  const catalog = await Promise.race([catalogFor(show).catch(() => null), new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), UPCOMING_CATALOG_WAIT_MS); })]).finally(() => clearTimeout(timer));
+  if (!catalog || catalog.releaseTiming?.source !== 'tvmaze') return none();
+  return episodes.map(e => {
+    const match = catalog.episodes.find(c => c.season === e.season && c.number === e.number);
+    return { ...e, releaseAt: match?.releaseAt ?? null, releaseSource: match?.releaseSource ?? null };
+  });
 }
 
 async function buildUpcomingReleases(userId: string, progress: { done: number; total: number }, force: boolean) {
@@ -249,7 +329,7 @@ export async function warmCaches() {
   if (warmup.state === 'running') return;
   warmup = { state: 'running', startedAt: new Date().toISOString() };
   try {
-    const linked = await prisma.show.findMany({ where: { tmdbId: { not: null } }, select: { name: true, tmdbId: true }, distinct: ['tmdbId'] });
+    const linked = await prisma.show.findMany({ where: { tmdbId: { not: null } }, select: { name: true, tmdbId: true, overview: true }, distinct: ['tmdbId'] });
     // Upcoming no longer reads TMDB catalogs, so both warm in parallel (TVMaze is rate-limited on its own).
     const catalogs = mapLimit(linked, 6, show => catalogFor(show).catch(() => null));
     const users = await prisma.show.findMany({ select: { userId: true }, distinct: ['userId'] });
@@ -278,7 +358,12 @@ export async function getHealth() {
   const built = upcomingCache.keys().flatMap(key => { const value = upcomingCache.peek(key); return value ? [value] : []; });
   const sum = (pick: (c: UpcomingResponse['coverage']) => number) => built.reduce((n, v) => n + pick(v.coverage), 0);
   const schedule = { source: 'TVMaze', evaluatedShows: sum(c => c.evaluatedShows), verifiedShows: sum(c => c.verifiedShows), verifiedByExternalId: sum(c => c.verifiedByExternalId), verifiedByTitle: sum(c => c.verifiedByTitle), needsReview: sum(c => c.unresolvedShows), unavailable: sum(c => c.unavailableShows), stale: built.some(v => v.stale) };
-  return { tmdb: tmdbHealth, schedule, caches: { catalogs: catalogCache.size, upcomingUsers: upcomingCache.size, tvmaze: tvmazeCacheStats(), warmup } };
+  // Manual release times: configuration state and how the cached catalogs applied each entry (no user data).
+  const config = loadReleaseOverrides();
+  const applied: Record<string, number> = {};
+  for (const key of catalogCache.keys()) for (const outcome of catalogCache.peek(key)?.releaseTiming?.overrides ?? []) applied[outcome.status] = (applied[outcome.status] || 0) + 1;
+  const releaseOverrides = { file: config.file ? 'present' : 'missing', valid: config.overrides.length, rejected: config.rejected.map(r => ({ id: r.id, reasons: r.reasons })), error: config.error, episodes: applied };
+  return { tmdb: tmdbHealth, schedule, releaseOverrides, caches: { catalogs: catalogCache.size, upcomingUsers: upcomingCache.size, tvmaze: tvmazeCacheStats(), warmup } };
 }
 
 export async function getEpisodeGuide(showId: string, userId: string, season: number) {
@@ -290,7 +375,7 @@ export async function getEpisodeGuide(showId: string, userId: string, season: nu
 
 /** Whether the show's legacy saved position covers an episode (ignoring unwatch records). */
 const positionCovers = (show: { seasonsWatched: number; episodesWatched: number }, catalog: Catalog, season: number, episode: number) =>
-  (show.seasonsWatched > 0 || show.episodesWatched > 0) && calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, today()).covered.has(episodeKey(season, episode));
+  (show.seasonsWatched > 0 || show.episodesWatched > 0) && calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, catalog, now()).covered.has(episodeKey(season, episode));
 
 /**
  * Mark one episode watched or not watched.
@@ -309,7 +394,7 @@ export async function setEpisodeWatched(showId: string, userId: string, season: 
   const catalog = cached ?? await catalogFor(owner);
   const found = catalog.episodes.find(e => e.season === season && e.number === episode);
   if (!found) throw new EpisodeGuideError(404, 'Episode not found');
-  if (watched && (!found.airDate || found.airDate > today())) throw new EpisodeGuideError(400, 'Episode has not aired');
+  if (watched && !isEpisodeReleased(found, now())) throw new EpisodeGuideError(400, 'Episode has not aired');
   await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${showId} AND "userId" = ${userId} FOR UPDATE`;
     const show = await tx.show.findFirst({ where: { id: showId, userId } });
@@ -344,9 +429,9 @@ async function savedEpisodeState(showId: string, userId: string, tmdbId: number 
   const show = await prisma.show.findFirst({ where: { id: showId, userId } });
   if (!show || show.tmdbId !== tmdbId) return null;
   const [watches, unwatches] = await Promise.all([prisma.episodeWatch.findMany({ where: { showId }, select: { season: true, episode: true, watchedAt: true } }), unwatchesOf(showId)]);
-  const now = today();
-  const summary = buildTrackingSummary(show, catalog, null, watches, now, null, unwatches);
-  const { episodes } = mergeShowEpisodes(show, catalog, watches, now, unwatches);
+  const at = now();
+  const summary = buildTrackingSummary(show, catalog, null, watches, at, null, unwatches);
+  const { episodes } = mergeShowEpisodes(show, catalog, watches, at, unwatches);
   return { summary, guide: { seasons: catalog.seasons, season, episodes: episodes.filter(e => e.season === season), watched: watches } };
 }
 
@@ -361,8 +446,9 @@ export async function setSeasonWatched(showId: string, userId: string, season: n
     if (!show) throw new EpisodeGuideError(404, 'Show not found');
     await protectUnrecordedCompletion(tx, show);
     const [watches, unwatches] = await Promise.all([tx.episodeWatch.findMany({ where: { showId } }), tx.episodeUnwatch.findMany({ where: { showId, season } })]);
-    const merged = mergeShowEpisodes(show, catalog, watches, today(), unwatches).episodes;
-    const aired = merged.filter(e => e.season === season && e.number > 0 && !!e.airDate && e.airDate <= today() && !e.watched);
+    const at = now();
+    const merged = mergeShowEpisodes(show, catalog, watches, at, unwatches).episodes;
+    const aired = merged.filter(e => e.season === season && e.number > 0 && isEpisodeReleased(e, at) && !e.watched);
     const restore = aired.filter(e => positionCovers(show, catalog, season, e.number)).map(e => e.number);
     const create = aired.filter(e => !restore.includes(e.number)).map(e => ({ showId, season, episode: e.number }));
     if (restore.length) await tx.episodeUnwatch.deleteMany({ where: { showId, season, episode: { in: restore } } });
@@ -398,9 +484,9 @@ export async function previewRematch(showId: string, userId: string, tmdbId: num
   const unchanged = show.tmdbId === tmdbId;
   return {
     showId, unchanged, currentTmdbId: show.tmdbId,
-    current: show.tmdbId ? summarizeSeries(show.tmdbId, current, 'current', show, today()) : null,
-    replacement: summarizeSeries(tmdbId, replacement, 'replacement', show, today()),
-    duplicate, progress: analyzeRematchProgress(show, watches, replacement, today()),
+    current: show.tmdbId ? summarizeSeries(show.tmdbId, current, 'current', show, now()) : null,
+    replacement: summarizeSeries(tmdbId, replacement, 'replacement', show, now()),
+    duplicate, progress: analyzeRematchProgress(show, watches, replacement, now()),
     canApply: !unchanged && !duplicate,
   };
 }

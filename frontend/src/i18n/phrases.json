@@ -2278,5 +2278,17 @@
   "Nothing to request": [
     "Rien à demander",
     "لا يوجد ما يُطلب"
+  ],
+  "Release time from a documented announcement": [
+    "Horaire issu d'une annonce documentée",
+    "موعد الإصدار مأخوذ من إعلان موثّق"
+  ],
+  "Available to track from": [
+    "Disponible au suivi à partir du",
+    "متاحة للمتابعة اعتبارًا من"
+  ],
+  "documented release time": [
+    "horaire de sortie documenté",
+    "موعد إصدار موثّق"
   ]
 }

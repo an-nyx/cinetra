@@ -20,6 +20,8 @@ async function main() {
   let tmdbCalls = 0;
   const seasons = [{ season_number: 1, episode_count: 4, air_date: day(-400) }];
   stub.getShow = async (id: number) => { tmdbCalls++; if (id !== 9101) throw Object.assign(new Error('not found'), { isAxiosError: true, response: { status: 404 } }); return { name: 'Stats Show', status: 'Returning Series', in_production: true, seasons, next_episode_to_air: null, genres: [{ id: 18, name: 'Drama' }, { id: 80, name: 'Crime' }] }; };
+  // No TheTVDB/IMDb IDs: episode release times use the TMDB date fallback and no TVMaze request is made.
+  stub.getExternalIds = async () => ({ tvdbId: null, imdbId: null });
   stub.getSeason = async () => { tmdbCalls++; return { episodes: [1, 2, 3].map(n => ({ episode_number: n, name: `E${n}`, air_date: day(-400 + n * 7), runtime: 45 })).concat([{ episode_number: 4, name: 'E4', air_date: day(30), runtime: 45 }]) }; };
   stub.getMovieInfo = async (id: number) => { tmdbCalls++; return { id, runtime: id === 9201 ? 120 : 95, genres: [{ name: id === 9201 ? 'Science Fiction' : 'Comedy' }] }; };
 

@@ -1,4 +1,5 @@
 import type { EpisodeGuide, TrackingSummary } from "../services/show.service";
+import { isEpisodeReleased } from "./release.ts";
 
 /**
  * Confirmed watch progress shared between the Watch Room, Home, Continue watching and the show cards.
@@ -46,7 +47,7 @@ export function createConfirmedSummaries() {
   };
 }
 
-const releasedBy = (airDate: string | null | undefined, today: string) => !!airDate && airDate <= today;
+
 /** Same rounding as the server: never 0% or 100% unless exact. */
 export function progressPercent(watched: number, released: number) {
   if (released <= 0) return null;
@@ -66,8 +67,8 @@ export function optimisticSummary(summary: TrackingSummary, guide: EpisodeGuide 
   const isNext = summary.nextEpisode?.season === season && summary.nextEpisode.number === number;
   const wasWatched = episode ? episode.watched : isNext ? false : null;
   if (wasWatched === null || wasWatched === watched) return { summary, nextPending: false };
-  const airDate = episode ? episode.airDate : summary.nextEpisode?.airDate ?? null;
-  const counted = summary.countDataAvailable && summary.progressPercent !== null && season > 0 && number > 0 && releasedBy(airDate, today);
+  const released = episode ? isEpisodeReleased(episode, today) : !!summary.nextEpisode && isEpisodeReleased(summary.nextEpisode, today);
+  const counted = summary.countDataAvailable && summary.progressPercent !== null && season > 0 && number > 0 && released;
   let next: TrackingSummary = summary;
   if (counted) {
     const delta = watched ? 1 : -1;
@@ -75,8 +76,8 @@ export function optimisticSummary(summary: TrackingSummary, guide: EpisodeGuide 
     next = { ...summary, watchedCount, remainingCount: summary.remainingCount - delta, progressPercent: progressPercent(watchedCount, summary.releasedCount) };
   }
   if (watched && isNext) {
-    const following = episodes.find(e => e.number > number && !e.watched && releasedBy(e.airDate, today));
-    if (following) return { summary: { ...next, nextEpisode: { season, number: following.number, name: following.name, airDate: following.airDate, runtime: following.runtime, watchedAt: null } }, nextPending: false };
+    const following = episodes.find(e => e.number > number && !e.watched && isEpisodeReleased(e, today));
+    if (following) return { summary: { ...next, nextEpisode: { season, number: following.number, name: following.name, airDate: following.airDate, releaseAt: following.releaseAt, runtime: following.runtime, watchedAt: null } }, nextPending: false };
     return { summary: { ...next, nextEpisode: null }, nextPending: true };
   }
   if (!watched && counted && episode) {
@@ -84,7 +85,7 @@ export function optimisticSummary(summary: TrackingSummary, guide: EpisodeGuide 
     const earlier = !current || season < current.season || (season === current.season && number < current.number);
     if (earlier) {
       const viewingState = next.viewingState === "caught_up" || next.viewingState === "fully_watched" ? "in_progress" : next.viewingState;
-      return { summary: { ...next, viewingState, completionEligible: false, nextEpisode: { season, number, name: episode.name, airDate: episode.airDate, runtime: episode.runtime, watchedAt: null } }, nextPending: false };
+      return { summary: { ...next, viewingState, completionEligible: false, nextEpisode: { season, number, name: episode.name, airDate: episode.airDate, releaseAt: episode.releaseAt, runtime: episode.runtime, watchedAt: null } }, nextPending: false };
     }
   }
   return { summary: next, nextPending: false };

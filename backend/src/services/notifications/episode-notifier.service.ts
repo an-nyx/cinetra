@@ -17,7 +17,7 @@ import { prisma } from '../../database/prisma';
 import type { Prisma } from '../../../generated/prisma/client';
 import { checkForUpdates, getSchedule } from '../tvmaze/tvmaze.service';
 import type { IdentityResult, TVMazeEpisode, TVMazeShow } from '../tvmaze/tvmaze-schedule.model';
-import { resolveShowIdentity, tmdbEpisodeInfo } from '../episode-guide.service';
+import { effectiveRelease, resolveShowIdentity, tmdbEpisodeInfo } from '../episode-guide.service';
 import { mapLimit } from '../swr-cache';
 import { EPISODE_PREMIERE_EVENT, NOTIFY_LOOKBACK_MS, episodePayload, isEpisodeWatched, isShowEligible, premiereKind, scheduleTimeZone, selectPremieredEpisodes, verifiedFinaleKind, type EpisodeKind, type PremiereExclusions } from './episode-alerts.model';
 import { classifySend, type PushSender } from './push-sender';
@@ -30,16 +30,24 @@ export type ScheduleSource = {
   refreshChanged(): Promise<void>;
   /** TMDB's episode label and air date (wording only: finale or not). Optional; absent means "regular". */
   episodeInfo?(show: { name: string; tmdbId: number }, season: number, number: number): Promise<{ episodeType: string | null; airDate: string | null } | null>;
+  /**
+   * Cinetra's effective release instant for the canonical TMDB episode (what Home and the Watch Room use). When
+   * present, nothing is announced before it. Absent (custom sources) means TVMaze's own premiere instant decides.
+   */
+  releaseAt?(show: { name: string; tmdbId: number; overview: string | null }, season: number, number: number): Promise<{ found: boolean; releaseAt: string | null; numberingVerified: boolean }>;
 };
 export const tvmazeScheduleSource: ScheduleSource = {
   resolve: show => resolveShowIdentity(show.tmdbId, show),
   schedule: id => getSchedule(id),
   refreshChanged: () => checkForUpdates(30 * 60_000),
   episodeInfo: (show, season, number) => tmdbEpisodeInfo(show, season, number),
+  releaseAt: (show, season, number) => effectiveRelease(show, season, number),
 };
 
 /** How long wording may wait for TMDB's episode label before the alert goes out as a regular episode. */
 const EPISODE_INFO_TIMEOUT_MS = 4000;
+/** How far Cinetra's effective release instant may differ from TVMaze's own (fallback D+1 12:00Z vs TVMaze; overrides). */
+const RELEASE_SKEW_MS = 2 * 24 * 60 * 60_000;
 /**
  * Wording only, never eligibility: premieres from TVMaze numbering; finales only when TMDB agrees (see
  * verifiedFinaleKind). Any lookup failure or timeout falls back to the plain kind, so delivery is never held up.
@@ -73,6 +81,10 @@ export type RunReport = {
   premiered: number; alreadyWatched: number; beforeOptIn: number; ledgerCreated: number;
   delivered: number; gone: number; retry: number; failed: number; uncertain: number; skipped: number; lostClaims: number;
   recoveredInterrupted: number; expired: number; exclusions: PremiereExclusions;
+  /** Premiered on TVMaze but not yet released by Cinetra's rule (announced later, never earlier). */
+  awaitingRelease: number;
+  /** Cinetra's release time could not be read (TMDB unavailable): retried on the next run, never guessed. */
+  releaseUnknown: number;
 };
 
 const emptyExclusions = (): PremiereExclusions => ({ specials: 0, undated: 0, duplicates: 0, repeats: 0, notYet: 0, tooOld: 0 });
@@ -135,14 +147,39 @@ async function discover(now: Date, source: ScheduleSource, report: RunReport) {
   const tvmazeIds = [...new Set(trusted.map(show => identities.get(show.id)!))];
   const schedules = new Map<number, ReturnType<typeof selectPremieredEpisodes>['episodes']>();
   const window = { since: new Date(now.getTime() - NOTIFY_LOOKBACK_MS), now };
+  // Cinetra's effective release instant can differ from TVMaze's own by up to a day and a half either way (a later
+  // conservative fallback, an earlier verified manual time), so candidates come from a wider window and are then
+  // kept only when their effective instant is inside the notification window. Same dedupe and rerun rules.
+  const candidates = source.releaseAt ? { since: new Date(window.since.getTime() - RELEASE_SKEW_MS), now: new Date(now.getTime() + RELEASE_SKEW_MS) } : window;
   await mapLimit(tvmazeIds, 4, async id => {
     try {
       const schedule = await source.schedule(id);
-      const { episodes, excluded } = selectPremieredEpisodes(schedule.episodes, window, scheduleTimeZone(schedule.show));
+      const timeZone = scheduleTimeZone(schedule.show);
+      const { excluded } = selectPremieredEpisodes(schedule.episodes, window, timeZone);
       for (const key of Object.keys(excluded) as (keyof PremiereExclusions)[]) report.exclusions[key] += excluded[key];
-      schedules.set(id, episodes);
+      schedules.set(id, selectPremieredEpisodes(schedule.episodes, candidates, timeZone).episodes);
     } catch { report.unavailableShows++; }
   });
+
+  /** When this episode becomes announceable: never before Cinetra releases it. Null = not (yet) announceable. */
+  const announceAt = async (show: (typeof trusted)[number], episode: { season: number; number: number; premieredAt: Date }): Promise<Date | null> => {
+    if (!source.releaseAt) return episode.premieredAt;
+    let timer: NodeJS.Timeout | undefined;
+    let info: Awaited<ReturnType<NonNullable<ScheduleSource['releaseAt']>>> | null;
+    try {
+      info = await Promise.race([
+        source.releaseAt({ name: show.name, tmdbId: show.tmdbId, overview: show.overview }, episode.season, episode.number),
+        new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), EPISODE_INFO_TIMEOUT_MS); }),
+      ]);
+    } catch { info = null; }
+    finally { clearTimeout(timer); }
+    if (!info) { report.releaseUnknown++; return null; }
+    // TMDB has no such episode, or no date for it: Cinetra does not consider it released.
+    if (!info.found || !info.releaseAt) { report.awaitingRelease++; return null; }
+    const released = new Date(info.releaseAt);
+    // Same numbering on both sides: Cinetra's instant is the release. Otherwise never earlier than either source.
+    return info.numberingVerified ? released : new Date(Math.max(released.getTime(), episode.premieredAt.getTime()));
+  };
 
   const subsByUser = new Map<string, typeof subscriptions>();
   for (const s of subscriptions) subsByUser.set(s.userId, [...(subsByUser.get(s.userId) || []), s]);
@@ -150,14 +187,21 @@ async function discover(now: Date, source: ScheduleSource, report: RunReport) {
   for (const show of trusted) {
     const tvmazeShowId = identities.get(show.id)!;
     for (const episode of schedules.get(tvmazeShowId) || []) {
+      const releasedAt = await announceAt(show, episode);
+      if (!releasedAt) continue;
+      if (releasedAt.getTime() > now.getTime()) { report.awaitingRelease++; continue; }
+      if (releasedAt.getTime() < window.since.getTime()) continue;   // released too long ago to announce
+      // Never replay history: what TVMaze itself dates before the lookback window is never announced, even if
+      // Cinetra's own (later, conservative) release instant is recent.
+      if (episode.premieredAt.getTime() < window.since.getTime()) continue;
       report.premiered++;
       if (isEpisodeWatched(show, watchesByShow.get(show.id) || [], episode.season, episode.number, unwatchesByShow.get(show.id) || [])) { report.alreadyWatched++; continue; }
       for (const sub of subsByUser.get(show.userId) || []) {
-        // Never announce what premiered before this device opted in: enabling alerts sends no backlog.
-        if (episode.premieredAt.getTime() < sub.notifyFrom.getTime()) { report.beforeOptIn++; continue; }
+        // Never announce what was out before this device opted in, by either source: enabling alerts sends no backlog.
+        if (Math.min(releasedAt.getTime(), episode.premieredAt.getTime()) < sub.notifyFrom.getTime()) { report.beforeOptIn++; continue; }
         rows.push({
           userId: show.userId, subscriptionId: sub.id, tvmazeShowId, tvmazeEpisodeId: episode.tvmazeEpisodeId, eventType: EPISODE_PREMIERE_EVENT,
-          showId: show.id, season: episode.season, episode: episode.number, premieredAt: episode.premieredAt, status: 'pending', nextAttemptAt: now,
+          showId: show.id, season: episode.season, episode: episode.number, premieredAt: releasedAt, status: 'pending', nextAttemptAt: now,
         });
       }
     }
@@ -257,7 +301,7 @@ export async function runEpisodeNotifications(options: RunOptions): Promise<RunR
   const report: RunReport = {
     startedAt: now.toISOString(), users: 0, devices: 0, showsChecked: 0, verifiedShows: 0, unverifiedShows: 0, unavailableShows: 0,
     premiered: 0, alreadyWatched: 0, beforeOptIn: 0, ledgerCreated: 0, delivered: 0, gone: 0, retry: 0, failed: 0, uncertain: 0, skipped: 0, lostClaims: 0,
-    recoveredInterrupted: 0, expired: 0, exclusions: emptyExclusions(),
+    recoveredInterrupted: 0, expired: 0, exclusions: emptyExclusions(), awaitingRelease: 0, releaseUnknown: 0,
   };
   const recovered = await recover(now);
   report.recoveredInterrupted = recovered.interrupted;

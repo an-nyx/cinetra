@@ -2,8 +2,10 @@ import {
   calculateLegacyCoverage, calculateTrackingProgress, episodeKey, isReleasedMetadataReliable, mergeEpisodeWatchState,
   type BroadcastStatus, type EpisodeCatalog, type EpisodeMetadata,
 } from './legacy-progress.model';
+import { assignReleaseTimes, isEpisodeReleased, type ReleaseSchedule, type ReleaseSource, type ReleaseTiming } from './release-rule.model';
+import type { ReleaseOverride } from './release-override.model';
 
-export type CatalogEpisode = EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; episodeType?: string | null };
+export type CatalogEpisode = EpisodeMetadata & { name: string; airTimestamp: string | null; runtime: number | null; episodeType?: string | null; releaseSource?: ReleaseSource | null; releaseOverrideId?: string };
 /** Show-level TMDB details kept with the catalog so Upcoming can reuse it instead of re-downloading. */
 export type CatalogMeta = {
   name: string | null; originalName: string | null; overview: string | null; firstAirDate: string | null;
@@ -14,6 +16,8 @@ export type CatalogMeta = {
 export type Catalog = Omit<EpisodeCatalog, 'episodes'> & {
   episodes: CatalogEpisode[]; source: 'TMDB'; broadcastStatus: string | null; inProduction: boolean | null; nextEpisodeAnnounced: boolean;
   meta?: CatalogMeta;
+  /** Where episode release instants came from (see release-rule.model). */
+  releaseTiming?: ReleaseTiming;
 };
 export type TrackedShow = { id: string; name: string; posterURL: string | null; status: string | null; completed: boolean; seasonsWatched: number; episodesWatched: number; completedMonitorFrom?: Date | null };
 export type WatchRecord = { season: number; episode: number; watchedAt: Date };
@@ -52,7 +56,7 @@ export function describePositionConflict(show: TrackedShow, catalog: Catalog, to
   const inSeason = regular.filter(ep => ep.season === s);
   if (e > inSeason.length) return `Saved position ${position} is beyond the ${inSeason.length} episodes TMDB lists for season ${s}.`;
   const covered = regular.filter(ep => ep.season < s || (ep.season === s && inSeason.indexOf(ep) < e));
-  if (covered.some(ep => !ep.airDate || ep.airDate > today)) return `Saved position ${position} includes episodes that have not aired or have no air date.`;
+  if (covered.some(ep => !isEpisodeReleased(ep, today))) return `Saved position ${position} includes episodes that have not aired or have no air date.`;
   const incomplete = catalog.seasons.find(season => season.number <= s && regular.filter(ep => ep.season === season.number).length !== season.episodeCount);
   if (incomplete) return `TMDB's episode list for season ${incomplete.number} is incomplete, so saved position ${position} cannot be placed reliably.`;
   return `Saved position ${position} does not fit TMDB's episode list.`;
@@ -64,9 +68,9 @@ function describeMetadataGap(catalog: Catalog, today: string) {
   if (!regular.length) return 'TMDB lists no regular episodes for this show.';
   for (const season of catalog.seasons) {
     const listed = regular.filter(ep => ep.season === season.number);
-    if (listed.some(ep => !!ep.airDate && ep.airDate <= today) && listed.length !== season.episodeCount) return `TMDB says season ${season.number} has ${season.episodeCount} episodes but lists ${listed.length}.`;
+    if (listed.some(ep => isEpisodeReleased(ep, today)) && listed.length !== season.episodeCount) return `TMDB says season ${season.number} has ${season.episodeCount} episodes but lists ${listed.length}.`;
   }
-  const lastAired = regular.map(ep => !!ep.airDate && ep.airDate <= today).lastIndexOf(true);
+  const lastAired = regular.map(ep => isEpisodeReleased(ep, today)).lastIndexOf(true);
   const undated = regular.slice(0, Math.max(0, lastAired)).find(ep => !ep.airDate);
   if (undated) return `${code(undated.season, undated.number)} has no air date on TMDB although later episodes have aired.`;
   return 'TMDB episode data is incomplete.';
@@ -90,7 +94,7 @@ export function catalogFromTMDB(details: TMDBDetailsLike, pages: { season: numbe
   for (const page of pages) {
     if (page.data) continue;
     const airDate = seasons.find(s => s.season_number === page.season)?.air_date;
-    if (airDate && airDate <= today) throw new Error(`TMDB season ${page.season} could not be loaded`);
+    if (airDate && airDate <= today.slice(0, 10)) throw new Error(`TMDB season ${page.season} could not be loaded`);
   }
   return {
     source: 'TMDB', seasons: seasons.map(s => ({ number: s.season_number, episodeCount: s.episode_count })),
@@ -102,12 +106,21 @@ export function catalogFromTMDB(details: TMDBDetailsLike, pages: { season: numbe
       seasonAirDates: Object.fromEntries(seasons.map(s => [s.season_number, s.air_date || null])),
       posterPath: details.poster_path || null,
     },
-    episodes: pages.flatMap(page => (page.data?.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: page.season, number: e.episode_number, name: e.name || '', airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null, episodeType: e.episode_type || null }))),
+    episodes: assignReleaseTimes(pages.flatMap(page => (page.data?.episodes || []).filter(e => e.episode_number > 0).map(e => ({ season: page.season, number: e.episode_number, name: e.name || '', airDate: e.air_date || null, airTimestamp: null, runtime: e.runtime || null, episodeType: e.episode_type || null }))), null, null, 'TVMaze timing not applied').episodes,
   };
 }
 
+/**
+ * Re-time a TMDB catalog's episodes from a verified TVMaze schedule (or reset them to the TMDB fallback when there is
+ * none). Identity, numbering, names and dates are unchanged; only `releaseAt`/`releaseSource` are set.
+ */
+export function withReleaseTimes(catalog: Catalog, schedule: ReleaseSchedule | null, tvmazeId: number | null, reason?: string, overrides: readonly ReleaseOverride[] = []): Catalog {
+  const { episodes, timing } = assignReleaseTimes(catalog.episodes, schedule, tvmazeId, reason, overrides);
+  return { ...catalog, episodes, releaseTiming: timing };
+}
+
 export type Checkpoint = { seasonsWatched: number; episodesWatched: number };
-const releasedRegular = (catalog: Catalog, today: string) => regularOf(catalog).filter(e => !!e.airDate && e.airDate <= today);
+const releasedRegular = (catalog: Catalog, today: string) => regularOf(catalog).filter(e => isEpisodeReleased(e, today));
 const positionOf = (catalog: Catalog, episode: { season: number; number: number }): Checkpoint => ({
   seasonsWatched: episode.season, episodesWatched: regularOf(catalog).filter(e => e.season === episode.season && e.number <= episode.number).length,
 });
@@ -169,7 +182,7 @@ export function mergeShowEpisodes(show: TrackedShow, catalog: Catalog | null, wa
 export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null, metadataError: string | null, watches: WatchRecord[], today: string, metadataFailure: MetadataFailure | null = null, unwatched: UnwatchRecord[] = []) {
   const { hasSavedPosition, legacy, episodes } = mergeShowEpisodes(show, catalog, watches, today, unwatched);
   episodes.sort((a, b) => a.season - b.season || a.number - b.number);
-  const upcoming = episodes.filter(e => e.airDate && e.airDate > today).sort((a, b) => a.airDate!.localeCompare(b.airDate!));
+  const upcoming = episodes.filter(e => e.airDate && !isEpisodeReleased(e, today)).sort((a, b) => a.airDate!.localeCompare(b.airDate!));
   const last = [...episodes].filter(e => e.watchedAt).sort((a, b) => b.watchedAt!.getTime() - a.watchedAt!.getTime())[0] || null;
   const broadcastStatus = toBroadcastStatus(catalog?.broadcastStatus);
   const hasActivity = hasSavedPosition || watches.length > 0;
@@ -193,14 +206,14 @@ export function buildTrackingSummary(show: TrackedShow, catalog: Catalog | null,
       if (season.number <= 1) continue;
       const seasonEpisodes = episodes.filter(e => e.season === season.number && e.number > 0);
       const premiere = seasonEpisodes.find(e => e.number === 1);
-      if (!premiere?.airDate || premiere.airDate < '2024-01-01' || premiere.airDate <= monitoredAfter || premiere.airDate > today) continue;
+      if (!premiere?.airDate || premiere.airDate < '2024-01-01' || premiere.airDate <= monitoredAfter || !isEpisodeReleased(premiere, today)) continue;
       const priorComplete = Array.from({ length: season.number - 1 }, (_, i) => i + 1).every(number => {
         const declared = catalog.seasons.find(s => s.number === number);
         const prior = episodes.filter(e => e.season === number && e.number > 0);
-        return !!declared && declared.episodeCount > 0 && prior.length === declared.episodeCount && prior.every(e => e.watched && !!e.airDate && e.airDate <= today);
+        return !!declared && declared.episodeCount > 0 && prior.length === declared.episodeCount && prior.every(e => e.watched && isEpisodeReleased(e, today));
       });
       if (!priorComplete) continue;
-      const unwatched = seasonEpisodes.filter(e => !e.watched && !!e.airDate && e.airDate <= today);
+      const unwatched = seasonEpisodes.filter(e => !e.watched && isEpisodeReleased(e, today));
       if (unwatched.length) return { season: season.number, count: unwatched.length, episodes: unwatched.map(e => ({ number: e.number, name: e.name, airDate: e.airDate })) };
     }
     return null;

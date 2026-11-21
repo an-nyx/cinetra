@@ -14,7 +14,7 @@ import { filterMovieReleases } from "@/lib/movie-calendar";
 import UpcomingMovieCard from "@/components/upcoming-movie-card";
 import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
 import {
-  calendarFilters, calendarStats, dayHeading, episodeCode, filterEvents, groupByDay, groupReleaseEvents, timeLabel,
+  calendarFilters, calendarStats, dateTimeLabel, dayHeading, episodeCode, filterEvents, groupByDay, groupReleaseEvents, releaseTimestamp, timeLabel,
   type CalendarFilter, type ReleaseEvent,
 } from "@/lib/upcoming-calendar";
 
@@ -51,6 +51,8 @@ function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: 
           </span>
           {!grouped && single.name && !/^Episode \d+$/i.test(single.name) && <span className="mt-0.5 block truncate text-xs text-foreground/75">{single.name}</span>}
           {grouped && <span className="mt-0.5 block text-xs text-foreground/75">{episodeCount(language, event.episodes.length)}</span>}
+          {event.manual && <span className="mt-0.5 block text-[11px] text-muted-foreground"><T>Release time from a documented announcement</T></span>}
+          {event.trackingFrom && <span className="mt-0.5 block text-[11px] text-muted-foreground">{phrase(language, "Available to track from")} {dateTimeLabel(event.trackingFrom, localeFor(language))}</span>}
         </span>
         <span className="shrink-0 self-start pt-0.5 text-right">
           {time ? <span className="block text-xs font-semibold text-primary">{time}</span> : null}
@@ -65,7 +67,7 @@ function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: 
       {event.episodes.map(episode => <li key={episode.id} className="flex min-h-8 items-center gap-2 py-1">
         <span className="w-14 shrink-0 font-mono text-[11px] text-muted-foreground">{episodeCode(episode.season, episode.number)}</span>
         <span className="min-w-0 flex-1 break-words">{episode.name || phrase(language, "Title not announced")}</span>
-        {episode.airTimestamp && episode.airTimestamp !== event.timestamp && <span className="shrink-0 text-muted-foreground">{timeLabel(episode.airTimestamp, localeFor(language))}</span>}
+        {releaseTimestamp(episode) && releaseTimestamp(episode) !== event.timestamp && <span className="shrink-0 text-muted-foreground">{timeLabel(releaseTimestamp(episode), localeFor(language))}</span>}
       </li>)}
     </ol>}
   </article>;

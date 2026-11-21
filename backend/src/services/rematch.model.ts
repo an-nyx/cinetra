@@ -1,4 +1,5 @@
 import { calculateLegacyCoverage, episodeKey } from './legacy-progress.model';
+import { isEpisodeReleased } from './release-rule.model';
 import { describePositionConflict, type Catalog, type TrackedShow } from './tracking-summary.model';
 
 /**
@@ -28,7 +29,7 @@ export function analyzeRematchProgress(show: TrackedShow, watches: { season: num
   const hasPosition = show.seasonsWatched > 0 || show.episodesWatched > 0;
   const legacy = calculateLegacyCoverage(show.seasonsWatched, show.episodesWatched, replacement, today);
   const positionFits = !hasPosition || !legacy.needsReview;
-  const released = new Set(replacement.episodes.filter(e => e.season > 0 && e.number > 0 && !!e.airDate && e.airDate <= today).map(e => episodeKey(e.season, e.number)));
+  const released = new Set(replacement.episodes.filter(e => e.season > 0 && e.number > 0 && isEpisodeReleased(e, today)).map(e => episodeKey(e.season, e.number)));
   const coveredReleased = hasPosition ? [...legacy.covered].filter(key => released.has(key)).length : 0;
   const known = new Set(replacement.episodes.filter(e => e.season > 0 && e.number > 0).map(e => episodeKey(e.season, e.number)));
   const records = [...new Map(watches.map(w => [episodeKey(w.season, w.episode), w])).values()].sort((a, b) => a.season - b.season || a.episode - b.episode);
@@ -69,6 +70,6 @@ export function summarizeSeries(tmdbId: number, catalog: Catalog | null, role: '
     overview: meta?.overview || (own ? saved.overview : null) || null,
     posterURL: meta?.posterPath ? `https://image.tmdb.org/t/p/w500${meta.posterPath}` : own ? saved.posterURL : null,
     seasons: catalog ? catalog.seasons.filter(s => s.number > 0).length : null,
-    releasedEpisodes: catalog ? catalog.episodes.filter(e => e.season > 0 && e.number > 0 && !!e.airDate && e.airDate <= today).length : null,
+    releasedEpisodes: catalog ? catalog.episodes.filter(e => e.season > 0 && e.number > 0 && isEpisodeReleased(e, today)).length : null,
   };
 }

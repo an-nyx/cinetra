@@ -88,7 +88,7 @@ export async function getCinemaStats(userId: string, timeZoneInput: unknown) {
       }
       return { id: movie.id, name: movie.name, posterURL: movie.posterURL, status: movie.status, rating: movie.rating, info, viewings };
     });
-    const stats = buildCinemaStats(showInputs, movieInputs, { today: new Date().toISOString().slice(0, 10), timeZone });
+    const stats = buildCinemaStats(showInputs, movieInputs, { today: new Date().toISOString().slice(0, 10), timeZone, now: new Date() });
     return { ...stats, metadataPending: pendingMetadata };
   } finally {
     clearTimeout(timer);

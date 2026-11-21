@@ -11,6 +11,7 @@
  */
 import type { TVMazeEpisode } from './tvmaze/tvmaze-schedule.model';
 import { premiereInstant } from './notifications/episode-alerts.model';
+import { isEpisodeReleased } from './release-rule.model';
 
 
 
@@ -19,7 +20,8 @@ export type ManagedStatus = 'watching' | 'completed';
 export const effectiveStatus = (show: { status: string | null; completed: boolean }) => show.status || (show.completed ? 'completed' : null);
 export const isManaged = (status: string | null): status is ManagedStatus => status === 'watching' || status === 'completed';
 
-export type StatusEpisode = { season: number; number: number; airDate: string | null; watched: boolean };
+/** `releaseAt` is Cinetra's effective release instant (release-rule.model); when present, it must also have passed. */
+export type StatusEpisode = { season: number; number: number; airDate: string | null; watched: boolean; releaseAt?: string | null };
 export type StatusCatalog = {
   seasons: { number: number; episodeCount: number }[];
   /** TMDB's next_episode_to_air, when announced. */
@@ -119,6 +121,9 @@ export function verifiedCoverage(input: { episodes: StatusEpisode[]; tvmaze: TVM
     } else if (Date.parse(`${e.airDate}T00:00:00Z`) + 2 * 86400000 > input.now.getTime()) {
       return { released, reason: `S${e.season}E${e.number} premiere not yet verified` };
     }
+    // Statuses never move ahead of what every page shows: the episode must also be released by Cinetra's own rule
+    // (TVMaze exact premiere, validated manual override or conservative TMDB fallback).
+    if ('releaseAt' in e && !isEpisodeReleased(e, input.now)) return { released, reason: `S${e.season}E${e.number} is not yet released in Cinetra` };
     released.push(e);
   }
   return { released, reason: null };

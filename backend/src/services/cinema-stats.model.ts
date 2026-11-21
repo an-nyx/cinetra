@@ -15,6 +15,7 @@
  */
 import { buildTrackingSummary, mergeShowEpisodes, type Catalog, type TrackedShow, type UnwatchRecord, type WatchRecord } from './tracking-summary.model';
 import { episodeKey } from './legacy-progress.model';
+import { isEpisodeReleased } from './release-rule.model';
 
 export type StatsShowInput = {
   show: TrackedShow;
@@ -68,7 +69,7 @@ export function watchedEpisodesOf(input: StatsShowInput, today: string) {
   const seen = new Set<string>();
   return regular.filter(e => {
     const key = episodeKey(e.season, e.number);
-    if (!e.watched || !e.airDate || e.airDate > today || seen.has(key)) return false;
+    if (!e.watched || !isEpisodeReleased(e, today) || seen.has(key)) return false;
     seen.add(key);
     return true;
   }).map(e => ({
@@ -84,6 +85,8 @@ export function buildCinemaStats(showInputs: StatsShowInput[], movieInputs: Stat
   const { today } = options;
   const timeZone = resolveTimeZone(options.timeZone);
   const now = options.now || new Date();
+  // Release eligibility uses the exact instant (same rule as Home); a caller that only knows a day gets its start.
+  const releaseNow = options.now ? options.now.toISOString() : today;
   const toYearMonth = yearMonthIn(timeZone);
 
   type YearAcc = { months: Month[]; episodes: number; movieViewings: number; minutes: number; itemsWithoutRuntime: number; bulkLoggedEpisodes: number; distinctMovies: Set<string>; shows: Map<string, TitleRef & { episodes: number; minutes: number }>; genres: Map<string, { titles: Set<string>; minutes: number }> };
@@ -126,7 +129,7 @@ export function buildCinemaStats(showInputs: StatsShowInput[], movieInputs: Stat
   for (const input of showInputs) {
     const status = effectiveStatus(input.show);
     if (status === 'watching' || status === 'completed' || status === 'dropped') tv.statusCounts[status]++; else tv.statusCounts.none++;
-    const summary = buildTrackingSummary(input.show, input.catalog, input.catalog ? null : 'TMDB metadata unavailable', input.watches, today, null, input.unwatches);
+    const summary = buildTrackingSummary(input.show, input.catalog, input.catalog ? null : 'TMDB metadata unavailable', input.watches, releaseNow, null, input.unwatches);
     const hasActivity = input.show.seasonsWatched > 0 || input.show.episodesWatched > 0 || input.watches.length > 0;
     // Same rule as Home's "Episodes watched": only verified counts are added up.
     const verified = summary.countDataAvailable && summary.progressPercent !== null;
@@ -134,7 +137,7 @@ export function buildCinemaStats(showInputs: StatsShowInput[], movieInputs: Stat
     tv.countedShows++;
     if (summary.viewingState === 'fully_watched') tv.fullyWatched++;
     if (summary.viewingState === 'caught_up') tv.caughtUp++;
-    const watched = watchedEpisodesOf(input, today);
+    const watched = watchedEpisodesOf(input, releaseNow);
     if (!watched.length) continue;
     tv.showsStarted++;
     tv.watchedEpisodes += watched.length;

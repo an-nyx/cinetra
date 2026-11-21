@@ -4,7 +4,8 @@ import { auditShow, inContinueWatching, type GuidePage, type Summary } from '../
 import { mergeShowEpisodes } from '../src/services/tracking-summary.model';
 
 // Generic: a season-1-complete checkpoint ("S2E0") on a returning show, as TMDB publishes season 2 over time.
-const today = '2026-11-09';
+// An instant after S2E2 (dated 2026-11-08) is released under the TMDB date fallback (2026-11-09 12:00 UTC).
+const today = '2026-11-09T13:00:00.000Z';
 type Ep = [season: number, number: number, airDate: string | null];
 function catalog(episodes: Ep[], seasons: Record<number, number>): Catalog {
   return {

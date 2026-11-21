@@ -173,7 +173,8 @@ async function main() {
 
   // S2E1 premieres (TMDB date today, TVMaze aired 3 hours ago) after the show was completed.
   await prisma.show.update({ where: { id: lifeShow.id }, data: { completedMonitorFrom: new Date(Date.now() - 5 * DAY) } });   // completed 5 days ago
-  life.pages[2] = [{ ...life.pages[2][0], air_date: day(0) }, ...episodes(5, 7, 7, 2)];
+  // TMDB and TVMaze list the same premiere date (TVMaze's airdate is the date of its airstamp here).
+  life.pages[2] = [{ ...life.pages[2][0], air_date: hoursAgo(3).toISOString().slice(0, 10) }, ...episodes(5, 7, 7, 2)];
   life.next = { season_number: 2, episode_number: 2, air_date: day(7) };
   tvmaze.get(15001)!.episodes = [...tvFromTmdb({ ...life, pages: { 1: life.pages[1] } }), tvEp(2, 1, hoursAgo(3)), ...life.pages[2].slice(1).map(e => tvEp(2, e.episode_number, new Date(`${e.air_date}T02:00:00Z`)))];
   providerChanged(5001);

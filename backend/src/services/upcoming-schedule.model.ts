@@ -2,17 +2,24 @@
  * Upcoming assembly (pure). Every dated release comes from TVMaze; TMDB dates are never merged in or used as a
  * fallback. A show whose TVMaze identity cannot be verified is listed for review and contributes nothing.
  */
+import type { ReleaseSource } from './release-rule.model';
 import { channelOf, IDENTITY_FAILURE_TEXT, isReturningWithoutDate, type EpisodeExclusions, type IdentityFailure, type IdentityMethod, type ScheduledEpisode, type TVMazeShow } from './tvmaze/tvmaze-schedule.model';
 
 export type LibraryShow = { id: string; name: string; posterURL: string | null; status: string | null };
-export type UpcomingRelease = ScheduledEpisode & {
+/**
+ * Cinetra's effective release instant for the same canonical episode (release-rule.model): the moment Home and the
+ * Watch Room treat it as released. Null when the TMDB catalog is unavailable or TVMaze's numbering for this series is
+ * not verified against TMDB (then the TVMaze date is shown alone, as before).
+ */
+export type ReleaseInfo = { releaseAt: string | null; releaseSource: ReleaseSource | null };
+export type UpcomingRelease = ScheduledEpisode & ReleaseInfo & {
   /** Stable key: TVMaze show ID + TVMaze episode ID. */
   id: string; tvmazeShowId: number;
   showId: string; showName: string; posterURL: string | null; showStatus: string | null;
   channel: string | null; streaming: boolean; scheduleSource: 'TVMaze';
 };
 export type ShowOutcome =
-  | { kind: 'scheduled'; show: LibraryShow; tvmaze: Pick<TVMazeShow, 'id' | 'name' | 'status' | 'network' | 'webChannel'>; method: IdentityMethod; tmdbBasis: 'linked' | 'schedule_match'; episodes: ScheduledEpisode[]; excluded: EpisodeExclusions; stale: boolean }
+  | { kind: 'scheduled'; show: LibraryShow; tvmaze: Pick<TVMazeShow, 'id' | 'name' | 'status' | 'network' | 'webChannel'>; method: IdentityMethod; tmdbBasis: 'linked' | 'schedule_match'; episodes: (ScheduledEpisode & Partial<ReleaseInfo>)[]; excluded: EpisodeExclusions; stale: boolean }
   | { kind: 'review'; show: LibraryShow; reason: IdentityFailure }
   | { kind: 'unavailable'; show: LibraryShow; provider: 'TMDB' | 'TVMaze' };
 
@@ -37,7 +44,7 @@ export function assembleUpcoming(input: ShowOutcome[], generatedAt: string) {
       const id = `${outcome.tvmaze.id}:${episode.episodeId}`;
       if (releases.has(id)) { excluded.duplicates++; continue; }
       releases.set(id, {
-        ...episode, id, tvmazeShowId: outcome.tvmaze.id, showId: outcome.show.id, showName: outcome.show.name,
+        ...episode, releaseAt: episode.releaseAt ?? null, releaseSource: episode.releaseSource ?? null, id, tvmazeShowId: outcome.tvmaze.id, showId: outcome.show.id, showName: outcome.show.name,
         posterURL: outcome.show.posterURL, showStatus: outcome.show.status, channel, streaming, scheduleSource: 'TVMaze',
       });
     }

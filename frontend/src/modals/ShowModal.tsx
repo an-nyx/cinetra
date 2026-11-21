@@ -1,6 +1,8 @@
 import { useLocalizedOverview } from "@/hooks/use-localized-overview";
 import { progressMessage, completionNotice, newSeasonMessage, nextEpisodeMessage, savedPositionDescription, watchCounts, watchRecordCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
+import { localeFor } from "@/i18n/calendar";
+import { dateTimeLabel } from "@/lib/upcoming-calendar";
 import { posterSrc } from "@/lib/poster";
 import { useEffect, useState, useRef } from "react";
 import { ShowService } from "@/services";
@@ -14,6 +16,7 @@ import SonarrPanel from "@/components/sonarr-panel";
 
 import { createWatchMutation } from "@/lib/optimistic-watch.mjs";
 import { optimisticSummary, publishConfirmedSummary, trackingTick } from "@/lib/tracking-sync";
+import { isEpisodeReleased } from "@/lib/release";
 
 interface Props {
   selectedShow: string | null;
@@ -25,7 +28,8 @@ interface Props {
   initialEditMatch?: boolean;
 }
 const code = (episode: TrackedEpisode) => `S${String(episode.season).padStart(2, '0')}E${String(episode.number).padStart(2, '0')}`;
-const today = () => new Date().toISOString().slice(0, 10);
+/** The current instant; release eligibility follows the server's `releaseAt` (lib/release.ts). */
+const today = () => new Date().toISOString();
 
 export default function ShowModal({ selectedShow, closeModal, shows, setShows, initialEditMatch = false }: Props) {
   const { language } = useLanguage();
@@ -254,15 +258,15 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
               <div role="tablist" aria-label={phrase(language, "Season")} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
                 {guide.seasons.map(item => <button key={item.number} type="button" role="tab" aria-selected={item.number === season} disabled={busy} onClick={() => selectSeason(item.number)} className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-medium ${item.number === season ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground'}`}><T>Season</T> {item.number}<span className="sr-only"> · {item.episodeCount} {phrase(language, "Episodes")}</span></button>)}
               </div>
-              <Button variant="outline" size="sm" disabled={busy || !guide.episodes.some(e => e.airDate && e.airDate <= today() && !e.watched)} onClick={() => act(() => ShowService.markSeasonWatched(summary.showId, season))}><T>Mark released season episodes watched</T></Button>
+              <Button variant="outline" size="sm" disabled={busy || !guide.episodes.some(e => isEpisodeReleased(e, today()) && !e.watched)} onClick={() => act(() => ShowService.markSeasonWatched(summary.showId, season))}><T>Mark released season episodes watched</T></Button>
               <div className="space-y-1">{guide.episodes.map(e => {
-                const aired = !!e.airDate && e.airDate <= today();
+                const aired = isEpisodeReleased(e, today());
                 const codeLabel = code({ ...e, season });
                 // Every watched episode can be unmarked, including ones covered by earlier saved progress; the server
                 // records the change without rewriting that progress.
                 return <button key={e.number} type="button" aria-label={`${phrase(language, e.watched ? 'Mark not watched' : 'Mark watched')} ${codeLabel} ${e.name}`} aria-pressed={e.watched} disabled={busy || (!aired && !e.watched)} onClick={() => toggleEpisode(season, e.number, !e.watched)} className="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card/50 px-3 py-3 text-left transition-[background-color,border-color] hover:border-primary/50 hover:bg-primary/5 disabled:cursor-default disabled:opacity-65">
                   <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${e.watched ? 'border-primary bg-primary text-primary-foreground' : ''}`}>{e.watched && <Check className="size-4" />}</span>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{codeLabel} · {e.name}</span><span className="text-xs text-muted-foreground">{e.airDate || phrase(language, 'Air date TBA')}{e.watchSource === 'legacy' ? ` · ${phrase(language, 'From earlier progress')}` : ''}</span></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{codeLabel} · {e.name}</span><span className="text-xs text-muted-foreground">{e.airDate || phrase(language, 'Air date TBA')}{!aired && e.airDate && e.releaseAt ? ` · ${phrase(language, 'Available to track from')} ${dateTimeLabel(e.releaseAt, localeFor(language))}${e.releaseSource === 'manual_override' ? ` (${phrase(language, 'documented release time')})` : ''}` : ''}{e.watchSource === 'legacy' ? ` · ${phrase(language, 'From earlier progress')}` : ''}</span></span>
                   {!aired && <CalendarDays className="size-4 shrink-0 text-muted-foreground" />}
                 </button>;
               })}</div>

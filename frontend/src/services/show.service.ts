@@ -45,11 +45,11 @@ export interface TmdbMatchPreview {
 export interface EpisodeGuide {
   seasons: { number: number; episodeCount: number }[];
   season: number;
-  episodes: { number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null }[];
+  episodes: { number: number; name: string; airDate: string | null; releaseAt?: string | null; releaseSource?: string | null; runtime: number | null; watchedAt: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null }[];
   watched: { season: number; episode: number; watchedAt: string }[];
 }
 
-export interface TrackedEpisode { season: number; number: number; name: string; airDate: string | null; runtime: number | null; watchedAt: string | null; watched?: boolean; watchSource?: 'explicit' | 'legacy' | 'both' | null }
+export interface TrackedEpisode { season: number; number: number; name: string; airDate: string | null; releaseAt?: string | null; runtime: number | null; watchedAt: string | null; watched?: boolean; watchSource?: 'explicit' | 'legacy' | 'both' | null }
 /** One new episode from the TVMaze-only schedule. `id` (TVMaze show + episode ID) is stable across refreshes. */
 export interface UpcomingRelease {
   id: string; tvmazeShowId: number; episodeId: number;
@@ -60,6 +60,12 @@ export interface UpcomingRelease {
   /** Present only when TVMaze confirms an air time; date-only releases never get one. */
   airTime: string | null; airTimestamp: string | null;
   runtime: number | null; seasonPremiere: boolean; channel: string | null; streaming: boolean; scheduleSource: 'TVMaze';
+  /**
+   * When Cinetra (Home, Watch Room) treats this episode as released, and where that instant comes from. Null when
+   * TVMaze's numbering is not verified against TMDB for this series or the catalog is unavailable.
+   */
+  releaseAt?: string | null;
+  releaseSource?: 'tvmaze_exact' | 'manual_override' | 'tvmaze_date_local' | 'tvmaze_date_worldwide' | 'tmdb_date' | null;
 }
 export interface ReturningTba { showId: string; showName: string; posterURL: string | null; showStatus: string | null; tvmazeStatus: string; announcedEpisodes: number }
 export interface ScheduleReview { showId: string; showName: string; posterURL: string | null; reason: string; detail: string }

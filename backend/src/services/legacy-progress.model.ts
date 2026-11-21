@@ -1,5 +1,8 @@
+import { isEpisodeReleased } from './release-rule.model';
+
 export type SeasonMetadata = { number: number; episodeCount: number };
-export type EpisodeMetadata = { season: number; number: number; airDate: string | null };
+/** `releaseAt` (see release-rule.model) decides release; without it the TMDB date fallback applies. */
+export type EpisodeMetadata = { season: number; number: number; airDate: string | null; releaseAt?: string | null };
 export type EpisodeCatalog = { seasons: SeasonMetadata[]; episodes: EpisodeMetadata[] };
 export type ExplicitWatch = { season: number; episode: number; watchedAt?: Date | string };
 export type WatchSource = 'explicit' | 'legacy' | 'both' | null;
@@ -20,7 +23,7 @@ export function calculateLegacyCoverage(
   seasonsWatched: number,
   episodesWatched: number,
   catalog: EpisodeCatalog | null,
-  now = new Date().toISOString().slice(0, 10),
+  now: string = new Date().toISOString(),
 ): LegacyCoverage {
   const empty = { covered: new Set<string>(), known: !!catalog, needsReview: false, normalizedSeason: null, normalizedEpisode: null };
   if (!catalog) return { ...empty, known: false };
@@ -48,8 +51,9 @@ export function calculateLegacyCoverage(
     if (!declared) return;
     for (let index = 0; index < Math.min(count, episodes.length); index++) {
       const episode = episodes[index];
-      if (!episode.airDate || episode.airDate <= now) covered.add(episodeKey(episode.season, episode.number));
-      if (!episode.airDate || episode.airDate > now) needsReview = true;
+      const released = isEpisodeReleased(episode, now);
+      if (!episode.airDate || released) covered.add(episodeKey(episode.season, episode.number));
+      if (!episode.airDate || !released) needsReview = true;
     }
     if (episodes.some((episode, index) => index > 0 && episode.number !== episodes[index - 1].number + 1)) needsReview = true;
   };
@@ -123,7 +127,7 @@ export type ViewingState = 'not_started' | 'in_progress' | 'caught_up' | 'fully_
 /** Statuses after which no further episodes are expected. TMDB reports cancelled series as "Canceled". */
 export const FINAL_BROADCAST_STATUSES: readonly BroadcastStatus[] = ['ended', 'canceled'];
 const CONTINUING_BROADCAST_STATUSES: readonly BroadcastStatus[] = ['returning', 'in_production', 'planned'];
-const isReleased = (episode: EpisodeMetadata, now: string) => !!episode.airDate && episode.airDate <= now;
+const isReleased = (episode: EpisodeMetadata, now: string) => isEpisodeReleased(episode, now);
 const byOrder = (a: EpisodeMetadata, b: EpisodeMetadata) => a.season - b.season || a.number - b.number;
 
 /** Every season's episode list is complete and every episode is dated: required to confirm a series has finished. */
@@ -139,7 +143,7 @@ export function isCatalogComplete(catalog: EpisodeCatalog | null) {
  * episode sits before an aired one. Announced episodes without an air date are simply not released yet, so they
  * do not make otherwise complete released-episode metadata unreliable.
  */
-export function isReleasedMetadataReliable(catalog: EpisodeCatalog | null, now = new Date().toISOString().slice(0, 10)) {
+export function isReleasedMetadataReliable(catalog: EpisodeCatalog | null, now: string = new Date().toISOString()) {
   if (!catalog || !catalog.seasons.length) return false;
   const episodes = catalog.episodes.filter(regular).sort(byOrder);
   if (!episodes.length) return false;
@@ -166,7 +170,7 @@ export function calculateTrackingProgress<T extends EpisodeMetadata & { watched:
   broadcastStatus: BroadcastStatus,
   inProduction: boolean | null,
   nextEpisodeAnnounced: boolean,
-  now = new Date().toISOString().slice(0, 10),
+  now: string = new Date().toISOString(),
   /** Whether a saved position or any individual watch record exists, including records that match no episode. */
   hasActivity = episodes.some(episode => episode.watched),
 ) {

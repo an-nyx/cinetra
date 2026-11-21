@@ -1,0 +1,5 @@
+{
+  "$comment": "Manual premiere times. Each entry needs an independently verifiable, episode-specific or officially documented season-wide source. Never add entries based on a platform's usual schedule. Format and rules: docs/release-overrides.md.",
+  "version": 1,
+  "overrides": []
+}

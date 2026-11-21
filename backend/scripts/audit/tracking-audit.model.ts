@@ -43,14 +43,14 @@ export type RawShow = {
   status?: string | null; tmdbId?: number | null; tvmazeId?: number | null;
 };
 export type CatalogSeason = { number: number; episodeCount: number };
-export type CatalogEpisode = { season: number; number: number; airDate: string | null };
+export type CatalogEpisode = { season: number; number: number; airDate: string | null; releaseAt?: string | null };
 export type Catalog = { seasons: CatalogSeason[]; episodes: CatalogEpisode[] };
 export type ExplicitRecord = { season: number; episode: number; watchedAt?: string };
 export type TMDBFacts = Catalog & {
   status: string | null; inProduction: boolean | null; nextEpisodeAnnounced: boolean;
   nextEpisode: { season: number; number: number; airDate: string | null } | null;
 };
-export type GuideEpisode = { number: number; name?: string; airDate: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null };
+export type GuideEpisode = { number: number; name?: string; airDate: string | null; releaseAt?: string | null; watched: boolean; watchSource: 'explicit' | 'legacy' | 'both' | null };
 export type GuidePage = { seasons: CatalogSeason[]; season: number; episodes: GuideEpisode[]; watched: ExplicitRecord[] };
 export type EpisodeRef = { season: number; number: number; name?: string; airDate: string | null };
 export type Summary = {
@@ -69,7 +69,18 @@ export const episodeCode = (season: number, episode: number) => `S${pad(season)}
 const keyOf = (season: number, episode: number) => `${season}:${episode}`;
 const codeOfKey = (key: string) => { const [s, e] = key.split(':').map(Number); return episodeCode(s, e); };
 const isRegular = (e: CatalogEpisode) => e.season > 0 && e.number > 0;
-const isReleased = (e: CatalogEpisode, today: string) => !!e.airDate && e.airDate <= today;
+/**
+ * Release rule, specified independently of the tracking model (docs: release-rule.model.ts): production serves each
+ * episode's release instant (`releaseAt`); without one, a TMDB date D counts once it has ended everywhere on Earth,
+ * D+1 12:00 UTC. `today` may be an ISO instant or a YYYY-MM-DD day (its start, UTC).
+ */
+const fallbackReleaseAt = (airDate: string) => /^\d{4}-\d{2}-\d{2}$/.test(airDate) ? new Date(Date.parse(`${airDate}T12:00:00Z`) + 86_400_000).toISOString() : null;
+const auditInstant = (today: string) => /^\d{4}-\d{2}-\d{2}$/.test(today) ? `${today}T00:00:00.000Z` : new Date(Date.parse(today)).toISOString();
+const isReleased = (e: Pick<CatalogEpisode, 'airDate' | 'releaseAt'>, today: string) => {
+  if (!e.airDate) return false;
+  const at = e.releaseAt !== undefined ? e.releaseAt : fallbackReleaseAt(e.airDate);
+  return !!at && at <= auditInstant(today);
+};
 const byOrder = (a: CatalogEpisode, b: CatalogEpisode) => a.season - b.season || a.number - b.number;
 const list = (keys: string[], max = 12) => keys.slice(0, max).map(codeOfKey).join(', ') + (keys.length > max ? ` (+${keys.length - max} more)` : '');
 
@@ -80,7 +91,7 @@ export const CONTINUING_STATUSES = ['Returning Series', 'In Production', 'Planne
 export function catalogFromGuides(pages: GuidePage[]): Catalog {
   return {
     seasons: (pages[0]?.seasons || []).filter(season => season.number > 0),
-    episodes: pages.flatMap(page => page.episodes.map(episode => ({ season: page.season, number: episode.number, airDate: episode.airDate || null }))),
+    episodes: pages.flatMap(page => page.episodes.map(episode => ({ season: page.season, number: episode.number, airDate: episode.airDate || null, ...(episode.releaseAt !== undefined ? { releaseAt: episode.releaseAt } : {}) }))),
   };
 }
 
@@ -143,9 +154,9 @@ export function assessLegacyPosition(show: Pick<RawShow, 'seasonsWatched' | 'epi
     else if (e > inSeason.length) issues.push({ code: 'position_exceeds_season', severity: 'warning', detail: `Saved position S${pad(s)}E${pad(e)} exceeds the ${inSeason.length} episodes the provider has for season ${s}.` });
     range.push(...inSeason.slice(0, e));
   }
-  const unaired = range.filter(ep => !!ep.airDate && ep.airDate > today).map(ep => keyOf(ep.season, ep.number));
+  const unaired = range.filter(ep => !!ep.airDate && !isReleased(ep, today)).map(ep => keyOf(ep.season, ep.number));
   const undated = range.filter(ep => !ep.airDate).map(ep => keyOf(ep.season, ep.number));
-  for (const ep of range) if (!(ep.airDate && ep.airDate > today)) covered.add(keyOf(ep.season, ep.number));
+  for (const ep of range) if (!ep.airDate || isReleased(ep, today)) covered.add(keyOf(ep.season, ep.number));
   if (unaired.length) issues.push({ code: 'position_covers_unaired', severity: 'warning', detail: `Saved position covers episodes that have not aired: ${list(unaired)}.` });
   if (undated.length) issues.push({ code: 'position_covers_undated', severity: 'warning', detail: `Saved position covers episodes without an air date, which cannot be confirmed as released: ${list(undated)}.` });
   const blocking = issues.some(issue => ['position_earlier_season_missing', 'position_season_missing', 'position_exceeds_season', 'position_covers_unaired', 'position_covers_undated'].includes(issue.code));
@@ -346,7 +357,7 @@ export function auditShow(input: ShowAuditInput) {
       const legacy = expected.legacy.covered.has(key); const explicitHas = expected.matched.has(key);
       const source = legacy && explicitHas ? 'both' : explicitHas ? 'explicit' : legacy ? 'legacy' : null;
       if (ep.watchSource !== source) wrongSource.push(`${episodeCode(page.season, ep.number)} ${ep.watchSource ?? 'none'}→${source ?? 'none'}`);
-      if (ep.watched && ep.airDate && ep.airDate <= today && ep.number > 0) releasedChecks++;
+      if (ep.watched && isReleased(ep, today) && ep.number > 0) releasedChecks++;
     }
     if (wrong.length) add('checkmark_mismatch', 'error', `Checkmarks disagree with the effective state: ${wrong.slice(0, 12).join('; ')}${wrong.length > 12 ? ` (+${wrong.length - 12} more)` : ''}.`);
     if (wrongSource.length) add('watch_source_mismatch', 'warning', `Watch source labels differ: ${wrongSource.slice(0, 8).join('; ')}${wrongSource.length > 8 ? ' …' : ''}.`);

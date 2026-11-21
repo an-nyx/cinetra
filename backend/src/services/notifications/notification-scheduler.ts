@@ -58,7 +58,7 @@ export async function tick() {
     const r = await runEpisodeNotifications({ sender });
     status.lastRun = r;
     // Counts only: no endpoints, titles or user identifiers in logs.
-    console.log(`Episode notifications: ${r.devices} devices, ${r.showsChecked} shows checked (${r.verifiedShows} verified, ${r.unverifiedShows} unverified, ${r.unavailableShows} unavailable), ${r.premiered} premieres in window (${r.alreadyWatched} watched, ${r.beforeOptIn} before opt-in), ${r.ledgerCreated} queued, ${r.delivered} sent, ${r.retry} retry, ${r.failed} failed, ${r.uncertain} uncertain, ${r.gone} expired subscriptions, ${r.skipped} skipped, ${r.expired} too old`);
+    console.log(`Episode notifications: ${r.devices} devices, ${r.showsChecked} shows checked (${r.verifiedShows} verified, ${r.unverifiedShows} unverified, ${r.unavailableShows} unavailable), ${r.premiered} premieres in window (${r.alreadyWatched} watched, ${r.beforeOptIn} before opt-in, ${r.awaitingRelease} awaiting Cinetra release, ${r.releaseUnknown} release time unknown), ${r.ledgerCreated} queued, ${r.delivered} sent, ${r.retry} retry, ${r.failed} failed, ${r.uncertain} uncertain, ${r.gone} expired subscriptions, ${r.skipped} skipped, ${r.expired} too old`);
   } catch (error) {
     status.lastError = { at: new Date().toISOString(), message: describe(error) };
     console.error('Episode notification run failed:', describe(error));

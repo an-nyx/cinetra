@@ -17,14 +17,30 @@ export const dayKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth
 /** Local midnight of a YYYY-MM-DD day (no UTC parsing, so no off-by-one). */
 export const parseDay = (key: string) => { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d); };
 const addDays = (key: string, days: number) => { const date = parseDay(key); date.setDate(date.getDate() + days); return dayKey(date); };
+/**
+ * The confirmed instant shown for a release: Cinetra's release time when it is a verified TVMaze premiere or a
+ * documented manual time (the moment Home and the Watch Room switch), else TVMaze's confirmed air time, else none.
+ */
+export const releaseTimestamp = (release: Pick<UpcomingRelease, "airTimestamp" | "releaseAt" | "releaseSource">) =>
+  release.releaseAt && (release.releaseSource === "tvmaze_exact" || release.releaseSource === "manual_override") ? release.releaseAt : release.airTimestamp;
 /** The local calendar day a release belongs to. */
-export const releaseDay = (release: Pick<UpcomingRelease, "airTimestamp" | "airDate">) => release.airTimestamp ? dayKey(new Date(release.airTimestamp)) : release.airDate;
+export const releaseDay = (release: Pick<UpcomingRelease, "airTimestamp" | "airDate" | "releaseAt" | "releaseSource">) => {
+  const timestamp = releaseTimestamp(release);
+  return timestamp ? dayKey(new Date(timestamp)) : release.airDate;
+};
+/** Date-only schedule: when Cinetra starts treating it as released (conservative rule), if that is known. */
+const trackingFrom = (release: Pick<UpcomingRelease, "releaseAt" | "releaseSource">) =>
+  release.releaseAt && release.releaseSource !== "tvmaze_exact" && release.releaseSource !== "manual_override" ? release.releaseAt : null;
 
 export type ReleaseEvent = {
   key: string; day: string; showId: string; showName: string; posterURL: string | null;
   episodes: UpcomingRelease[]; premiere: boolean; seriesPremiere: boolean;
   /** Earliest confirmed instant among the episodes; null when TVMaze gives only a date. */
   timestamp: string | null; channel: string | null; streaming: boolean;
+  /** Some episode's time comes from a documented manual release time. */
+  manual: boolean;
+  /** Date-only releases: the latest instant from which Cinetra treats them as released (Home, Watch Room); else null. */
+  trackingFrom: string | null;
 };
 
 /**
@@ -34,14 +50,16 @@ export type ReleaseEvent = {
  */
 export function groupReleaseEvents(releases: UpcomingRelease[], now: Date): ReleaseEvent[] {
   const today = dayKey(now);
+  const instant = now.toISOString();
   const unique = new Map<string, UpcomingRelease>();
   for (const release of releases) if (release && !unique.has(release.id)) unique.set(release.id, release);
   const events = new Map<string, ReleaseEvent>();
   for (const release of unique.values()) {
     const day = releaseDay(release);
-    if (day < today) continue;
+    // A past day stays listed while Cinetra has not released the episode yet, so it is never missing everywhere.
+    if (day < today && !(release.releaseAt && release.releaseAt > instant)) continue;
     const key = `${day}|${release.showId}`;
-    const event = events.get(key) || { key, day, showId: release.showId, showName: release.showName, posterURL: release.posterURL, episodes: [], premiere: false, seriesPremiere: false, timestamp: null, channel: release.channel, streaming: release.streaming };
+    const event = events.get(key) || { key, day, showId: release.showId, showName: release.showName, posterURL: release.posterURL, episodes: [], premiere: false, seriesPremiere: false, timestamp: null, channel: release.channel, streaming: release.streaming, manual: false, trackingFrom: null };
     event.episodes.push(release);
     events.set(key, event);
   }
@@ -49,8 +67,10 @@ export function groupReleaseEvents(releases: UpcomingRelease[], now: Date): Rele
     event.episodes.sort((a, b) => a.season - b.season || a.number - b.number);
     event.premiere = event.episodes.some(e => e.seasonPremiere);
     event.seriesPremiere = event.episodes.some(e => e.season === 1 && e.number === 1);
-    const times = event.episodes.flatMap(e => e.airTimestamp ? [e.airTimestamp] : []).sort();
+    const times = event.episodes.flatMap(e => { const t = releaseTimestamp(e); return t ? [t] : []; }).sort();
     event.timestamp = times[0] || null;
+    event.manual = event.episodes.some(e => e.releaseSource === "manual_override" && !!e.releaseAt);
+    event.trackingFrom = event.episodes.flatMap(e => { const t = trackingFrom(e); return t ? [t] : []; }).sort().at(-1) || null;
   }
   // Date-only releases lead their day (no time is known), then confirmed times in order.
   return [...events.values()].sort((a, b) => a.day.localeCompare(b.day) || (a.timestamp ? Date.parse(a.timestamp) : 0) - (b.timestamp ? Date.parse(b.timestamp) : 0) || a.showName.localeCompare(b.showName));
@@ -94,6 +114,8 @@ export function relativeDay(day: string, now: Date) {
 }
 /** Compact date for Home: "Today", "Tomorrow" or "Wed, Nov 11". */
 export const shortDay = (day: string, now: Date, locale?: string) => relativeDay(day, now) || parseDay(day).toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
+/** Local date and time, e.g. "Thu, Nov 26, 1:00 PM". */
+export const dateTimeLabel = (timestamp: string, locale?: string) => new Date(timestamp).toLocaleString(locale, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 /** Local time of a confirmed air time, e.g. "9:00 PM"; null for date-only releases. */
 export const timeLabel = (timestamp: string | null, locale?: string) => timestamp ? new Date(timestamp).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" }) : null;
 
