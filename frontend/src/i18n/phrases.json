@@ -2290,5 +2290,65 @@
   "documented release time": [
     "horaire de sortie documenté",
     "موعد إصدار موثّق"
+  ],
+  "Search my library": [
+    "Rechercher dans ma bibliothèque",
+    "البحث في مكتبتي"
+  ],
+  "Add TV Show": [
+    "Ajouter une série",
+    "إضافة مسلسل"
+  ],
+  "Add Movie": [
+    "Ajouter un film",
+    "إضافة فيلم"
+  ],
+  "Find movies and TV shows saved in your library.": [
+    "Retrouvez les films et séries enregistrés dans votre bibliothèque.",
+    "ابحث عن الأفلام والمسلسلات المحفوظة في مكتبتك."
+  ],
+  "Search saved titles…": [
+    "Rechercher un titre enregistré…",
+    "ابحث عن عنوان محفوظ…"
+  ],
+  "Loading your library…": [
+    "Chargement de votre bibliothèque…",
+    "جارٍ تحميل مكتبتك…"
+  ],
+  "Could not load your library. Please try again.": [
+    "Impossible de charger votre bibliothèque. Veuillez réessayer.",
+    "تعذّر تحميل مكتبتك. يُرجى المحاولة مرة أخرى."
+  ],
+  "Type a title to search your library.": [
+    "Saisissez un titre pour rechercher dans votre bibliothèque.",
+    "اكتب عنوانًا للبحث في مكتبتك."
+  ],
+  "1 matching title": [
+    "1 titre correspondant",
+    "عنوان واحد مطابق"
+  ],
+  "{n} matching titles": [
+    "{n} titres correspondants",
+    "عدد العناوين المطابقة: {n}"
+  ],
+  "No matching titles in your library.": [
+    "Aucun titre correspondant dans votre bibliothèque.",
+    "لا توجد عناوين مطابقة في مكتبتك."
+  ],
+  "Try again": [
+    "Réessayer",
+    "إعادة المحاولة"
+  ],
+  "No poster": [
+    "Pas d’affiche",
+    "لا يوجد ملصق"
+  ],
+  "Movie": [
+    "Film",
+    "فيلم"
+  ],
+  "Airs in": [
+    "Diffusion dans",
+    "يُعرض بعد"
   ]
 }

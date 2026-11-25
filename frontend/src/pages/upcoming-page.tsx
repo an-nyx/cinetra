@@ -12,6 +12,9 @@ import { posterSrc } from "@/lib/poster";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
 import { filterMovieReleases } from "@/lib/movie-calendar";
 import UpcomingMovieCard from "@/components/upcoming-movie-card";
+import ReleaseCountdown from "@/components/release-countdown";
+import { nextCountdown } from "@/lib/release-countdown";
+import { useSlidingIndicator } from "@/hooks/use-sliding-indicator";
 import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
 import {
   calendarFilters, calendarStats, dateTimeLabel, dayHeading, episodeCode, filterEvents, groupByDay, groupReleaseEvents, releaseTimestamp, timeLabel,
@@ -30,16 +33,17 @@ function Poster({ url, className }: { url: string | null; className: string }) {
     : <span className={`dash-poster flex items-center justify-center text-muted-foreground ${className}`}><Tv className="size-4" /></span>;
 }
 
-function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: string) => void }) {
+function ReleaseCard({ event, onOpen, countdownAt }: { event: ReleaseEvent; onOpen: (showId: string) => void; countdownAt?: number }) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const grouped = event.episodes.length > 1;
   const single = event.episodes[0];
   const time = timeLabel(event.timestamp, localeFor(language));
   const line = localizedEpisodeLine(language, event);
+  const countdownId = `countdown-${event.key}`;
   return <article className="dash-card dash-row overflow-hidden">
     <div className="flex min-w-0 items-stretch">
-      <button type="button" onClick={() => onOpen(event.showId)} aria-label={`Open ${event.showName}: ${line}${time ? `, ${time}` : ""}`} className="flex min-w-0 flex-1 items-center gap-3 p-2.5 text-left">
+      <button type="button" onClick={() => onOpen(event.showId)} aria-label={`Open ${event.showName}: ${line}${time ? `, ${time}` : ""}`} aria-describedby={countdownAt ? countdownId : undefined} className="flex min-w-0 flex-1 items-center gap-3 p-2.5 text-left">
         <Poster url={event.posterURL} className="h-[66px] w-11" />
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -56,6 +60,7 @@ function ReleaseCard({ event, onOpen }: { event: ReleaseEvent; onOpen: (showId: 
         </span>
         <span className="shrink-0 self-start pt-0.5 text-right">
           {time ? <span className="block text-xs font-semibold text-primary">{time}</span> : null}
+          {countdownAt && <ReleaseCountdown id={countdownId} at={countdownAt} className="mt-1" />}
           {event.channel && <span className="mt-0.5 hidden max-w-[5.5rem] truncate text-[11px] text-muted-foreground min-[360px]:block">{event.channel}</span>}
         </span>
       </button>
@@ -97,6 +102,9 @@ export default function UpcomingPage() {
     }
     return [...entries.values()].sort((a, b) => a.day.localeCompare(b.day));
   }, [visible, visibleMovies, category]);
+  // One countdown at most: the next verified release within 24 hours (display only; the schedule decides the rest).
+  const countdown = useMemo(() => nextCountdown(events, now), [events, now]);
+  const categoryIndicator = useSlidingIndicator(category);
   const stats = calendarStats(events);
   const counts = useMemo(() => Object.fromEntries(calendarFilters.map(f => [f.id, filterEvents(events, f.id, now).length])) as Record<CalendarFilter, number>, [events, now]);
   const coverage = schedule?.coverage;
@@ -126,10 +134,13 @@ export default function UpcomingPage() {
     </p>}
 
     <nav aria-label={phrase(language, "Release categories") } className="filter-rail mt-3">
-      {([['all', 'All'], ['tv', 'TV Shows'], ['movies', 'Movies']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={category === id} onClick={() => { setCategory(id); if (id === "movies" && filter === "premieres") setFilter("all"); }} className="upcoming-filter min-h-10 shrink-0 px-3.5 text-xs font-semibold">{phrase(language, label)}</button>)}
+      <div ref={categoryIndicator.track} className="segmented-track">
+        <span ref={categoryIndicator.indicator} className="segmented-indicator" aria-hidden="true" />
+        {([['all', 'All'], ['tv', 'TV Shows'], ['movies', 'Movies']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={category === id} data-active={category === id} onClick={() => { setCategory(id); if (id === "movies" && filter === "premieres") setFilter("all"); }} className="segmented-option px-4 text-xs font-semibold">{phrase(language, label)}</button>)}
+      </div>
     </nav>
     <nav aria-label={phrase(language, "Upcoming filters") } className="filter-rail mt-3">
-      {calendarFilters.filter(option => category !== "movies" || option.id !== "premieres").map(option => <button key={option.id} type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)} className="upcoming-filter min-h-10 shrink-0 whitespace-nowrap px-3.5 text-xs font-semibold">
+      {calendarFilters.filter(option => category !== "movies" || option.id !== "premieres").map(option => <button key={option.id} type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)} className="upcoming-filter min-h-11 shrink-0 whitespace-nowrap px-3.5 text-xs font-semibold">
         {phrase(language, option.label)}{schedule && category === "tv" && <span className="ml-1.5 opacity-70">{counts[option.id]}</span>}
       </button>)}
     </nav>
@@ -139,7 +150,7 @@ export default function UpcomingPage() {
     {movies.error && category !== "tv" && <div role="status" className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><span><T>Movie releases could not be refreshed.</T></span><Button size="sm" variant="outline" onClick={movies.retry}><T>Retry movies</T></Button></div>}
     {days.length > 0 && <section aria-label={phrase(language, "Scheduled releases") } className="mt-2">{days.map(({ day, events: dayEvents, movies: dayMovies }) => <section key={day} aria-labelledby={`day-${day}`} className="release-day-group">
       <h2 id={`day-${day}`} className="release-day flex items-baseline justify-between text-[11px] font-bold tracking-[0.12em] text-muted-foreground"><span>{dayHeading(day, localeFor(language))}</span>{calendarRelative(language, day, now) && <span className="text-primary">{calendarRelative(language, day, now)}</span>}</h2>
-      <div className="space-y-2 pb-2">{dayEvents.map(event => <ReleaseCard key={event.key} event={event} onOpen={setSelectedShow} />)}{dayMovies.map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div>
+      <div className="space-y-2 pb-2">{dayEvents.map(event => <ReleaseCard key={event.key} event={event} onOpen={setSelectedShow} countdownAt={countdown?.key === event.key ? countdown.at : undefined} />)}{dayMovies.map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div>
     </section>)}</section>}
     {category !== "tv" && filter === "all" && !!movies.data?.releases.some(movie => !movie.date) && <details className="dash-card group mt-4 px-3 py-1"><summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold"><T>Upcoming Movies — Date TBA</T><ChevronDown className="ml-auto size-4" /></summary><p className="pb-2 text-xs text-muted-foreground"><T>TMDB lists these collection members, but their release details are unconfirmed.</T></p><div className="space-y-2 pb-2">{movies.data.releases.filter(movie => !movie.date).map(movie => <UpcomingMovieCard key={movie.tmdbId} movie={movie} />)}</div></details>}
     {(loading || building) && category !== "movies" && <div role="status" className="dash-card mt-4 flex items-center justify-between gap-3 p-3 text-xs text-muted-foreground"><span>{building && building.total > 0 ? language === "ar" ? `جارٍ تحميل مواعيد المسلسلات… تم التحقق من ${building.done} من أصل ${building.total}` : language === "fr" ? `Chargement des sorties TV… ${building.done} séries vérifiées sur ${building.total}` : `Preparing TV releases… ${building.done} of ${building.total} shows checked` : phrase(language, "Preparing TV releases…")}</span><Button size="sm" variant="outline" onClick={refresh} disabled={refreshing}><T>Retry TV</T></Button></div>}

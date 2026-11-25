@@ -1,5 +1,5 @@
 import { localeFor, localizedEpisodeLine, localizedShortDay } from "@/i18n/calendar";
-import { watchCounts, verifiedShowCounts, unavailableShowCounts } from "@/i18n/tracking";
+import { watchCounts, verifiedShowCounts, unavailableShowCounts, unwatchedCount, releasedUnwatchedCount } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router";
@@ -18,8 +18,10 @@ import { groupReleaseEvents, timeLabel } from "@/lib/upcoming-calendar";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
 import { filterMovieReleases } from "@/lib/movie-calendar";
 import { useNow, useUpcomingSchedule } from "@/hooks/use-upcoming";
+import ReleaseCountdown from "@/components/release-countdown";
+import ProgressPoster from "@/components/progress-poster";
+import { nextCountdown } from "@/lib/release-countdown";
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const nextCode = (item: TrackingSummary) => item.nextEpisode ? episodeCode(item.nextEpisode.season, item.nextEpisode.number) : null;
 function relativeTime(iso: string, now: Date) {
   const days = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(new Date(iso).setHours(0, 0, 0, 0)).getTime()) / 86_400_000);
@@ -73,7 +75,10 @@ export default function WelcomePage() {
 
   const dash = useMemo(() => homeDashboard(tracking, 6, featuredId.current), [tracking]);
   useEffect(() => { featuredId.current = dash.featured?.showId ?? null; }, [dash.featured?.showId]);
-  const comingSoon = useMemo(() => groupReleaseEvents(upcoming.schedule?.releases || [], now).slice(0, 3), [upcoming.schedule, now]);
+  const allReleases = useMemo(() => groupReleaseEvents(upcoming.schedule?.releases || [], now), [upcoming.schedule, now]);
+  const comingSoon = useMemo(() => allReleases.slice(0, 3), [allReleases]);
+  // Same rule as Upcoming: one countdown, for the next verified release within 24 hours (display only).
+  const countdown = useMemo(() => nextCountdown(allReleases, now), [allReleases, now]);
   const open = (showId: string, fixMatch = false) => { setEditMatch(fixMatch); setSelectedShow(showId); };
   const markNext = async (item: TrackingSummary) => {
     try { await controller.mark(item); }
@@ -98,14 +103,16 @@ export default function WelcomePage() {
           <Button variant="ghost" size="icon" onClick={load} aria-label={phrase(language, "Refresh dashboard") } className="-my-2 -mr-2 rounded-full"><RefreshCw className="size-4" /></Button>
         </div>
         {featured ? <div className="mt-1 flex gap-3">
-          <button type="button" onClick={() => open(featured.showId)} aria-label={`Open ${featured.name}`} className="shrink-0"><Poster url={featured.posterURL} size="w185" className="h-[108px] w-[72px] cinema-poster" /></button>
+          <button type="button" onClick={() => open(featured.showId)} aria-label={`Open ${featured.name}`} className="shrink-0">{featured.posterURL
+            ? <ProgressPoster src={posterSrc(featured.posterURL, "w185")!} percent={featured.progressPercent} className="dash-poster cinema-poster h-[108px] w-[72px]" />
+            : <Poster url={featured.posterURL} size="w185" className="h-[108px] w-[72px] cinema-poster" />}</button>
           <div className="min-w-0 flex-1">
             <button type="button" onClick={() => open(featured.showId)} className="block max-w-full text-left"><span className="line-clamp-2 break-words text-base font-semibold leading-snug hover:text-primary">{featured.name}</span></button>
             <p className="mt-0.5 truncate text-xs text-muted-foreground"><span className="font-medium text-foreground/90"><T>Next</T> {nextCode(featured)}</span>{featured.nextEpisode?.name ? ` · ${featured.nextEpisode.name}` : ""}</p>
             {featured.progressPercent !== null && <p className="truncate text-[11px] text-muted-foreground">{watchCounts(language, featured.watchedCount, featured.releasedCount)}</p>}
             <div className="mt-1.5 flex items-center gap-2">
               {featured.progressPercent !== null && <div className="mini-progress min-w-8 flex-1" role="progressbar" aria-label={phrase(language, "Released episodes watched") } aria-valuenow={featured.progressPercent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${featured.progressPercent}%` }} /></div>}
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{featured.progressPercent !== null ? `${featured.progressPercent}% · ` : ""}{featured.countDataAvailable ? `${featured.remainingCount} unwatched` : phrase(language, "Count unavailable")}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{featured.progressPercent !== null ? `${featured.progressPercent}% · ` : ""}{featured.countDataAvailable ? unwatchedCount(language, featured.remainingCount) : phrase(language, "Count unavailable")}</span>
             </div>
             <div className="mt-2 flex justify-end">
               <Button size="sm" className="h-9 max-w-full gap-1 rounded-full px-3 text-xs" disabled={!!busy} onClick={() => markNext(featured)} aria-label={`Mark ${nextCode(featured)} of ${featured.name} watched`}><Check className="size-3.5" />{busy === featured.showId ? "Updating…" : <T>Mark next watched</T>}</Button>
@@ -150,7 +157,7 @@ export default function WelcomePage() {
         <ul className="space-y-1.5">{newShown.map(item => <li key={item.showId}><button type="button" onClick={() => open(item.showId)} className="dash-card dash-row flex min-h-14 w-full items-center gap-3 p-2 text-left">
           <Poster url={item.posterURL} size="w92" className="h-[54px] w-9" />
           <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.name}</span>
-            <span className="block truncate text-xs text-muted-foreground">{item.newSeasonToWatch ? `Season ${item.newSeasonToWatch.season} is out · ` : ""}{plural(item.remainingCount, "released episode")} unwatched</span></span>
+            <span className="block truncate text-xs text-muted-foreground">{item.newSeasonToWatch ? `Season ${item.newSeasonToWatch.season} is out · ` : ""}{releasedUnwatchedCount(language, item.remainingCount)}</span></span>
           <span className="release-tag shrink-0">{item.newSeasonToWatch ? "New season" : `${item.newEpisodes} new`}</span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
         </button></li>)}</ul>
@@ -163,7 +170,7 @@ export default function WelcomePage() {
           : <ul className="space-y-1.5">{comingSoon.map(event => <li key={event.key}><button type="button" onClick={() => open(event.showId)} className="dash-card dash-row flex min-h-14 w-full items-center gap-3 p-2 text-left">
             <Poster url={event.posterURL} size="w92" className="h-[54px] w-9" />
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{event.showName}</span><span className="block truncate text-xs text-muted-foreground">{localizedEpisodeLine(language, event)}</span></span>
-            <span className="shrink-0 text-right text-xs"><span className="block font-semibold text-primary">{localizedShortDay(language, event.day, now)}</span>{timeLabel(event.timestamp, localeFor(language)) && <span className="block text-[11px] text-muted-foreground">{timeLabel(event.timestamp, localeFor(language))}</span>}</span>
+            <span className="shrink-0 text-right text-xs"><span className="block font-semibold text-primary">{localizedShortDay(language, event.day, now)}</span>{timeLabel(event.timestamp, localeFor(language)) && <span className="block text-[11px] text-muted-foreground">{timeLabel(event.timestamp, localeFor(language))}</span>}{countdown?.key === event.key && <ReleaseCountdown at={countdown.at} className="mt-1" />}</span>
           </button></li>)}</ul>}
       </section>}
 

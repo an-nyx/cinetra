@@ -1,5 +1,5 @@
 import { openTitle, favoriteTitle } from "@/i18n/labels";
-import { progressMessage, watchCounts } from "@/i18n/tracking";
+import { progressMessage, unwatchedCount, watchCounts } from "@/i18n/tracking";
 import { T, phrase, useLanguage } from "@/i18n";
 import { Heart, Tv } from "lucide-react";
 import { ShowType } from "@/types";
@@ -63,7 +63,7 @@ export default function Show({
           <span className="absolute inset-0 flex items-center justify-center"><Tv className="size-8" /></span>
           {posterURL && <img loading="lazy" className="relative h-full w-full object-cover" src={posterSrc(posterURL, "w342")} decoding="async" alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
         </button>
-        {tracking?.newSeasonToWatch && <button type="button" onClick={() => setSelectedShow(id)} className="absolute inset-x-0 bottom-0 min-h-10 bg-black/80 px-1 text-center text-[11px] leading-4 text-white"><span className="block truncate font-semibold"><T>New season to watch</T></span><span className="block truncate">S{tracking.newSeasonToWatch.season} · {tracking.newSeasonToWatch.count} unwatched</span></button>}
+        {tracking?.newSeasonToWatch && <button type="button" onClick={() => setSelectedShow(id)} className="absolute inset-x-0 bottom-0 min-h-10 bg-black/80 px-1 text-center text-[11px] leading-4 text-white"><span className="block truncate font-semibold"><T>New season to watch</T></span><span className="block truncate">S{tracking.newSeasonToWatch.season} · {unwatchedCount(language, tracking.newSeasonToWatch.count)}</span></button>}
       </div>
       {/* Fixed rows keep every card the same height: title, personal status, effective progress, next episode, and optional action. */}
       <div className="grid min-w-0 grid-rows-[1.25rem_1rem_1rem_1rem_1.25rem] gap-px px-2.5 py-1 sm:grid-rows-[2.5rem_1.25rem_1.25rem_1.25rem_2.5rem] sm:gap-0.5 sm:px-3 sm:py-2">

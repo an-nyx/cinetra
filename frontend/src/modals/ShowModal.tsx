@@ -13,6 +13,8 @@ import { ShowType } from "@/types/index.ts";
 import { Check, CalendarDays, Pencil, Play, Trash2, Tv } from "lucide-react";
 import EditShowMatch from "./EditShowMatch";
 import SonarrPanel from "@/components/sonarr-panel";
+import SeasonTabs from "@/components/season-tabs";
+import ProgressPoster from "@/components/progress-poster";
 
 import { createWatchMutation } from "@/lib/optimistic-watch.mjs";
 import { optimisticSummary, publishConfirmedSummary, trackingTick } from "@/lib/tracking-sync";
@@ -202,7 +204,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
         {editingMatch && show ? <EditShowMatch showId={show.id} showName={show.name} showPosterURL={show.posterURL || null} currentTmdbId={show.tmdbId ?? null} onCancel={() => setEditingMatch(false)} onApplied={matchApplied} /> : <>
           {matchNotice && <p role="status" className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">{phrase(language, matchNotice)}</p>}
           {show && <div className="flex gap-4 py-6 sm:gap-6">
-            {show.posterURL ? <img src={posterSrc(show.posterURL, "w342")} alt="" className="cinema-poster h-36 w-24 shrink-0 rounded-xl object-cover sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
+            {show.posterURL ? <ProgressPoster src={posterSrc(show.posterURL, "w342")!} percent={summary?.progressPercent ?? null} className="cinema-poster h-36 w-24 shrink-0 rounded-xl sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
             <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wider text-muted-foreground"><T>Personal status</T></span>
                 <div role="group" aria-label={phrase(language, "Personal status")} className="flex flex-wrap rounded-xl border bg-card p-1">
@@ -254,10 +256,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
             </div>
             {guide && <section id="episodes" className="space-y-3">
               <div><p className="cinema-eyebrow"><T>Episode guide</T></p><h3 className="mt-1 text-xl font-semibold"><T>Seasons & episodes</T></h3></div>
-              {/* Seasons as tappable pills: one tap, no picker. Scrolls sideways for long-running shows. */}
-              <div role="tablist" aria-label={phrase(language, "Season")} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-                {guide.seasons.map(item => <button key={item.number} type="button" role="tab" aria-selected={item.number === season} disabled={busy} onClick={() => selectSeason(item.number)} className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-medium ${item.number === season ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground'}`}><T>Season</T> {item.number}<span className="sr-only"> · {item.episodeCount} {phrase(language, "Episodes")}</span></button>)}
-              </div>
+              <SeasonTabs seasons={guide.seasons} season={season} busy={busy} onSelect={selectSeason} />
               <Button variant="outline" size="sm" disabled={busy || !guide.episodes.some(e => isEpisodeReleased(e, today()) && !e.watched)} onClick={() => act(() => ShowService.markSeasonWatched(summary.showId, season))}><T>Mark released season episodes watched</T></Button>
               <div className="space-y-1">{guide.episodes.map(e => {
                 const aired = isEpisodeReleased(e, today());

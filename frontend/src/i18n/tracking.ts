@@ -74,6 +74,16 @@ export function watchCounts(language: Language, watched: number, released: numbe
   if (language === "ar") return `شوهد ${watched} · الحلقات المعروضة: ${released}`;
   return `${watched} effectively watched · ${released} released episodes`;
 }
+export function unwatchedCount(language: Language, count: number) {
+  if (language === "fr") return `${count} non vu${count > 1 ? "s" : ""}`;
+  if (language === "ar") return `لم تُشاهَد: ${count}`;
+  return `${count} unwatched`;
+}
+export function releasedUnwatchedCount(language: Language, count: number) {
+  if (language === "fr") return `${count} épisode${count > 1 ? "s" : ""} diffusé${count > 1 ? "s" : ""} non vu${count > 1 ? "s" : ""}`;
+  if (language === "ar") return `حلقات معروضة لم تُشاهَد: ${count}`;
+  return `${count} released episode${count === 1 ? "" : "s"} unwatched`;
+}
 export function watchRecordCounts(language: Language, explicit: number, inferred: number) {
   if (language === "fr") return `${explicit} enregistré${explicit > 1 ? "s" : ""} individuellement · ${inferred} pris en compte par la position enregistrée`;
   if (language === "ar") return `المسجلة بشكل منفصل: ${explicit} · المحتسبة من موضع التوقف: ${inferred}`;
