@@ -55,7 +55,10 @@ export class ShowPrismaRepository implements ShowRepository {
       const nextCompletedFlag = showData.completed !== undefined ? showData.completed : current.completed;
       const isCompleted = nextStatus === 'completed' || (!nextStatus && nextCompletedFlag);
       const boundary = isCompleted && !wasCompleted ? new Date() : !isCompleted && wasCompleted ? null : undefined;
-      const result = await tx.show.update({ where: { id: showId }, data: { ...showData, ...(boundary !== undefined ? { completedMonitorFrom: boundary } : {}) } });
+      // Every edit through this path is the user's own choice. Moving to Completed records when (manualCompletedAt):
+      // episodes released before that instant never reopen it. Leaving Completed clears it; edits that keep the
+      // status (favorite, saved position, re-pressing Completed) leave both timestamps as they are.
+      const result = await tx.show.update({ where: { id: showId }, data: { ...showData, ...(boundary !== undefined ? { completedMonitorFrom: boundary, manualCompletedAt: boundary } : {}) } });
       if (showData.seasonsWatched !== undefined || showData.episodesWatched !== undefined) {
         await tx.episodeWatch.updateMany({ where: { showId }, data: { checkpointBeforeSeason: null, checkpointBeforeEpisode: null, checkpointAfterSeason: null, checkpointAfterEpisode: null } });
       }

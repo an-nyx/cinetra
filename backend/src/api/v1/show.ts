@@ -204,8 +204,9 @@ router.put("/:id", async (req: Request<{id: string}, {}, UpdateShowDto>, res: Re
   if (!result) {
     res.status(404).json({ message: "Show not found or you don't have permission to update it" });
   } else {
-    await reconcileAfterAction(showId, req.user.id);
-    res.status(200).json(await showModule.Queries.GetByIdQuery.execute(showId, req.user.id));
+    // Report any automatic change the rules made right after this edit, so the dialog can say why the status moved.
+    const statusChange = await reconcileAfterAction(showId, req.user.id);
+    res.status(200).json({ ...await showModule.Queries.GetByIdQuery.execute(showId, req.user.id), statusChange });
   }
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'P2002') res.status(409).json({ message: 'Show already exists' });

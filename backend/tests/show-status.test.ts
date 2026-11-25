@@ -1,6 +1,6 @@
 /** Automatic Watching <-> Completed rules (pure). */
 import assert from 'node:assert/strict';
-import { hasRegularTracking, verifiedPremiereAfterBaseline, verifiedPremieresAfterBaseline, decideStatus, effectiveStatus, verifiedUnwatchedPremiere, verifyCompletion, type StatusEpisode, type TVMazeEvidence } from '../src/services/show-status.model';
+import { hasRegularTracking, manualCompletionBaseline, verifiedPremiereAfterBaseline, verifiedPremieresAfterBaseline, decideStatus, effectiveStatus, verifiedUnwatchedPremiere, verifyCompletion, type StatusEpisode, type TVMazeEvidence } from '../src/services/show-status.model';
 import type { TVMazeEpisode } from '../src/services/tvmaze/tvmaze-schedule.model';
 
 const now = new Date('2026-12-01T12:00:00Z');
@@ -94,3 +94,23 @@ const rerun = { episodes: [{ ...s1[0], watched: false }], today, now, baseline: 
 assert.equal(verifiedPremiereAfterBaseline(rerun).reopen, false, 'later reruns cannot reopen baseline-protected completion');
 assert.equal(verifiedPremiereAfterBaseline({ episodes: [ep(1, 1, '2026-11-25', false)], today, now, baseline: new Date('2026-11-25T00:00:00Z'), tvmaze: { kind: 'not_listed' } }).reopen, false, 'date-only premiere within baseline day is uncertain');
 console.log('Legacy manual completion baseline tests passed');
+
+// --- Manual Completed (manualCompletedAt) -----------------------------------------------------------------------
+const chosen = new Date('2026-11-20T00:00:00Z');
+assert.equal(manualCompletionBaseline({ status: 'completed', completed: true, manualCompletedAt: chosen }), chosen, 'manual Completed carries its baseline');
+assert.equal(manualCompletionBaseline({ status: null, completed: true, manualCompletedAt: chosen }), chosen, 'legacy completed flag honoured');
+assert.equal(manualCompletionBaseline({ status: 'completed', completed: true, manualCompletedAt: null }), null, 'automatic or older Completed: no manual baseline');
+assert.equal(manualCompletionBaseline({ status: 'completed', completed: true }), null, 'field absent: existing rules apply');
+assert.equal(manualCompletionBaseline({ status: 'completed', completed: true, manualCompletedAt: new Date('invalid') }), null, 'invalid instant is ignored');
+for (const status of ['watching', 'dropped', 'paused', 'planned', null]) {
+  assert.equal(manualCompletionBaseline({ status, completed: false, manualCompletedAt: chosen }), null, `${status}: a stale timestamp never applies`);
+}
+// Episodes released before the manual choice never reopen it, however many remain unwatched.
+const manualGaps = { episodes: s2premiere.map(e => ({ ...e, watched: false })), tvmaze: tvS2, today, now };
+assert.equal(verifiedUnwatchedPremiere(manualGaps).reopen, true, 'without a manual baseline these gaps would reopen it');
+assert.equal(verifiedPremiereAfterBaseline({ ...manualGaps, baseline: now }).reopen, false, 'chosen now: earlier releases never reopen');
+// Strictly later: a premiere at exactly the chosen instant does not reopen; one millisecond earlier choice does.
+const s2at = new Date('2026-12-01T02:00:00Z');   // tvS2's verified S2E1 premiere
+assert.equal(verifiedPremiereAfterBaseline({ ...manualGaps, baseline: s2at }).reopen, false, 'release at the same instant is not later');
+assert.deepEqual(verifiedPremiereAfterBaseline({ ...manualGaps, baseline: new Date(s2at.getTime() - 1) }), { reopen: true, season: 2, number: 1 }, 'a verified release after the choice reopens it');
+console.log('Manual Completed baseline tests passed');

@@ -12,7 +12,7 @@ import { mapLimit } from './swr-cache';
 import { resolveShowIdentity, trackingState, type ShowRow } from './episode-guide.service';
 import { getSchedule } from './tvmaze/tvmaze.service';
 import { scheduleTimeZone } from './notifications/episode-alerts.model';
-import { hasRegularTracking, verifiedPremieresAfterBaseline, verifiedPremiereAfterBaseline, verifiedCoverage, verifiedUnwatchedPremiere, decideStatus, effectiveStatus, isManaged, verifyCompletion, type CompletionCheck, type ReopenCheck, type StatusTransition, type TVMazeEvidence } from './show-status.model';
+import { hasRegularTracking, manualCompletionBaseline, verifiedPremieresAfterBaseline, verifiedPremiereAfterBaseline, verifiedCoverage, verifiedUnwatchedPremiere, decideStatus, effectiveStatus, isManaged, verifyCompletion, type CompletionCheck, type ReopenCheck, type StatusTransition, type TVMazeEvidence } from './show-status.model';
 
 /** TVMaze evidence for a show, through the same verified identity and cached schedules as Upcoming and notifications. */
 export async function tvmazeEvidence(show: { name: string; overview: string | null; tmdbId: number | null; tvmazeId: number | null }, fresh = false): Promise<TVMazeEvidence> {
@@ -45,17 +45,23 @@ export async function evaluateShow(show: ShowRow, options: { now?: Date; fresh?:
   const known = new Set(state.episodes.map(e => `${e.season}:${e.number}`));
   const unmapped = [...state.watches, ...state.unwatches].some(e => e.season > 0 && e.episode > 0 && !known.has(`${e.season}:${e.episode}`));
   const evidenceIssue = unmapped ? 'Saved watch or unwatch identity does not fit TMDB episodes' : !state.progress.progressReliable ? 'Episode metadata incomplete or checkpoint needs review' : coverage.reason;
-  const legacyCompletion = show.statusAutomationProtected || status === 'completed' && !hasRegularTracking({ ...show, watches: state.watches, unwatches: state.unwatches });
+  // A Completed chosen by hand carries its own reliable baseline: it takes precedence over the legacy rules below,
+  // which keep applying unchanged to every record without one (automatic completions and older records).
+  const manualBaseline = manualCompletionBaseline(show);
+  const legacyCompletion = !manualBaseline && (show.statusAutomationProtected || status === 'completed' && !hasRegularTracking({ ...show, watches: state.watches, unwatches: state.unwatches }));
   const baseline = options.confirmedCompletionBaseline;
   const confirmationRequired = legacyCompletion && !baseline;
   const explanation = legacyCompletion
     ? baseline ? `Personal Completed preserved through your confirmed baseline ${baseline.toISOString()}. Actual viewing is unrecorded; only verified new premieres after that instant are candidates. This confirmation is for this preview only.`
       : 'Personal Completed is viewing evidence. No regular episode history or checkpoint was recorded; actual viewing is unknown. Confirm when you had finished all then-premiered regular episodes before any reopening can be proposed. Saved status timestamps are not a confirmed viewing baseline.'
+    : manualBaseline ? `You chose Completed on ${manualBaseline.toISOString()}. Episodes released before then never reopen it; only a verified release after that instant can.`
     : 'Effective episode tracking is available. Review this correction individually before activation.';
   const reopen: ReopenCheck = confirmationRequired ? { reopen: false, reason: explanation } : evidenceIssue ? { reopen: false, reason: evidenceIssue }
+    : manualBaseline ? verifiedPremiereAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline: manualBaseline })
     : legacyCompletion && baseline ? verifiedPremiereAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline })
     : verifiedUnwatchedPremiere({ episodes: state.episodes, tvmaze, today: state.today, now });
-  const relevantGaps = legacyCompletion
+  const relevantGaps = manualBaseline ? verifiedPremieresAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline: manualBaseline }).episodes
+    : legacyCompletion
     ? baseline ? verifiedPremieresAfterBaseline({ episodes: state.episodes, tvmaze, today: state.today, now, baseline }).episodes : []
     : coverage.released.filter(e => !e.watched);
   return { fresh: options.fresh === true, evaluatedAt: Date.now(), resolvedTvmazeId: tvmaze.kind === 'verified' ? tvmaze.tvmazeId ?? null : null, legacyCompletion, confirmationRequired, completionBaseline: legacyCompletion && baseline ? baseline.toISOString() : null, explanation, released: coverage.released.length, watched: legacyCompletion ? null : coverage.released.filter(e => e.watched).length, unwatched: relevantGaps.map(e => `S${e.season}E${e.number}`), evidenceIssue, watches: recordKeys(state.watches), unwatches: recordKeys(state.unwatches), status, completion, reopen, transition: evidenceIssue || confirmationRequired ? null : decideStatus({ status, completion, reopen }) };
@@ -69,7 +75,7 @@ export async function applyTransition(show: ShowRow, transition: StatusTransitio
     await tx.$queryRaw`SELECT id FROM "Show" WHERE id = ${show.id} AND "userId" = ${show.userId} FOR UPDATE`;
     const [watches, unwatches] = await Promise.all([tx.episodeWatch.findMany({ where: { showId: show.id } }), tx.episodeUnwatch.findMany({ where: { showId: show.id } })]);
     if (recordKeys(watches) !== evidence.watches || recordKeys(unwatches) !== evidence.unwatches) return false;
-    const result = await tx.show.updateMany({ where: { id: show.id, userId: show.userId, updatedAt: show.updatedAt, seasonsWatched: show.seasonsWatched, episodesWatched: show.episodesWatched, tmdbId: show.tmdbId, tvmazeId: show.tvmazeId, completedMonitorFrom: show.completedMonitorFrom, status: show.status, completed: show.completed }, data: { status: transition.to, completed: transition.to === 'completed', completedMonitorFrom: transition.to === 'completed' ? now : null } });
+    const result = await tx.show.updateMany({ where: { id: show.id, userId: show.userId, updatedAt: show.updatedAt, seasonsWatched: show.seasonsWatched, episodesWatched: show.episodesWatched, tmdbId: show.tmdbId, tvmazeId: show.tvmazeId, completedMonitorFrom: show.completedMonitorFrom, manualCompletedAt: show.manualCompletedAt, status: show.status, completed: show.completed }, data: { status: transition.to, completed: transition.to === 'completed', completedMonitorFrom: transition.to === 'completed' ? now : null, manualCompletedAt: null } });
     return result.count === 1;
   });
 }
@@ -160,7 +166,7 @@ export async function statusPreview(userId: string, now = new Date(), confirmedB
         prisma.episodeWatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true } }),
         prisma.episodeUnwatch.findMany({ where: { showId: show.id }, select: { season: true, episode: true } }),
       ]);
-      const legacyCompletion = show.statusAutomationProtected || status === 'completed' && !hasRegularTracking({ ...show, watches, unwatches });
+      const legacyCompletion = !manualCompletionBaseline(show) && (show.statusAutomationProtected || status === 'completed' && !hasRegularTracking({ ...show, watches, unwatches }));
       const explanation = legacyCompletion ? `Personal Completed preserved. Actual viewing is unrecorded, not zero. ${reason}. A completion baseline requires your confirmation before new premieres can be assessed.` : reason;
       return { ...base, legacyCompletion, confirmationRequired: legacyCompletion && !confirmedBaselines[show.id], completionBaseline: confirmedBaselines[show.id] ?? null, explanation, automatic: null, retroactive: null, completion: explanation, reopen: '-', ambiguous: true };
     };

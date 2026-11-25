@@ -137,8 +137,13 @@ class ShowServiceClass extends ApiService {
   }
 
   async updateShow(id: string, data: UpdateShowData): Promise<ShowType> {
-    const response = await this.put<ShowType>(`/show/${id}`, data);
-    return response.data;
+    return (await this.updateShowWithStatus(id, data)).show;
+  }
+
+  /** The saved show plus any automatic status change the server made right after this edit (null when none). */
+  async updateShowWithStatus(id: string, data: UpdateShowData): Promise<{ show: ShowType; statusChange: StatusChange | null }> {
+    const { statusChange = null, ...show } = (await this.put<ShowType & { statusChange?: StatusChange | null }>(`/show/${id}`, data)).data;
+    return { show, statusChange };
   }
 
   async deleteShow(id: string): Promise<void> {

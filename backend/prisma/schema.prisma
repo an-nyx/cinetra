@@ -43,6 +43,9 @@ model Show {
   episodeUnwatches EpisodeUnwatch[]
   statusAutomationProtected Boolean @default(false)
   completedMonitorFrom DateTime?
+  /// When the user last chose Completed by hand (null for automatic completions and older records). Only an episode
+  /// whose verified release is strictly later than this instant may reopen the show automatically.
+  manualCompletedAt DateTime?
   user            User     @relation(fields: [userId], references: [id])
   userId          String
   createdAt       DateTime @default(now())

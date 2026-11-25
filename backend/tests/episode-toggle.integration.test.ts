@@ -382,9 +382,12 @@ async function main() {
     assert.equal((await row(protectedShow.id)).completed, true);
   }
   assert.equal((await row(oldLegacy.id)).status, 'completed');
+  assert.equal((await row(historical.id)).manualCompletedAt, null, 'existing records carry no manual baseline');
+  // Changed on purpose (2026-11-25): a Completed chosen by hand persists despite earlier released gaps (section 7).
   const manualResponse = await call('PUT', `/show/${historical.id}`, { status: 'completed', completed: true });
-  assert.equal(manualResponse.json.status, 'watching', 'manual Completed uses the same verified gap rules');
-  await prisma.show.update({ where: { id: historical.id }, data: { status: 'completed', completed: true } });
+  assert.deepEqual([manualResponse.json.status, manualResponse.json.statusChange], ['completed', null], 'manual Completed is the user\'s choice');
+  // The rest of this section exercises the existing rules on a Completed record without a manual baseline.
+  await prisma.show.update({ where: { id: historical.id }, data: { status: 'completed', completed: true, manualCompletedAt: null } });
   const candidate = await row(historical.id);
   const evaluated = await evaluateShow(candidate, { fresh: true });
   assert.ok(evaluated?.transition);
@@ -425,6 +428,112 @@ async function main() {
   await runShowStatusMonitor();
   assert.equal((await row(legacyToProtect.id)).status, 'completed', 'full-library monitor honors durable legacy protection');
   console.log('✓ full-library behavior beyond the old six, including durable legacy protection after first tracking');
+
+
+  // ===== 7. Completed chosen by hand persists; only a verified release after that choice reopens it (2026-11-25) =====
+  const historyOf = async (id: string) => JSON.stringify(await Promise.all([prisma.episodeWatch.findMany({ where: { showId: id }, orderBy: { id: 'asc' } }), prisma.episodeUnwatch.findMany({ where: { showId: id }, orderBy: { id: 'asc' } })]));
+  const statusOf = (s: Awaited<ReturnType<typeof row>>) => [s.status, s.completed];
+  // 7a. A tracked show with released episodes left unwatched: 2 of 6 watched, season finished long ago.
+  const manualSeries = series('Manual Completed', 7700, { 1: episodes(6, -120) });
+  const manualDone = await addShow('Manual Completed', 5700, manualSeries);
+  assert.equal((await mark(manualDone.id, 1, 1, true)).status, 200);
+  assert.equal((await mark(manualDone.id, 1, 2, true)).status, 200);
+  const manualHistory = await historyOf(manualDone.id);
+  const manualBefore = untouched(await row(manualDone.id));
+  const chosenBefore = Date.now();
+  const chosen = await call('PUT', `/show/${manualDone.id}`, { status: 'completed', completed: true });
+  assert.equal(chosen.status, 200);
+  assert.deepEqual([chosen.json.status, chosen.json.completed, chosen.json.statusChange], ['completed', true, null], 'manual Completed persists with 4 released episodes unwatched');
+  let m = await row(manualDone.id);
+  assert.ok(m.manualCompletedAt instanceof Date && m.manualCompletedAt.getTime() >= chosenBefore && m.manualCompletedAt.getTime() <= Date.now(), 'the moment of the choice is stored');
+  assert.equal(m.completedMonitorFrom?.getTime(), m.manualCompletedAt!.getTime(), 'completion boundary maintained as before');
+  assert.equal(m.statusAutomationProtected, false, 'the durable legacy flag stays reserved for older records');
+  const chosenAt = m.manualCompletedAt!;
+  assert.deepEqual(untouched(m), manualBefore, 'saved position, favorite and metadata untouched');
+  assert.equal(await historyOf(manualDone.id), manualHistory, 'no watch or unwatch records created or removed');
+  // Background monitor, an explicit reconciliation and more tracking actions on earlier episodes: still Completed.
+  report = await runShowStatusMonitor(new Date());
+  assert.deepEqual(statusOf(await row(manualDone.id)), ['completed', true], 'monitor never reopens it for earlier releases');
+  assert.equal(await reconcileAfterAction(manualDone.id, user.id), null);
+  assert.equal((await mark(manualDone.id, 1, 2, false)).json.statusChange, null, 'unwatching an earlier episode does not reopen it');
+  assert.equal((await mark(manualDone.id, 1, 3, true)).json.statusChange, null);
+  assert.deepEqual(statusOf(await row(manualDone.id)), ['completed', true]);
+  assert.equal((await row(manualDone.id)).manualCompletedAt?.getTime(), chosenAt.getTime(), 'tracking actions keep the stored choice');
+  // Persistence after a refresh: every read the pages use (Home, Shows, Upcoming, dialog) reports Completed.
+  assert.deepEqual([(await call('GET', `/show/${manualDone.id}`)).json.status, (await summary(manualDone.id)).status], ['completed', 'completed']);
+  assert.equal((await call('GET', '/show')).json.find((s: { id: string }) => s.id === manualDone.id).status, 'completed');
+  assert.equal((await call('GET', '/show/tracking')).json.find((s: { showId: string }) => s.showId === manualDone.id)?.status, 'completed');
+  // Re-pressing Completed or editing other fields keeps the original instant.
+  await call('PUT', `/show/${manualDone.id}`, { status: 'completed', completed: true });
+  await call('PUT', `/show/${manualDone.id}`, { favorite: false });
+  assert.equal((await row(manualDone.id)).manualCompletedAt?.getTime(), chosenAt.getTime(), 're-pressing Completed keeps the first instant');
+  const preview7 = (await statusPreview(user.id)).find(r => r.showId === manualDone.id)!;
+  assert.deepEqual([preview7.automatic, preview7.retroactive, preview7.legacyCompletion], [null, null, false], 'preview proposes nothing for a manual choice');
+
+  // 7b. S2E1 released (verified, 3 hours ago) BEFORE the choice (made 1 hour ago): never overrides it.
+  manualSeries.pages[2] = [{ episode_number: 1, name: 'S2E1', air_date: hoursAgo(3).toISOString().slice(0, 10), runtime: null }, ...episodes(5, 7, 7, 2)];
+  manualSeries.seasons.push({ season_number: 2, episode_count: 6, air_date: manualSeries.pages[2][0].air_date });
+  manualSeries.next = { season_number: 2, episode_number: 2, air_date: day(7) };
+  tvmaze.get(15700)!.episodes = [...tvFromTmdb({ ...manualSeries, pages: { 1: manualSeries.pages[1] } }), tvEp(2, 1, hoursAgo(3)), ...manualSeries.pages[2].slice(1).map(e => tvEp(2, e.episode_number, new Date(`${e.air_date}T02:00:00Z`)))];
+  providerChanged(5700);
+  await prisma.show.update({ where: { id: manualDone.id }, data: { manualCompletedAt: hoursAgo(1), completedMonitorFrom: hoursAgo(1) } });   // time passing
+  report = await runShowStatusMonitor(new Date());
+  assert.deepEqual(statusOf(await row(manualDone.id)), ['completed', true], 'an episode released before the choice never reopens it');
+  assert.equal((await mark(manualDone.id, 1, 4, true)).json.statusChange, null);
+  assert.equal((await row(manualDone.id)).status, 'completed');
+
+  // 7c. The same S2E1 is genuinely new when the choice was made 5 days ago: verified release after it -> Watching.
+  await prisma.show.update({ where: { id: manualDone.id }, data: { manualCompletedAt: new Date(Date.now() - 5 * DAY), completedMonitorFrom: new Date(Date.now() - 5 * DAY) } });
+  const beforeReopen = untouched(await row(manualDone.id));
+  const historyBeforeReopen = await historyOf(manualDone.id);
+  report = await runShowStatusMonitor(new Date());
+  m = await row(manualDone.id);
+  assert.deepEqual([m.status, m.completed, m.completedMonitorFrom, m.manualCompletedAt], ['watching', false, null, null], 'a verified release after the choice reopens it');
+  assert.deepEqual(untouched(m), beforeReopen);
+  assert.equal(await historyOf(manualDone.id), historyBeforeReopen, 'reopening writes status fields only');
+  // Back on Watching, ordinary rules apply again: choosing Completed by hand records a new instant.
+  await call('PUT', `/show/${manualDone.id}`, { status: 'completed', completed: true });
+  assert.ok(((await row(manualDone.id)).manualCompletedAt?.getTime() ?? 0) > chosenAt.getTime());
+  assert.equal((await row(manualDone.id)).status, 'completed', 'S2E1 now predates the new choice');
+
+  // 7d. A Completed chosen by hand on a show with no tracking at all: same rule, no permanent legacy flag.
+  const untrackedSeries = series('Manual Untracked', 7701, { 1: episodes(3, -200) });
+  const untracked = await addShow('Manual Untracked', 5701, untrackedSeries);
+  assert.equal((await call('PUT', `/show/${untracked.id}`, { status: 'completed', completed: true })).json.status, 'completed');
+  m = await row(untracked.id);
+  assert.deepEqual([m.statusAutomationProtected, m.manualCompletedAt instanceof Date], [false, true]);
+  assert.equal((await mark(untracked.id, 1, 1, true)).json.statusChange, null, 'first tracking action keeps the choice');
+  assert.equal((await row(untracked.id)).statusAutomationProtected, false);
+  await runShowStatusMonitor(new Date());
+  assert.equal((await row(untracked.id)).status, 'completed');
+
+  // 7e. Dropped stays Dropped: fully watched finished show, every trigger; and Completed -> Dropped clears the choice.
+  const droppedSeries = series('Manual Dropped', 7702, { 1: episodes(3, -90) });
+  const droppedShow = await addShow('Manual Dropped', 5702, droppedSeries);
+  assert.equal((await call('PUT', `/show/${droppedShow.id}`, { status: 'completed', completed: true })).json.status, 'completed');
+  const droppedResponse = await call('PUT', `/show/${droppedShow.id}`, { status: 'dropped', completed: false });
+  assert.deepEqual([droppedResponse.json.status, droppedResponse.json.statusChange], ['dropped', null]);
+  m = await row(droppedShow.id);
+  assert.deepEqual([m.status, m.completed, m.manualCompletedAt, m.completedMonitorFrom], ['dropped', false, null, null]);
+  await markSeason(droppedShow.id, 1);
+  assert.equal((await mark(droppedShow.id, 1, 3, false)).json.statusChange, null);
+  assert.equal((await mark(droppedShow.id, 1, 3, true)).json.statusChange, null);
+  await runShowStatusMonitor(new Date());
+  assert.equal((await row(droppedShow.id)).status, 'dropped', 'Dropped is never changed automatically');
+  assert.equal((await statusPreview(user.id)).find(r => r.showId === droppedShow.id)!.retroactive, null);
+
+  // 7f. Unchanged automatic behaviour: Watching on a finished, fully watched show completes it automatically (no
+  // manual baseline), the PUT reports why, and unwatching then reopens that automatic completion as before.
+  const autoSeries = series('Automatic', 7703, { 1: episodes(3, -90) });
+  const autoShow = await addShow('Automatic', 5703, autoSeries, { status: 'dropped' });
+  await markSeason(autoShow.id, 1);
+  const toWatching = await call('PUT', `/show/${autoShow.id}`, { status: 'watching', completed: false });
+  assert.deepEqual([toWatching.json.status, toWatching.json.statusChange?.from, toWatching.json.statusChange?.to], ['completed', 'watching', 'completed'], 'automatic completion reported to the dialog');
+  m = await row(autoShow.id);
+  assert.deepEqual([m.status, m.manualCompletedAt, m.completedMonitorFrom instanceof Date], ['completed', null, true], 'automatic completions carry no manual baseline');
+  assert.equal((await mark(autoShow.id, 1, 2, false)).json.statusChange?.to, 'watching', 'tracked gap still reopens an automatic completion');
+  assert.equal((await mark(autoShow.id, 1, 2, true)).json.statusChange?.to, 'completed');
+  console.log('✓ manual Completed persists through gaps, earlier releases and refreshes; only later verified releases reopen it; Dropped and automatic rules unchanged');
 
   server.close();
   await prisma.$executeRawUnsafe('TRUNCATE "EpisodeUnwatch", "EpisodeWatch", "Show", "User" CASCADE');

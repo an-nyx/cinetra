@@ -3,8 +3,9 @@
  *
  * "Completed" means every released regular episode is watched and the latest released season has verifiably finished
  * airing. It does not require the series to have ended: an announced future season that has not started does not
- * reopen the show. Tracked gaps can move it back to Watching. A personal Completed assertion without regular tracking is protected;
- * only verified premieres after a user-confirmed baseline can reopen it.
+ * reopen the show. Tracked gaps can move an automatic completion back to Watching. A personal Completed assertion without regular tracking is protected;
+ * only verified premieres after a user-confirmed baseline can reopen it. A Completed chosen by hand (manualCompletedAt)
+ * is never reopened by episodes released before that choice; only a verified release strictly after it can reopen it.
  *
  * Only the two managed statuses ever change: Dropped, Paused, Planned and "no status" are never touched. Anything
  * uncertain (incomplete or contradictory provider data) yields "no change".
@@ -19,6 +20,15 @@ export type ManagedStatus = 'watching' | 'completed';
 /** The effective personal status, honoring the legacy `completed` flag for shows saved without a status. */
 export const effectiveStatus = (show: { status: string | null; completed: boolean }) => show.status || (show.completed ? 'completed' : null);
 export const isManaged = (status: string | null): status is ManagedStatus => status === 'watching' || status === 'completed';
+/**
+ * The instant the user chose Completed by hand, while the show is still Completed; null otherwise (automatic
+ * completions and records saved before this was stored). A manual Completed is the user's own statement: released
+ * episodes left unwatched never override it, and only a verified release strictly after this instant can reopen it.
+ */
+export function manualCompletionBaseline(show: { status: string | null; completed: boolean; manualCompletedAt?: Date | null }): Date | null {
+  const at = show.manualCompletedAt;
+  return effectiveStatus(show) === 'completed' && at instanceof Date && Number.isFinite(at.getTime()) ? at : null;
+}
 
 /** `releaseAt` is Cinetra's effective release instant (release-rule.model); when present, it must also have passed. */
 export type StatusEpisode = { season: number; number: number; airDate: string | null; watched: boolean; releaseAt?: string | null };

@@ -182,8 +182,10 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
     if (!selectedShow) return;
     setStatusNotice(null);
     await act(async () => {
-      const updated = await ShowService.updateShow(selectedShow, { status, completed: status === 'completed' });
+      const { show: updated, statusChange } = await ShowService.updateShowWithStatus(selectedShow, { status, completed: status === 'completed' });
       setShows(current => current.map(item => item.id === updated.id ? updated : item));
+      // Returned so the dialog explains an automatic change next to the status (e.g. Watching on a finished show).
+      return statusChange;
     });
   };
   const deleteShow = async () => {

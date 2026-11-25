@@ -29,7 +29,9 @@ const upcomingCache = new SWRCache<UpcomingResponse>({ freshMs: 5 * 60_000, stal
 
 /** Preserve a manual completion assertion before the first tracking record can erase its provenance. */
 export async function protectUnrecordedCompletion(tx: Pick<typeof prisma, 'show' | 'episodeWatch' | 'episodeUnwatch'>, show: ShowRow) {
-  if (show.statusAutomationProtected || (show.status || (show.completed ? 'completed' : null)) !== 'completed' || show.seasonsWatched !== 0 || show.episodesWatched !== 0) return;
+  // A Completed chosen by hand already records its own reliable baseline (manualCompletedAt), which protects it more
+  // precisely; this durable legacy flag stays reserved for completions saved without one.
+  if (show.statusAutomationProtected || show.manualCompletedAt || (show.status || (show.completed ? 'completed' : null)) !== 'completed' || show.seasonsWatched !== 0 || show.episodesWatched !== 0) return;
   const [watches, unwatches] = await Promise.all([tx.episodeWatch.count({ where: { showId: show.id, season: { gt: 0 }, episode: { gt: 0 } } }), tx.episodeUnwatch.count({ where: { showId: show.id, season: { gt: 0 }, episode: { gt: 0 } } })]);
   if (!watches && !unwatches) await tx.show.update({ where: { id: show.id }, data: { statusAutomationProtected: true } });
 }
