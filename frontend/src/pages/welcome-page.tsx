@@ -13,6 +13,7 @@ import type { ShowType } from "@/types";
 import { posterSrc } from "@/lib/poster";
 import { createHomeTracking } from "@/lib/home-tracking";
 import { onConfirmedSummary } from "@/lib/tracking-sync";
+import { celebrateNextEpisodeSave, celebrationAnchor } from "@/lib/celebration";
 import { episodeCode, homeDashboard } from "@/lib/tracking";
 import { groupReleaseEvents, timeLabel } from "@/lib/upcoming-calendar";
 import { useMovieDiscovery } from "@/hooks/use-movie-discovery";
@@ -80,8 +81,14 @@ export default function WelcomePage() {
   // Same rule as Upcoming: one countdown, for the next verified release within 24 hours (display only).
   const countdown = useMemo(() => nextCountdown(allReleases, now), [allReleases, now]);
   const open = (showId: string, fixMatch = false) => { setEditMatch(fixMatch); setSelectedShow(showId); };
-  const markNext = async (item: TrackingSummary) => {
-    try { await controller.mark(item); }
+  const markNext = async (item: TrackingSummary, control?: Element | null) => {
+    const episode = item.nextEpisode;
+    const anchor = celebrationAnchor(control);
+    try {
+      const saved = await controller.mark(item);
+      // Only a save this tap made and that is now shown; skipped, superseded and failed saves resolve without one.
+      if (saved && episode) celebrateNextEpisodeSave(item, episode, saved, anchor);
+    }
     catch (error) { setError(error instanceof Error && error.message.startsWith("Episode saved.") ? error.message : "Could not save episode. Please try again."); }
   };
   const featured = dash.featured;
@@ -115,7 +122,7 @@ export default function WelcomePage() {
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{featured.progressPercent !== null ? `${featured.progressPercent}% · ` : ""}{featured.countDataAvailable ? unwatchedCount(language, featured.remainingCount) : phrase(language, "Count unavailable")}</span>
             </div>
             <div className="mt-2 flex justify-end">
-              <Button size="sm" className="h-9 max-w-full gap-1 rounded-full px-3 text-xs" disabled={!!busy} onClick={() => markNext(featured)} aria-label={`Mark ${nextCode(featured)} of ${featured.name} watched`}><Check className="size-3.5" />{busy === featured.showId ? "Updating…" : <T>Mark next watched</T>}</Button>
+              <Button size="sm" className="h-9 max-w-full gap-1 rounded-full px-3 text-xs" disabled={!!busy} onClick={event => markNext(featured, event.currentTarget)} aria-label={`Mark ${nextCode(featured)} of ${featured.name} watched`}><Check className="size-3.5" />{busy === featured.showId ? "Updating…" : <T>Mark next watched</T>}</Button>
             </div>
           </div>
         </div> : <p className="mt-1 text-sm text-muted-foreground">{phrase(language, shows.length ? "You're caught up — no released episode is waiting." : "Add a show to start tracking.")} <Link to="/shows" className="text-primary"><T>Go to Shows</T></Link></p>}
@@ -142,7 +149,7 @@ export default function WelcomePage() {
             </button>
             {/* Poster-sized overlay so the action sits on the poster's corner without covering the title. */}
             <span className="pointer-events-none absolute inset-x-0 top-0 aspect-[2/3]">
-              <button type="button" disabled={!!busy} onClick={() => markNext(item)} aria-label={`Mark ${nextCode(item)} of ${item.name} watched`} className="touch-target pointer-events-auto absolute bottom-1.5 right-1.5 flex size-8 items-center justify-center rounded-full border border-primary/40 bg-background/85 text-primary shadow-lg backdrop-blur disabled:opacity-50">
+              <button type="button" disabled={!!busy} onClick={event => markNext(item, event.currentTarget)} aria-label={`Mark ${nextCode(item)} of ${item.name} watched`} className="touch-target pointer-events-auto absolute bottom-1.5 right-1.5 flex size-8 items-center justify-center rounded-full border border-primary/40 bg-background/85 text-primary shadow-lg backdrop-blur disabled:opacity-50">
                 <Check className={`size-4 ${busy === item.showId ? "animate-pulse" : ""}`} />
               </button>
             </span>

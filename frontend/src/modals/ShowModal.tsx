@@ -19,6 +19,7 @@ import ProgressPoster from "@/components/progress-poster";
 import { createWatchMutation } from "@/lib/optimistic-watch.mjs";
 import { optimisticSummary, publishConfirmedSummary, trackingTick } from "@/lib/tracking-sync";
 import { isEpisodeReleased } from "@/lib/release";
+import { celebrateWatch, celebrationAnchor } from "@/lib/celebration";
 
 interface Props {
   selectedShow: string | null;
@@ -32,6 +33,8 @@ interface Props {
 const code = (episode: TrackedEpisode) => `S${String(episode.season).padStart(2, '0')}E${String(episode.number).padStart(2, '0')}`;
 /** The current instant; release eligibility follows the server's `releaseAt` (lib/release.ts). */
 const today = () => new Date().toISOString();
+/** Whether the loaded guide already showed that whole season watched (then completing it again is not a milestone). */
+const previousSeasonComplete = (guide: EpisodeGuide, season: number) => guide.season === season && guide.episodes.length > 0 && guide.episodes.every(e => e.watched);
 
 export default function ShowModal({ selectedShow, closeModal, shows, setShows, initialEditMatch = false }: Props) {
   const { language } = useLanguage();
@@ -55,9 +58,15 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
   currentShow.current = selectedShow;
   const watchVersion = useRef(0);
   const [nextPending, setNextPending] = useState(false);
-  const toggleEpisode = async (episodeSeason: number, number: number, watched: boolean) => {
+  const toggleEpisode = async (episodeSeason: number, number: number, watched: boolean, control?: Element | null) => {
     if (!selectedShow || busy || !guide) return;
     const id = selectedShow;
+    const anchor = watched ? celebrationAnchor(control) : null;
+    // Presentation only: a confirmed "watched" save celebrates the highest milestone it reached (never unwatching).
+    const seasonCompleteBefore = previousSeasonComplete(guide, episodeSeason);
+    const celebrate = (after: TrackingSummary, guideAfter: EpisodeGuide | null) => {
+      if (watched) celebrateWatch({ before: summary, after, season: episodeSeason, episode: number, guideAfter, seasonCompleteBefore, showId: id, showName: after.name || show?.name || "", anchor });
+    };
     const previous = guide;
     const previousSummary = summary;
     const statusBefore = show ? `${show.status ?? ''}:${show.completed}` : null;
@@ -103,6 +112,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
           setSummary(confirmed.summary); setNextPending(false);
           if (confirmed.guide?.season === previous.season) setGuide(confirmed.guide);
           publishConfirmedSummary({ summary: confirmed.summary, started, confirmed: trackingTick() });
+          celebrate(confirmed.summary, confirmed.guide);
         } else {
           // Older server or re-linked show: read the committed state once. A failed read never undoes the save.
           const read = trackingTick();
@@ -110,6 +120,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
             if (!isCurrent()) return;
             setSummary(data); setGuide(loaded); setNextPending(false);
             publishConfirmedSummary({ summary: data, started: read, confirmed: read });
+            celebrate(data, loaded);
           }).catch(() => { if (isCurrent()) { setNextPending(false); setError('Episode saved. Reopen this show to refresh its progress.'); } });
         }
         void followStatus().catch(() => {});
@@ -125,6 +136,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
     setGuide(loaded);
     if (loaded) setSeason(loaded.season);
     window.dispatchEvent(new Event('tracking-updated'));
+    return { summary: data, guide: loaded };
   };
 
   useEffect(() => {
@@ -156,7 +168,8 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
     if (needsReview) { setEditing(true); window.setTimeout(() => document.getElementById('saved-position')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }
   };
 
-  const act = async (action: () => Promise<unknown>, selectedSeason = season) => {
+  /** `saved` runs only after the action and the refresh it already makes both succeeded (used for celebrations). */
+  const act = async (action: () => Promise<unknown>, selectedSeason = season, saved?: (refreshed: { summary: TrackingSummary; guide: EpisodeGuide | null }) => void) => {
     if (!selectedShow || busy) return;
     setBusy(true); setError("");
     try {
@@ -165,11 +178,21 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
       const change = result && typeof result === 'object' && 'to' in result ? result as StatusChange : null;
       setStatusNotice(change);
       // Marking the next episode can advance the saved checkpoint server-side; show the stored position at once.
-      const [, updated] = await Promise.all([refresh(selectedShow, selectedSeason), ShowService.getShowById(selectedShow).catch(() => null)]);
+      const [refreshed, updated] = await Promise.all([refresh(selectedShow, selectedSeason), ShowService.getShowById(selectedShow).catch(() => null)]);
       if (updated) setShows(current => current.map(item => item.id === updated.id ? updated : item));
+      saved?.(refreshed);
     }
     catch { setError('Could not save progress. Please try again.'); }
     finally { setBusy(false); }
+  };
+  // "Mark released season episodes watched": celebrates from the progress shown before and the refresh it already makes.
+  const markSeason = (control: Element) => {
+    if (!summary || !guide) return;
+    const before = summary, id = summary.showId, target = season, anchor = celebrationAnchor(control);
+    const seasonCompleteBefore = previousSeasonComplete(guide, target);
+    void act(() => ShowService.markSeasonWatched(id, target), target, refreshed => {
+      if (currentShow.current === id) celebrateWatch({ before, after: refreshed.summary, season: target, episode: null, guideAfter: refreshed.guide, seasonCompleteBefore, showId: id, showName: refreshed.summary.name || show?.name || "", anchor });
+    });
   };
   const selectSeason = async (value: number) => {
     if (!selectedShow) return;
@@ -248,7 +271,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
             <div className="grid gap-3 sm:grid-cols-2">
               <section className="cinema-surface border-primary/30 bg-primary/5 p-5">
                 <p className="cinema-eyebrow mb-2"><T>Watch next</T></p>
-                {summary.nextEpisode ? <><h3 className="font-semibold">{code(summary.nextEpisode)} · {summary.nextEpisode.name}</h3><p className="mt-1 text-xs text-muted-foreground">{nextEpisodeMessage(language, summary.nextEpisode.airDate, summary.remainingCount)}</p><Button className="mt-4 w-full gap-2" disabled={busy} onClick={() => toggleEpisode(summary.nextEpisode!.season, summary.nextEpisode!.number, true)}><Play className="size-4" /><T>Mark next episode watched</T></Button></> : nextPending ? <p role="status" className="text-sm text-muted-foreground"><T>Updating next episode…</T></p> : <p className="text-sm text-muted-foreground">{summary.viewingState === "fully_watched" ? phrase(language, "Final regular episode watched. The series is confirmed ended.") : summary.viewingState === "caught_up" ? phrase(language, "Caught up with currently released episodes; future episodes may follow.") : summary.guideAvailable ? phrase(language, "No released episode to track.") : phrase(language, "Episode guide unavailable. Your watched episodes are kept.")}</p>}
+                {summary.nextEpisode ? <><h3 className="font-semibold">{code(summary.nextEpisode)} · {summary.nextEpisode.name}</h3><p className="mt-1 text-xs text-muted-foreground">{nextEpisodeMessage(language, summary.nextEpisode.airDate, summary.remainingCount)}</p><Button className="mt-4 w-full gap-2" disabled={busy} onClick={event => toggleEpisode(summary.nextEpisode!.season, summary.nextEpisode!.number, true, event.currentTarget)}><Play className="size-4" /><T>Mark next episode watched</T></Button></> : nextPending ? <p role="status" className="text-sm text-muted-foreground"><T>Updating next episode…</T></p> : <p className="text-sm text-muted-foreground">{summary.viewingState === "fully_watched" ? phrase(language, "Final regular episode watched. The series is confirmed ended.") : summary.viewingState === "caught_up" ? phrase(language, "Caught up with currently released episodes; future episodes may follow.") : summary.guideAvailable ? phrase(language, "No released episode to track.") : phrase(language, "Episode guide unavailable. Your watched episodes are kept.")}</p>}
               </section>
               <section className="cinema-surface p-5"><p className="cinema-eyebrow mb-2"><T>Last watched</T></p>
                 <p className="font-semibold">{summary.lastEpisode ? `${code(summary.lastEpisode)} · ${summary.lastEpisode.name}` : summary.legacyPosition ? phrase(language, 'Earlier progress, no watch dates') : phrase(language, 'No episodes logged yet')}</p>
@@ -259,14 +282,14 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
             {guide && <section id="episodes" className="space-y-3">
               <div><p className="cinema-eyebrow"><T>Episode guide</T></p><h3 className="mt-1 text-xl font-semibold"><T>Seasons & episodes</T></h3></div>
               <SeasonTabs seasons={guide.seasons} season={season} busy={busy} onSelect={selectSeason} />
-              <Button variant="outline" size="sm" disabled={busy || !guide.episodes.some(e => isEpisodeReleased(e, today()) && !e.watched)} onClick={() => act(() => ShowService.markSeasonWatched(summary.showId, season))}><T>Mark released season episodes watched</T></Button>
+              <Button variant="outline" size="sm" disabled={busy || !guide.episodes.some(e => isEpisodeReleased(e, today()) && !e.watched)} onClick={event => markSeason(event.currentTarget)}><T>Mark released season episodes watched</T></Button>
               <div className="space-y-1">{guide.episodes.map(e => {
                 const aired = isEpisodeReleased(e, today());
                 const codeLabel = code({ ...e, season });
                 // Every watched episode can be unmarked, including ones covered by earlier saved progress; the server
                 // records the change without rewriting that progress.
-                return <button key={e.number} type="button" aria-label={`${phrase(language, e.watched ? 'Mark not watched' : 'Mark watched')} ${codeLabel} ${e.name}`} aria-pressed={e.watched} disabled={busy || (!aired && !e.watched)} onClick={() => toggleEpisode(season, e.number, !e.watched)} className="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card/50 px-3 py-3 text-left transition-[background-color,border-color] hover:border-primary/50 hover:bg-primary/5 disabled:cursor-default disabled:opacity-65">
-                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${e.watched ? 'border-primary bg-primary text-primary-foreground' : ''}`}>{e.watched && <Check className="size-4" />}</span>
+                return <button key={e.number} type="button" aria-label={`${phrase(language, e.watched ? 'Mark not watched' : 'Mark watched')} ${codeLabel} ${e.name}`} aria-pressed={e.watched} disabled={busy || (!aired && !e.watched)} onClick={event => toggleEpisode(season, e.number, !e.watched, event.currentTarget.querySelector("[data-celebration-anchor]"))} className="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card/50 px-3 py-3 text-left transition-[background-color,border-color] hover:border-primary/50 hover:bg-primary/5 disabled:cursor-default disabled:opacity-65">
+                  <span data-celebration-anchor className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${e.watched ? 'border-primary bg-primary text-primary-foreground' : ''}`}>{e.watched && <Check className="size-4" />}</span>
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{codeLabel} · {e.name}</span><span className="text-xs text-muted-foreground">{e.airDate || phrase(language, 'Air date TBA')}{!aired && e.airDate && e.releaseAt ? ` · ${phrase(language, 'Available to track from')} ${dateTimeLabel(e.releaseAt, localeFor(language))}${e.releaseSource === 'manual_override' ? ` (${phrase(language, 'documented release time')})` : ''}` : ''}{e.watchSource === 'legacy' ? ` · ${phrase(language, 'From earlier progress')}` : ''}</span></span>
                   {!aired && <CalendarDays className="size-4 shrink-0 text-muted-foreground" />}
                 </button>;

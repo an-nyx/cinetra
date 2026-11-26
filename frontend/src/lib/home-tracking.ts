@@ -43,7 +43,8 @@ export function createHomeTracking({
     load,
     apply,
     invalidate() { ++version; },
-    async mark(item: TrackingSummary) {
+    /** Resolves with the save's answer once it is shown; undefined when nothing was saved or the result was superseded. */
+    async mark(item: TrackingSummary): Promise<unknown> {
       if (writing || awaitingRefresh || !item.nextEpisode) return;
       const mutation = ++version;
       const started = trackingTick();
@@ -60,12 +61,13 @@ export function createHomeTracking({
       if (summary && summary.showId === item.showId) {
         apply({ summary, started, confirmed: trackingTick() });
         pending(null);
-        return;
+        return result;
       }
       awaitingRefresh = true;
       // A refresh failure must not undo the save or enable marking the stale episode again.
       try { await load(); }
       catch { throw new Error("Episode saved. Refresh the dashboard to load the next episode."); }
+      return result;
     },
   };
 }

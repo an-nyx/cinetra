@@ -21,7 +21,7 @@ interface ShowProps {
   setShows: React.Dispatch<React.SetStateAction<ShowType[]>>;
   type: "show" | "movie";
   tracking?: TrackingSummary;
-  onMarkNext?: (item: TrackingSummary) => void;
+  onMarkNext?: (item: TrackingSummary, control?: Element | null) => void;
 }
 
 export default function Show({
@@ -75,7 +75,7 @@ export default function Show({
             : <span className="truncate">{progressMessage(language, tracking)?.label || phrase(language, "Progress unverified")}</span>}
         </>}</p>
         <p className="truncate text-xs leading-4 text-muted-foreground">{tracking && !tracking.error && nextEpisodeCode(tracking) ? `${phrase(language, "Next")} ${nextEpisodeCode(tracking)}` : null}</p>
-        <div className="flex min-w-0 items-center">{tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="min-h-5 max-w-full truncate text-left text-xs font-semibold leading-4 text-primary hover:underline" onClick={() => onMarkNext(tracking)}><T>Mark next watched</T> <span aria-hidden="true">→</span></button>}</div>
+        <div className="flex min-w-0 items-center">{tracking?.nextEpisode && !tracking.error && onMarkNext && <button type="button" className="min-h-5 max-w-full truncate text-left text-xs font-semibold leading-4 text-primary hover:underline" onClick={event => onMarkNext(tracking, event.currentTarget)}><T>Mark next watched</T> <span aria-hidden="true">→</span></button>}</div>
       </div>
       <button type="button" className="absolute right-1.5 top-1.5 flex size-10 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-primary" aria-label={favoriteTitle(language, name, favorite)} aria-pressed={favorite} onClick={() => toggleFavorite(id, favorite)}><Heart className={`size-5 ${favorite ? "fill-rose-400 text-rose-400" : ""}`} /></button>
     </article>

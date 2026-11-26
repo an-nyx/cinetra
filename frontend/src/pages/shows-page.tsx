@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { ShowService } from "@/services";
 import type { TrackingSummary } from "@/services/show.service";
 import { createConfirmedSummaries, onConfirmedSummary, trackingTick } from "@/lib/tracking-sync";
+import { celebrateNextEpisodeSave, celebrationAnchor } from "@/lib/celebration";
 
 import ShowModal from "../modals/ShowModal.tsx";
 import AddShowModal from "../modals/AddShowModal.tsx";
@@ -90,9 +91,11 @@ export default function ShowsPage() {
   }, [shows.length]);
 
   const nextPending = useRef(false);
-  const markNext = async (item: TrackingSummary) => {
+  const markNext = async (item: TrackingSummary, control?: Element | null) => {
     if (!item.nextEpisode || nextPending.current) return;
     nextPending.current = true;
+    const episode = item.nextEpisode;
+    const anchor = celebrationAnchor(control);
     const started = trackingTick();
     const previous = tracking;
     setTracking(items => items.map(row => row.showId === item.showId ? { ...row, nextEpisode: null } : row));
@@ -104,6 +107,8 @@ export default function ShowsPage() {
       nextPending.current = false;
       return;
     }
+    // The save succeeded: celebrate once, from the row the user acted on and the confirmed answer.
+    celebrateNextEpisodeSave(item, episode, saved, anchor);
     if (saved.summary) {
       const update = { summary: saved.summary, started, confirmed: trackingTick() };
       if (confirmed.current.accept(update)) setTracking(rows => confirmed.current.merge(rows));

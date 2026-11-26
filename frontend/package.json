@@ -16,7 +16,8 @@
     "test:sonarr": "node --test tests/sonarr.test.mjs",
     "test:radarr": "node --test tests/radarr.test.mjs",
     "test:stats": "node --test tests/cinema-stats.test.mjs",
-    "test:appearance": "node --test tests/progress-poster-preference.test.mjs"
+    "test:appearance": "node --test tests/progress-poster-preference.test.mjs tests/celebration-preference.test.mjs",
+    "test:celebrations": "node --test tests/celebration.test.mjs tests/celebration-preference.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

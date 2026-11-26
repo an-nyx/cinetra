@@ -20,6 +20,7 @@ import { ThemeProvider } from "./components/theme-provider.tsx";
 import HomePage from "./pages/home-page.tsx";
 import StatsPage from "./pages/stats-page.tsx";
 import { LanguageProvider, T } from "./i18n";
+import CelebrationLayer from "./components/celebration-layer.tsx";
 
 const router = createBrowserRouter([
   {
@@ -81,6 +82,7 @@ const App: FC = () => {
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>
+      <CelebrationLayer />
     </ThemeProvider></LanguageProvider>
   );
 };
