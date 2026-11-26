@@ -15,7 +15,8 @@
     "test:episode-toggle": "node --test tests/optimistic-watch.test.mjs tests/release.test.mjs",
     "test:sonarr": "node --test tests/sonarr.test.mjs",
     "test:radarr": "node --test tests/radarr.test.mjs",
-    "test:stats": "node --test tests/cinema-stats.test.mjs"
+    "test:stats": "node --test tests/cinema-stats.test.mjs",
+    "test:appearance": "node --test tests/progress-poster-preference.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

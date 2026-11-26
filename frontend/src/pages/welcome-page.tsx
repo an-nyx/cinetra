@@ -104,7 +104,7 @@ export default function WelcomePage() {
         </div>
         {featured ? <div className="mt-1 flex gap-3">
           <button type="button" onClick={() => open(featured.showId)} aria-label={`Open ${featured.name}`} className="shrink-0">{featured.posterURL
-            ? <ProgressPoster src={posterSrc(featured.posterURL, "w185")!} percent={featured.progressPercent} className="dash-poster cinema-poster h-[108px] w-[72px]" />
+            ? <ProgressPoster src={posterSrc(featured.posterURL, "w185")!} percent={featured.progressPercent} className="dash-poster cinema-poster h-[108px] w-[72px]" original={<Poster url={featured.posterURL} size="w185" className="h-[108px] w-[72px] cinema-poster" />} />
             : <Poster url={featured.posterURL} size="w185" className="h-[108px] w-[72px] cinema-poster" />}</button>
           <div className="min-w-0 flex-1">
             <button type="button" onClick={() => open(featured.showId)} className="block max-w-full text-left"><span className="line-clamp-2 break-words text-base font-semibold leading-snug hover:text-primary">{featured.name}</span></button>

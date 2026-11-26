@@ -6,6 +6,21 @@
 import assert from 'node:assert/strict';
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
+// Deterministic clock: the fixture premieres on AIR, two days after this test's "now". Without pinning, the premiere
+// eventually falls outside TVMaze's 3-day past-episode window (which keeps only number and date) and the exact time is
+// legitimately dropped. Time still advances in real time from this instant, so waits and cache freshness behave
+// normally. Installed before any service module is imported.
+const RealDate = Date;
+const CLOCK_OFFSET = RealDate.parse('2026-11-20T12:00:00.000Z') - RealDate.now();
+class PinnedDate extends RealDate {
+  constructor(...args: unknown[]) {
+    if (args.length === 0) super(RealDate.now() + CLOCK_OFFSET);
+    else super(...(args as [string | number]));
+  }
+  static now() { return RealDate.now() + CLOCK_OFFSET; }
+}
+globalThis.Date = PinnedDate as DateConstructor;
+
 const AIR = '2026-11-22';
 let tvmazeDelay = 2500;
 let tvmazeCalls = 0;

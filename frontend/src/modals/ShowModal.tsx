@@ -206,7 +206,7 @@ export default function ShowModal({ selectedShow, closeModal, shows, setShows, i
         {editingMatch && show ? <EditShowMatch showId={show.id} showName={show.name} showPosterURL={show.posterURL || null} currentTmdbId={show.tmdbId ?? null} onCancel={() => setEditingMatch(false)} onApplied={matchApplied} /> : <>
           {matchNotice && <p role="status" className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">{phrase(language, matchNotice)}</p>}
           {show && <div className="flex gap-4 py-6 sm:gap-6">
-            {show.posterURL ? <ProgressPoster src={posterSrc(show.posterURL, "w342")!} percent={summary?.progressPercent ?? null} className="cinema-poster h-36 w-24 shrink-0 rounded-xl sm:h-44 sm:w-30" /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
+            {show.posterURL ? <ProgressPoster src={posterSrc(show.posterURL, "w342")!} percent={summary?.progressPercent ?? null} className="cinema-poster h-36 w-24 shrink-0 rounded-xl sm:h-44 sm:w-30" original={<img src={posterSrc(show.posterURL, "w342")} alt="" className="cinema-poster h-36 w-24 shrink-0 rounded-xl object-cover sm:h-44 sm:w-30" />} /> : <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-xl bg-muted"><Tv /></div>}
             <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wider text-muted-foreground"><T>Personal status</T></span>
                 <div role="group" aria-label={phrase(language, "Personal status")} className="flex flex-wrap rounded-xl border bg-card p-1">
